@@ -27,7 +27,7 @@ INPUT_FILE := input.nml
 ROOT_DIR := .
 SRCS_DIR := $(ROOT_DIR)/src
 APP_DIR := $(ROOT_DIR)/app
-EXE_DIR := $(ROOT_DIR)/run
+EXE_DIR := $(ROOT_DIR)
 CONFIG_DIR := $(ROOT_DIR)/configs
 LIBS_DIR := $(ROOT_DIR)/dependencies
 LIBS :=
@@ -74,7 +74,7 @@ DEPS := $(SRCS_DIR)/.depend.mk
 all: $(EXE)
 
 $(EXE): $(OBJS)
-	@mkdir -p $(EXE_DIR)/data
+#	@mkdir -p $(EXE_DIR)/data
 	$(FC) $(FFLAGS) $^ $(LIBS) $(INCS) -o $(EXE)
 
 run: $(EXE)
@@ -82,9 +82,9 @@ run: $(EXE)
 	@printf "\nDefault input file $(INPUT_FILE) copied to run folder $(EXE_DIR)\n"
 
 # Create object files from Fortran source
+
 $(OBJS): %.o: %
 	$(FC) $(FFLAGS) $(CPP) $(DEFINES) $(INCS) $(FFLAGS_MOD_DIR) $(SRCS_DIR) -c -o $@ $<
-
 # Process the Fortran source for module dependencies
 $(DEPS):
 	@echo '# This file contains the module dependencies' > $(DEPS)
@@ -101,6 +101,26 @@ clean:
 allclean:
 	@make libsclean
 	@make clean
+
+##################################################
+# CPU: USE_NVTX=0
+#MODULES = src/common_mpi.f90 src/types.f90 src/param.f90 src/mom.f90 src/scal.f90 \
+          src/utils.f90 src/fftw.f90 src/fft.f90 src/bound.f90 src/correc.f90 \
+          src/debug.f90 src/fillps.f90 src/solver.f90 src/initgrid.f90 \
+          src/output.f90 src/timer.f90 src/updatep.f90 \
+# GPU: USE_NVTX=0/1
+#MODULES = src/common_mpi.f90 src/types.f90 src/param.f90 src/mom.f90 src/scal.f90 \
+          src/common_cudecomp.f90 src/utils.f90 src/fftw.f90 src/fft.f90 src/bound.f90 src/correc.f90 \
+          src/debug.f90 src/fillps.f90 src/solver.f90 src/initgrid.f90 \
+          src/load.f90 src/output.f90 src/nvtx.f90 src/timer.f90 src/updatep.f90 \
+          src/solver_gpu.f90 src/workspaces.f90 \
+
+# Build rule for object files from MODULES
+#modules: $(MODULES:.f90=.o)
+
+#%.o: %.f90
+#	$(FC) $(FFLAGS) $(CPP) $(DEFINES) $(INCS) $(FFLAGS_MOD_DIR) $(SRCS_DIR) -c -o $@ $<
+#################################################
 #
 # rules for building the external libraries (compile with 'make libs'):
 #
