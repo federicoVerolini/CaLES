@@ -1,6 +1,6 @@
 *.o
 *.d
-src/.depend.mk
+!src/.depend.mk
 *.a
 *.mod
 *.smod
@@ -17,3 +17,4 @@ run/
 src/data/*.*
 run/data/*.*
 !src/data/readme.txt
+tests/
