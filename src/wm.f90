@@ -9,30 +9,30 @@ module mod_wm
   use mod_typedef, only: cond_bound
   implicit none
   private
-  public comput_bcuvw,comput_bcp
+  public comput_bcp
   contains
       !
-  subroutine comput_bcuvw(cbc,n,bc,bcu,bcv,bcw)
-    !
-    ! bcu,bcv,bcw, determined via bcvel or wall model
-    !
-    implicit none
-    character(len=1), intent(in), dimension(0:1,3,3) :: cbc
-    integer , intent(in), dimension(3) :: n
-    real(rp), intent(in), dimension(0:1,3,3) :: bc
-    real(rp), intent(inout), dimension(0:,0:,0:) :: bcu,bcv,bcw
-    !
-    if(.true.) then
-      bcu(:,:,0) = bc(0,3,1)
-      bcv(:,:,0) = bc(0,3,2)
-      bcw(:,:,0) = bc(0,3,3)
-      bcu(:,:,1) = bc(1,3,1)
-      bcv(:,:,1) = bc(1,3,2)
-      bcw(:,:,1) = bc(1,3,3)
-    else !%to be replaced by wall model
-      !
-    end if
-  end subroutine comput_bcuvw
+  ! subroutine comput_bcuvw(cbc,n,bc,bcu,bcv,bcw)
+  !   !
+  !   ! bcu,bcv,bcw, determined via bcvel or wall model
+  !   !
+  !   implicit none
+  !   character(len=1), intent(in), dimension(0:1,3,3) :: cbc
+  !   integer , intent(in), dimension(3) :: n
+  !   real(rp), intent(in), dimension(0:1,3,3) :: bc
+  !   real(rp), intent(inout), dimension(0:,0:,0:) :: bcu,bcv,bcw
+  !   !
+  !   if(.true.) then
+  !     bcu(:,:,0) = bc(0,3,1)
+  !     bcv(:,:,0) = bc(0,3,2)
+  !     bcw(:,:,0) = bc(0,3,3)
+  !     bcu(:,:,1) = bc(1,3,1)
+  !     bcv(:,:,1) = bc(1,3,2)
+  !     bcw(:,:,1) = bc(1,3,3)
+  !   else !%to be replaced by wall model
+  !     !
+  !   end if
+  ! end subroutine comput_bcuvw
   !
   subroutine comput_bcp(cbc,n,bc,is_bound,bcp)
     !

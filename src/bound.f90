@@ -9,7 +9,7 @@ module mod_bound
   use mod_common_mpi, only: ierr,halo,ipencil_axis
   use mod_const
   use mod_typedef   , only: cond_bound
-  use mod_wm        , only: comput_bcp,comput_bcuvw
+  use mod_wm        , only: comput_bcp
   implicit none
   private
   public boundp,bounduvw,updt_rhs_b
@@ -94,6 +94,7 @@ module mod_bound
     real(rp), intent(in), dimension(0:) :: dzc
     real(rp), intent(inout), dimension(0:,0:,0:) :: p
     type(cond_bound) :: bcp
+    real(rp), dimension(:,:) :: bcps
     integer :: idir,nh
     !
     nh = 1
@@ -112,38 +113,40 @@ module mod_bound
     call comput_bcp(cbc,n,bc,is_bound,bcp)
     !
     if(is_bound(0,1)) then
-      call set_bc(cbc(0,1),0,1,nh,.true.,bc(0,1),bcp%x(0,0,0),dl(1),p)
+      call set_bc(cbc(0,1),0,1,nh,.true.,bcp%x,dl(1),p)
     end if
     if(is_bound(1,1)) then
-      call set_bc(cbc(1,1),1,1,nh,.true.,bc(1,1),bcp%x(0,0,1),dl(1),p)
+      call set_bc(cbc(1,1),1,1,nh,.true.,bcp%x,dl(1),p)
     end if
     if(is_bound(0,2)) then
-      call set_bc(cbc(0,2),0,2,nh,.true.,bc(0,2),bcp%y(0,0,0),dl(2),p)
+      call set_bc(cbc(0,2),0,2,nh,.true.,bcp%y,dl(2),p)
      end if
     if(is_bound(1,2)) then
-      call set_bc(cbc(1,2),1,2,nh,.true.,bc(1,2),bcp%y(0,0,1),dl(2),p)
+      call set_bc(cbc(1,2),1,2,nh,.true.,bcp%y,dl(2),p)
     end if
     if(is_bound(0,3)) then
-      call set_bc(cbc(0,3),0,3,nh,.true.,bc(0,3),bcp%z(0,0,0),dzc(0)   ,p)
+      call set_bc(cbc(0,3),0,3,nh,.true.,bcp%z,dzc(0)   ,p)
     end if
     if(is_bound(1,3)) then
-      call set_bc(cbc(1,3),1,3,nh,.true.,bc(1,3),bcp%z(0,0,1),dzc(n(3)),p)
+      call set_bc(cbc(1,3),1,3,nh,.true.,bcp%z,dzc(n(3)),p)
     end if
   end subroutine boundp
   !
-  subroutine set_bc(ctype,ibound,idir,nh,centered,rvalue,rvaluep,dr,p)
+  subroutine set_bc(ctype,ibound,idir,nh,centered,bcps,dr,p)
     implicit none
     character(len=1), intent(in) :: ctype
     integer , intent(in) :: ibound,idir,nh
     logical , intent(in) :: centered
-    real(rp), intent(in), dimension(1-nh:,1-nh:) :: rvaluep   
-    real(rp), intent(in) :: rvalue,dr
-    real(rp), intent(inout), dimension(1-nh:,1-nh:,1-nh:) :: p    !!!!!why?
-    real(rp) :: factor,sgn
+    real(rp), intent(in), dimension(1-nh:,1-nh:,0:) :: bcps !bcps, single direction
+    real(rp), intent(in) :: dr
+    real(rp), intent(inout), dimension(1-nh:,1-nh:,1-nh:) :: p
+    real(rp), allocatable, dimension(:,:) :: factor
+    real(rp) :: sgn
     integer  :: n,dh
     !
     n = size(p,idir) - 2*nh
-    factor = rvalue
+    allocate(factor(size(bcps,1),size(bcps,2)))
+    factor = bcps(:,:,ibound)
     if(ctype == 'D'.and.centered) then
       factor = 2.*factor
       sgn    = -1.
@@ -332,7 +335,7 @@ module mod_bound
               !$acc kernels default(present) async(1)
               !$OMP PARALLEL WORKSHARE
               !p(:,:,n) = 1./3.*(-2.*factor+4.*p(:,:,n-1)-p(:,:,n-2))
-              p(:,:,n+1) = p(:,:,n) ! unused
+              p(:,:,n+1) = p(:,:,n)
               p(:,:,n+dh) = 1.*factor + p(:,:,n-1-dh)
               !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
