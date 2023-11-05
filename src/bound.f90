@@ -9,7 +9,7 @@ module mod_bound
   use mod_common_mpi, only: ierr,halo,ipencil_axis
   use mod_const
   use mod_typedef   , only: cond_bound
-  use mod_wm        , only: comput_bcp
+  use mod_wm        , only: comput_bcuvw,comput_bcp
   implicit none
   private
   public boundp,bounduvw,updt_rhs_b
@@ -28,6 +28,7 @@ module mod_bound
     real(rp), intent(in), dimension(3 ) :: dl
     real(rp), intent(in), dimension(0:) :: dzc,dzf
     real(rp), intent(inout), dimension(0:,0:,0:) :: u,v,w
+    type(cond_bound) :: bcu,bcv,bcw
     logical :: impose_norm_bc
     integer :: idir,nh
     !
@@ -45,38 +46,49 @@ module mod_bound
     call updthalo_gpu(nh,cbc(0,:,3)//cbc(1,:,3)==['PP','PP','PP'],w)
 #endif
     !
+    allocate(bcu%x(0:n(2)+1,0:n(3)+1,0:1), &
+             bcv%x(0:n(2)+1,0:n(3)+1,0:1), &
+             bcw%x(0:n(2)+1,0:n(3)+1,0:1), &
+             bcu%y(0:n(1)+1,0:n(3)+1,0:1), &
+             bcv%y(0:n(1)+1,0:n(3)+1,0:1), &
+             bcw%y(0:n(1)+1,0:n(3)+1,0:1), &
+             bcu%z(0:n(1)+1,0:n(2)+1,0:1), &
+             bcv%z(0:n(1)+1,0:n(2)+1,0:1), &
+             bcw%z(0:n(1)+1,0:n(2)+1,0:1))
+    call comput_bcuvw(cbc,n,bc,is_bound,bcu,bcv,bcw)
+    !
     impose_norm_bc = (.not.is_correc).or.(cbc(0,1,1)//cbc(1,1,1) == 'PP')
     if(is_bound(0,1)) then
-      if(impose_norm_bc) call set_bc(cbc(0,1,1),0,1,nh,.false.,bc(0,1,1),dl(1),u)
-                         call set_bc(cbc(0,1,2),0,1,nh,.true. ,bc(0,1,2),dl(1),v)
-                         call set_bc(cbc(0,1,3),0,1,nh,.true. ,bc(0,1,3),dl(1),w)
+      if(impose_norm_bc) call set_bc(cbc(0,1,1),0,1,nh,.false.,bcu%x,dl(1),u)
+                         call set_bc(cbc(0,1,2),0,1,nh,.true. ,bcv%x,dl(1),v)
+                         call set_bc(cbc(0,1,3),0,1,nh,.true. ,bcw%x,dl(1),w)
     end if
     if(is_bound(1,1)) then
-      if(impose_norm_bc) call set_bc(cbc(1,1,1),1,1,nh,.false.,bc(1,1,1),dl(1),u)
-                         call set_bc(cbc(1,1,2),1,1,nh,.true. ,bc(1,1,2),dl(1),v)
-                         call set_bc(cbc(1,1,3),1,1,nh,.true. ,bc(1,1,3),dl(1),w)
+      if(impose_norm_bc) call set_bc(cbc(1,1,1),1,1,nh,.false.,bcu%x,dl(1),u)
+                         call set_bc(cbc(1,1,2),1,1,nh,.true. ,bcv%x,dl(1),v)
+                         call set_bc(cbc(1,1,3),1,1,nh,.true. ,bcw%x,dl(1),w)
     end if
     impose_norm_bc = (.not.is_correc).or.(cbc(0,2,2)//cbc(1,2,2) == 'PP')
     if(is_bound(0,2)) then
-                         call set_bc(cbc(0,2,1),0,2,nh,.true. ,bc(0,2,1),dl(2),u)
-      if(impose_norm_bc) call set_bc(cbc(0,2,2),0,2,nh,.false.,bc(0,2,2),dl(2),v)
-                         call set_bc(cbc(0,2,3),0,2,nh,.true. ,bc(0,2,3),dl(2),w)
+                         call set_bc(cbc(0,2,1),0,2,nh,.true. ,bcu%y,dl(2),u)
+      if(impose_norm_bc) call set_bc(cbc(0,2,2),0,2,nh,.false.,bcv%y,dl(2),v)
+                         call set_bc(cbc(0,2,3),0,2,nh,.true. ,bcw%y,dl(2),w)
      end if
     if(is_bound(1,2)) then
-                         call set_bc(cbc(1,2,1),1,2,nh,.true. ,bc(1,2,1),dl(2),u)
-      if(impose_norm_bc) call set_bc(cbc(1,2,2),1,2,nh,.false.,bc(1,2,2),dl(2),v)
-                         call set_bc(cbc(1,2,3),1,2,nh,.true. ,bc(1,2,3),dl(2),w)
+                         call set_bc(cbc(1,2,1),1,2,nh,.true. ,bcu%y,dl(2),u)
+      if(impose_norm_bc) call set_bc(cbc(1,2,2),1,2,nh,.false.,bcv%y,dl(2),v)
+                         call set_bc(cbc(1,2,3),1,2,nh,.true. ,bcw%y,dl(2),w)
     end if
     impose_norm_bc = (.not.is_correc).or.(cbc(0,3,3)//cbc(1,3,3) == 'PP')
     if(is_bound(0,3)) then
-                         call set_bc(cbc(0,3,1),0,3,nh,.true. ,bc(0,3,1),dzc(0)   ,u)
-                         call set_bc(cbc(0,3,2),0,3,nh,.true. ,bc(0,3,2),dzc(0)   ,v)
-      if(impose_norm_bc) call set_bc(cbc(0,3,3),0,3,nh,.false.,bc(0,3,3),dzf(0)   ,w)
+                         call set_bc(cbc(0,3,1),0,3,nh,.true. ,bcu%z,dzc(0)   ,u)
+                         call set_bc(cbc(0,3,2),0,3,nh,.true. ,bcv%z,dzc(0)   ,v)
+      if(impose_norm_bc) call set_bc(cbc(0,3,3),0,3,nh,.false.,bcw%z,dzf(0)   ,w)
     end if
     if(is_bound(1,3)) then
-                         call set_bc(cbc(1,3,1),1,3,nh,.true. ,bc(1,3,1),dzc(n(3)),u)
-                         call set_bc(cbc(1,3,2),1,3,nh,.true. ,bc(1,3,2),dzc(n(3)),v)
-      if(impose_norm_bc) call set_bc(cbc(1,3,3),1,3,nh,.false.,bc(1,3,3),dzf(n(3)),w)
+                         call set_bc(cbc(1,3,1),1,3,nh,.true. ,bcu%z,dzc(n(3)),u)
+                         call set_bc(cbc(1,3,2),1,3,nh,.true. ,bcv%z,dzc(n(3)),v)
+      if(impose_norm_bc) call set_bc(cbc(1,3,3),1,3,nh,.false.,bcw%z,dzf(n(3)),w)
     end if
   end subroutine bounduvw
   !
@@ -94,7 +106,6 @@ module mod_bound
     real(rp), intent(in), dimension(0:) :: dzc
     real(rp), intent(inout), dimension(0:,0:,0:) :: p
     type(cond_bound) :: bcp
-    real(rp), dimension(:,:) :: bcps
     integer :: idir,nh
     !
     nh = 1
@@ -145,7 +156,8 @@ module mod_bound
     integer  :: n,dh
     !
     n = size(p,idir) - 2*nh
-    allocate(factor(size(bcps,1),size(bcps,2)))
+    allocate(factor(0:size(bcps,1)-1, &
+                    0:size(bcps,2)-1))
     factor = bcps(:,:,ibound)
     if(ctype == 'D'.and.centered) then
       factor = 2.*factor

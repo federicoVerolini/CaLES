@@ -9,30 +9,55 @@ module mod_wm
   use mod_typedef, only: cond_bound
   implicit none
   private
-  public comput_bcp
+  public comput_bcuvw,comput_bcp
   contains
       !
-  ! subroutine comput_bcuvw(cbc,n,bc,bcu,bcv,bcw)
-  !   !
-  !   ! bcu,bcv,bcw, determined via bcvel or wall model
-  !   !
-  !   implicit none
-  !   character(len=1), intent(in), dimension(0:1,3,3) :: cbc
-  !   integer , intent(in), dimension(3) :: n
-  !   real(rp), intent(in), dimension(0:1,3,3) :: bc
-  !   real(rp), intent(inout), dimension(0:,0:,0:) :: bcu,bcv,bcw
-  !   !
-  !   if(.true.) then
-  !     bcu(:,:,0) = bc(0,3,1)
-  !     bcv(:,:,0) = bc(0,3,2)
-  !     bcw(:,:,0) = bc(0,3,3)
-  !     bcu(:,:,1) = bc(1,3,1)
-  !     bcv(:,:,1) = bc(1,3,2)
-  !     bcw(:,:,1) = bc(1,3,3)
-  !   else !%to be replaced by wall model
-  !     !
-  !   end if
-  ! end subroutine comput_bcuvw
+  subroutine comput_bcuvw(cbc,n,bc,is_bound,bcu,bcv,bcw)
+    !
+    ! bcu,bcv,bcw, determined via bcvel or wall model
+    !
+    implicit none
+    character(len=1), intent(in), dimension(0:1,3,3) :: cbc
+    integer , intent(in), dimension(3) :: n
+    real(rp), intent(in), dimension(0:1,3,3) :: bc
+    logical , intent(in), dimension(0:1,3) :: is_bound
+    type(cond_bound), intent(out) :: bcu,bcv,bcw
+    !
+    if(.true.) then
+      if(is_bound(0,1)) then
+        bcu%x(:,:,0) = bc(0,1,1)
+        bcv%x(:,:,0) = bc(0,1,2)
+        bcw%x(:,:,0) = bc(0,1,3)
+      end if
+      if(is_bound(1,1)) then
+        bcu%x(:,:,1) = bc(1,1,1)
+        bcv%x(:,:,1) = bc(1,1,2)
+        bcw%x(:,:,1) = bc(1,1,3)
+      end if
+      if(is_bound(0,2)) then
+        bcu%y(:,:,0) = bc(0,2,1)
+        bcv%y(:,:,0) = bc(0,2,2)
+        bcw%y(:,:,0) = bc(0,2,3)
+      end if
+      if(is_bound(1,2)) then
+        bcu%y(:,:,1) = bc(1,2,1)
+        bcv%y(:,:,1) = bc(1,2,2)
+        bcw%y(:,:,1) = bc(1,2,3)
+      end if
+      if(is_bound(0,3)) then
+        bcu%z(:,:,0) = bc(0,3,1)
+        bcv%z(:,:,0) = bc(0,3,2)
+        bcw%z(:,:,0) = bc(0,3,3)
+      end if
+      if(is_bound(1,3)) then
+        bcu%z(:,:,1) = bc(1,3,1)
+        bcv%z(:,:,1) = bc(1,3,2)
+        bcw%z(:,:,1) = bc(1,3,3)
+      end if
+    else
+      !
+    end if
+  end subroutine comput_bcuvw
   !
   subroutine comput_bcp(cbc,n,bc,is_bound,bcp)
     !
