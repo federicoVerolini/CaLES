@@ -6,7 +6,7 @@
 ! -
 module mod_workspaces
 #if defined(_OPENACC)
-  use mod_types
+  use mod_const
   use mod_common_cudecomp, only: work,work_cuda,work_halo,work_halo_cuda
   use mod_utils, only: f_sizeof
   implicit none

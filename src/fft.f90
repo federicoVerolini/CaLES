@@ -8,7 +8,7 @@ module mod_fft
   use, intrinsic :: iso_c_binding , only: C_INT
   use mod_common_mpi, only: ierr
   use mod_fftw_param
-  use mod_types
+  use mod_const
 #if defined(_OPENACC)
   use mod_utils     , only: f_sizeof
 #endif

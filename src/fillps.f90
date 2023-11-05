@@ -5,7 +5,7 @@
 !
 ! -
 module mod_fillps
-  use mod_types
+  use mod_const
   implicit none
   private
   public fillps

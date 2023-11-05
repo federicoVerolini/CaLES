@@ -5,7 +5,7 @@
 !
 ! -
 module mod_correc
-  use mod_types
+  use mod_const
   implicit none
   private
   public correc

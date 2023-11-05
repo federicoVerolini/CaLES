@@ -7,7 +7,9 @@
 module mod_bound
   use mpi
   use mod_common_mpi, only: ierr,halo,ipencil_axis
-  use mod_types
+  use mod_const
+  use mod_typedef   , only: cond_bound
+  use mod_wm        , only: comput_bcp,comput_bcuvw
   implicit none
   private
   public boundp,bounduvw,updt_rhs_b
@@ -91,6 +93,7 @@ module mod_bound
     real(rp), intent(in), dimension(3 ) :: dl
     real(rp), intent(in), dimension(0:) :: dzc
     real(rp), intent(inout), dimension(0:,0:,0:) :: p
+    type(cond_bound) :: bcp
     integer :: idir,nh
     !
     nh = 1
@@ -103,33 +106,39 @@ module mod_bound
     call updthalo_gpu(nh,cbc(0,:)//cbc(1,:)==['PP','PP','PP'],p)
 #endif
     !
+    allocate(bcp%x(0:n(2)+1,0:n(3)+1,0:1), &
+             bcp%y(0:n(1)+1,0:n(3)+1,0:1), &
+             bcp%z(0:n(1)+1,0:n(2)+1,0:1))
+    call comput_bcp(cbc,n,bc,is_bound,bcp)
+    !
     if(is_bound(0,1)) then
-      call set_bc(cbc(0,1),0,1,nh,.true.,bc(0,1),dl(1),p)
+      call set_bc(cbc(0,1),0,1,nh,.true.,bc(0,1),bcp%x(0,0,0),dl(1),p)
     end if
     if(is_bound(1,1)) then
-      call set_bc(cbc(1,1),1,1,nh,.true.,bc(1,1),dl(1),p)
+      call set_bc(cbc(1,1),1,1,nh,.true.,bc(1,1),bcp%x(0,0,1),dl(1),p)
     end if
     if(is_bound(0,2)) then
-      call set_bc(cbc(0,2),0,2,nh,.true.,bc(0,2),dl(2),p)
+      call set_bc(cbc(0,2),0,2,nh,.true.,bc(0,2),bcp%y(0,0,0),dl(2),p)
      end if
     if(is_bound(1,2)) then
-      call set_bc(cbc(1,2),1,2,nh,.true.,bc(1,2),dl(2),p)
+      call set_bc(cbc(1,2),1,2,nh,.true.,bc(1,2),bcp%y(0,0,1),dl(2),p)
     end if
     if(is_bound(0,3)) then
-      call set_bc(cbc(0,3),0,3,nh,.true.,bc(0,3),dzc(0)   ,p)
+      call set_bc(cbc(0,3),0,3,nh,.true.,bc(0,3),bcp%z(0,0,0),dzc(0)   ,p)
     end if
     if(is_bound(1,3)) then
-      call set_bc(cbc(1,3),1,3,nh,.true.,bc(1,3),dzc(n(3)),p)
+      call set_bc(cbc(1,3),1,3,nh,.true.,bc(1,3),bcp%z(0,0,1),dzc(n(3)),p)
     end if
   end subroutine boundp
   !
-  subroutine set_bc(ctype,ibound,idir,nh,centered,rvalue,dr,p)
+  subroutine set_bc(ctype,ibound,idir,nh,centered,rvalue,rvaluep,dr,p)
     implicit none
     character(len=1), intent(in) :: ctype
     integer , intent(in) :: ibound,idir,nh
     logical , intent(in) :: centered
+    real(rp), intent(in), dimension(1-nh:,1-nh:) :: rvaluep   
     real(rp), intent(in) :: rvalue,dr
-    real(rp), intent(inout), dimension(1-nh:,1-nh:,1-nh:) :: p
+    real(rp), intent(inout), dimension(1-nh:,1-nh:,1-nh:) :: p    !!!!!why?
     real(rp) :: factor,sgn
     integer  :: n,dh
     !
@@ -529,7 +538,7 @@ module mod_bound
   end subroutine updthalo
 #if defined(_OPENACC)
   subroutine updthalo_gpu(nh,periods,p)
-    use mod_types
+    use mod_const
     use cudecomp
     use mod_common_cudecomp, only: work => work_halo, &
                                    ch => handle,gd => gd_halo, &

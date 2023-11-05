@@ -5,7 +5,7 @@
 !
 ! -
 module mod_scal
-  use mod_types
+  use mod_const
   implicit none
   private
   public scal,cmpt_scalflux

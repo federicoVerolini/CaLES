@@ -24,7 +24,7 @@ module mod_sanity
 #else
   use mod_solver_gpu, only: solver => solver_gpu
 #endif
-  use mod_types
+  use mod_const
   implicit none
   private
   public test_sanity_input,test_sanity_solver

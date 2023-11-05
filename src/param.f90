@@ -5,7 +5,7 @@
 !
 ! -
 module mod_param
-use mod_types
+use mod_const
 !@acc use cudecomp
 implicit none
 public

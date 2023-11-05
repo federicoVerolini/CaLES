@@ -8,7 +8,7 @@ module mod_initflow
   use mpi
   use mod_common_mpi, only: ierr,myid
   use mod_param     , only: pi
-  use mod_types
+  use mod_const
   implicit none
   private
   public initflow,add_noise

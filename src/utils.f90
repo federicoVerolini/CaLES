@@ -15,7 +15,7 @@ contains
     ! compute the mean value of an observable over the entire domain
     !
     use mpi
-    use mod_types
+    use mod_const
     implicit none
     integer , intent(in), dimension(3) :: n
     real(rp), intent(in), dimension(0:) :: grid_vol_ratio
@@ -47,7 +47,7 @@ contains
     isize = storage_size(val)/8
   end function f_sizeof
   subroutine swap(arr1,arr2)
-    use mod_types, only: rp
+    use mod_const, only: rp
     implicit none
     real(rp), intent(inout), pointer, contiguous, dimension(:,:,:) :: arr1,arr2
     real(rp),                pointer, contiguous, dimension(:,:,:) :: tmp
@@ -60,7 +60,7 @@ contains
     !
     ! estimate GPU memory footprint, assuming one MPI task <-> one GPU
     !
-    use mod_types, only: i8,rp
+    use mod_const, only: i8,rp
     integer, intent(in), dimension(3) :: n,n_z
     integer :: nh(3)
     integer(i8) :: itotal,itemp,rp_size

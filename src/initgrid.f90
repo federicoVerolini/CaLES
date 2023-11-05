@@ -6,7 +6,7 @@
 ! -
 module mod_initgrid
   use mod_param, only:pi
-  use mod_types
+  use mod_const
   implicit none
   private
   public initgrid

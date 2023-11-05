@@ -8,7 +8,7 @@ module mod_output
   use mpi
   use decomp_2d_io
   use mod_common_mpi, only:ierr,myid
-  use mod_types
+  use mod_const
   implicit none
   private
   public out0d,gen_alias,out1d,out1d_chan,out2d,out3d,write_log_output,write_visu_2d,write_visu_3d

@@ -5,7 +5,7 @@
 !
 ! -
 module mod_post
-  use mod_types
+  use mod_const
   implicit none
   private
   public vorticity,rotation_rate,strain_rate,q_criterion

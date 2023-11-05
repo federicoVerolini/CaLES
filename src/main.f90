@@ -80,7 +80,7 @@ program cans
   use mod_updatep        , only: updatep
   use mod_utils          , only: bulk_mean
   !@acc use mod_utils    , only: device_memory_footprint
-  use mod_types
+  use mod_const
   use omp_lib
   implicit none
   integer , dimension(3) :: lo,hi,n,n_x_fft,n_y_fft,lo_z,hi_z,n_z

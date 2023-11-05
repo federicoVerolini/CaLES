@@ -8,7 +8,7 @@ module mod_solver
   use, intrinsic :: iso_c_binding, only: C_PTR
   use decomp_2d
   use mod_fft   , only: fft
-  use mod_types
+  use mod_const
   implicit none
   private
   public solver

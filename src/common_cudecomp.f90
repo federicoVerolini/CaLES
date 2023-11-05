@@ -6,7 +6,7 @@
 ! -
 module mod_common_cudecomp
 #if defined(_OPENACC)
-  use mod_types
+  use mod_const
   !@cuf use cudafor
   use cudecomp
   use openacc
