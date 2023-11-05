@@ -12,7 +12,7 @@
 *dSYM
 *.xdmf
 *.xmf
-cans
+cans*
 run/
 src/data/*.*
 run/data/*.*
