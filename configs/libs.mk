@@ -1,4 +1,4 @@
-override LIBS += -L$(LIBS_DIR)/2decomp-fft -ldecomp2d -L/home/mchao/opt/fftw3/fftw-3.3.10/lib -lfftw3
+override LIBS += -L$(LIBS_DIR)/2decomp-fft -ldecomp2d -L/home/soaringxmc/opt/fftw3/fftw-3.3.10/lib -lfftw3
 override INCS += -I$(LIBS_DIR)/2decomp-fft/mod
 
 ifeq ($(strip $(GPU)),1)
