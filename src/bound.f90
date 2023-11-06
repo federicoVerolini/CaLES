@@ -159,6 +159,7 @@ module mod_bound
     allocate(factor(0:size(bcps,1)-1, &
                     0:size(bcps,2)-1))
     factor = bcps(:,:,ibound)
+    if(any(factor(:,:) /= 0.)) print*, 'ibound=',ibound,'idir=',idir
     if(ctype == 'D'.and.centered) then
       factor = 2.*factor
       sgn    = -1.

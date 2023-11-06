@@ -23,6 +23,16 @@ module mod_wm
     logical , intent(in), dimension(0:1,3) :: is_bound
     type(cond_bound), intent(out) :: bcu,bcv,bcw
     !
+    allocate(bcu%x(0:n(2)+1,0:n(3)+1,0:1), &
+             bcv%x(0:n(2)+1,0:n(3)+1,0:1), &
+             bcw%x(0:n(2)+1,0:n(3)+1,0:1), &
+             bcu%y(0:n(1)+1,0:n(3)+1,0:1), &
+             bcv%y(0:n(1)+1,0:n(3)+1,0:1), &
+             bcw%y(0:n(1)+1,0:n(3)+1,0:1), &
+             bcu%z(0:n(1)+1,0:n(2)+1,0:1), &
+             bcv%z(0:n(1)+1,0:n(2)+1,0:1), &
+             bcw%z(0:n(1)+1,0:n(2)+1,0:1))
+    !
     if(.true.) then
       if(is_bound(0,1)) then
         bcu%x(:,:,0) = bc(0,1,1)
@@ -69,6 +79,10 @@ module mod_wm
     real(rp), intent(in), dimension(0:1,3) :: bc
     logical , intent(in), dimension(0:1,3) :: is_bound
     type(cond_bound), intent(out) :: bcp
+    !
+    allocate(bcp%x(0:n(2)+1,0:n(3)+1,0:1), &
+             bcp%y(0:n(1)+1,0:n(3)+1,0:1), &
+             bcp%z(0:n(1)+1,0:n(2)+1,0:1))
     !
     if(is_bound(0,1)) bcp%x(:,:,0) = bc(0,1)
     if(is_bound(1,1)) bcp%x(:,:,1) = bc(1,1)

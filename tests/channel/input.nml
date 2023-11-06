@@ -6,7 +6,7 @@ cfl = 0.95, dtmin = 1.e5
 visci = 100.
 inivel = 'poi'
 is_wallturb = T
-nstep = 2, time_max = 100., tw_max = 0.1
+nstep = 10, time_max = 100., tw_max = 0.1
 stop_type(1:3) = T, F, F
 restart = F, is_overwrite_save = T, nsaves_max = 0
 icheck = 1, iout0d = 1, iout1d = 1, iout2d = 1, iout3d = 1, isave = 1
@@ -14,10 +14,10 @@ cbcvel(0:1,1:3,1) = 'P','P',  'P','P',  'D','D'
 cbcvel(0:1,1:3,2) = 'P','P',  'P','P',  'D','D'
 cbcvel(0:1,1:3,3) = 'P','P',  'P','P',  'D','D'
 cbcpre(0:1,1:3)   = 'P','P',  'P','P',  'N','N'
-bcvel(0:1,1:3,1) =  0.,0.,   0.,0.,   0.,0.
-bcvel(0:1,1:3,2) =  0.,0.,   0.,0.,   0.,0.
+bcvel(0:1,1:3,1) =  0.,0.,   0.,0.,   1.,2.
+bcvel(0:1,1:3,2) =  0.,0.,   0.,0.,   3.,4.
 bcvel(0:1,1:3,3) =  0.,0.,   0.,0.,   0.,0.
-bcpre(0:1,1:3  ) =  0.,0.,   0.,0.,   0.,0.
+bcpre(0:1,1:3  ) =  0.,0.,   0.,0.,   1.,2.
 bforce(1:3) = 0., 0., 0.
 is_forced(1:3) = T, F, F
 velf(1:3) = 1., 0., 0.
