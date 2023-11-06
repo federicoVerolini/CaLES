@@ -46,6 +46,8 @@ module mod_bound
     call updthalo_gpu(nh,cbc(0,:,3)//cbc(1,:,3)==['PP','PP','PP'],w)
 #endif
     !
+    !this part can be put in main as long as updthalo is not needed by wall model
+    !need to check staggered grid
     allocate(bcu%x(0:n(2)+1,0:n(3)+1,0:1), &
              bcv%x(0:n(2)+1,0:n(3)+1,0:1), &
              bcw%x(0:n(2)+1,0:n(3)+1,0:1), &
@@ -55,7 +57,7 @@ module mod_bound
              bcu%z(0:n(1)+1,0:n(2)+1,0:1), &
              bcv%z(0:n(1)+1,0:n(2)+1,0:1), &
              bcw%z(0:n(1)+1,0:n(2)+1,0:1))
-    call comput_bcuvw(cbc,n,bc,is_bound,bcu,bcv,bcw)
+    call comput_bcuvw(cbc,n,bc,is_bound,u,v,w,bcu,bcv,bcw)
     !
     impose_norm_bc = (.not.is_correc).or.(cbc(0,1,1)//cbc(1,1,1) == 'PP')
     if(is_bound(0,1)) then
@@ -143,12 +145,12 @@ module mod_bound
     end if
   end subroutine boundp
   !
-  subroutine set_bc(ctype,ibound,idir,nh,centered,bcps,dr,p)
+  subroutine set_bc(ctype,ibound,idir,nh,centered,bcval,dr,p)
     implicit none
     character(len=1), intent(in) :: ctype
     integer , intent(in) :: ibound,idir,nh
     logical , intent(in) :: centered
-    real(rp), intent(in), dimension(1-nh:,1-nh:,0:) :: bcps !bcps, single direction
+    real(rp), intent(in), dimension(1-nh:,1-nh:,0:) :: bcval !bcval, two faces
     real(rp), intent(in) :: dr
     real(rp), intent(inout), dimension(1-nh:,1-nh:,1-nh:) :: p
     real(rp), allocatable, dimension(:,:) :: factor
@@ -156,10 +158,9 @@ module mod_bound
     integer  :: n,dh
     !
     n = size(p,idir) - 2*nh
-    allocate(factor(0:size(bcps,1)-1, &
-                    0:size(bcps,2)-1))
-    factor = bcps(:,:,ibound)
-    if(any(factor(:,:) /= 0.)) print*, 'ibound=',ibound,'idir=',idir
+    allocate(factor(0:size(bcval,1)-1, &
+                    0:size(bcval,2)-1))
+    factor = bcval(:,:,ibound)
     if(ctype == 'D'.and.centered) then
       factor = 2.*factor
       sgn    = -1.
