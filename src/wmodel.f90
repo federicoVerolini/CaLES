@@ -24,7 +24,7 @@ module mod_wm
     real(rp), intent(in), dimension(0:,0:,0:) :: u,v,w
     type(cond_bound), intent(inout) :: bcu,bcv,bcw
     !
-    if(.true.) then
+    if(.false.) then
       if(is_bound(0,1)) then
         if(cbc(0,1,1)/='P') bcu%x(:,:,0) = bc(0,1,1)
         if(cbc(0,1,2)/='P') bcv%x(:,:,0) = bc(0,1,2)
@@ -77,14 +77,14 @@ module mod_wm
         if(cbc(1,2,3)/='P') bcw%y(:,:,1) = bc(1,2,3)
       end if
       if(is_bound(0,3)) then
-        if(cbc(0,3,1)/='P') bcu%z(:,:,0) = -0.01*u(:,:,1   )
-        if(cbc(0,3,2)/='P') bcv%z(:,:,0) = -0.01*v(:,:,1   )
-        if(cbc(0,3,3)/='P') bcw%z(:,:,0) =  0.
+        if(cbc(0,3,1)/='P') bcu%z(:,:,0) = -1.*u(:,:,1   )
+        if(cbc(0,3,2)/='P') bcv%z(:,:,0) = -v(:,:,1   )
+        if(cbc(0,3,3)/='P') bcw%z(:,:,0) =  w(:,:,1   )
       end if
       if(is_bound(1,3)) then
-        if(cbc(1,3,1)/='P') bcu%z(:,:,1) = -0.01*u(:,:,n(3))
-        if(cbc(1,3,2)/='P') bcv%z(:,:,1) = -0.01*v(:,:,n(3))
-        if(cbc(1,3,3)/='P') bcw%z(:,:,1) =  0.
+        if(cbc(1,3,1)/='P') bcu%z(:,:,1) = -1.*u(:,:,n(3))
+        if(cbc(1,3,2)/='P') bcv%z(:,:,1) = -v(:,:,n(3))
+        if(cbc(1,3,3)/='P') bcw%z(:,:,1) =  w(:,:,n(3))
       end if
     end if
     !

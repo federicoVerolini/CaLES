@@ -34,6 +34,17 @@ module mod_bound
     !
     nh = 1
     !
+    allocate(bcu%x(0:n(2)+1,0:n(3)+1,0:1), &
+    bcv%x(0:n(2)+1,0:n(3)+1,0:1), &
+    bcw%x(0:n(2)+1,0:n(3)+1,0:1), &
+    bcu%y(0:n(1)+1,0:n(3)+1,0:1), &
+    bcv%y(0:n(1)+1,0:n(3)+1,0:1), &
+    bcw%y(0:n(1)+1,0:n(3)+1,0:1), &
+    bcu%z(0:n(1)+1,0:n(2)+1,0:1), &
+    bcv%z(0:n(1)+1,0:n(2)+1,0:1), &
+    bcw%z(0:n(1)+1,0:n(2)+1,0:1))
+    call comput_bcuvw(cbc,n,bc,is_bound,u,v,w,bcu,bcv,bcw)
+    !
 #if !defined(_OPENACC)
     do idir = 1,3
       call updthalo(nh,halo(idir),nb(:,idir),idir,u)
@@ -48,16 +59,16 @@ module mod_bound
     !
     !this part can be put in main as long as updthalo is not needed by wall model
     !need to check staggered grid
-    allocate(bcu%x(0:n(2)+1,0:n(3)+1,0:1), &
-             bcv%x(0:n(2)+1,0:n(3)+1,0:1), &
-             bcw%x(0:n(2)+1,0:n(3)+1,0:1), &
-             bcu%y(0:n(1)+1,0:n(3)+1,0:1), &
-             bcv%y(0:n(1)+1,0:n(3)+1,0:1), &
-             bcw%y(0:n(1)+1,0:n(3)+1,0:1), &
-             bcu%z(0:n(1)+1,0:n(2)+1,0:1), &
-             bcv%z(0:n(1)+1,0:n(2)+1,0:1), &
-             bcw%z(0:n(1)+1,0:n(2)+1,0:1))
-    call comput_bcuvw(cbc,n,bc,is_bound,u,v,w,bcu,bcv,bcw)
+    ! allocate(bcu%x(0:n(2)+1,0:n(3)+1,0:1), &
+    !          bcv%x(0:n(2)+1,0:n(3)+1,0:1), &
+    !          bcw%x(0:n(2)+1,0:n(3)+1,0:1), &
+    !          bcu%y(0:n(1)+1,0:n(3)+1,0:1), &
+    !          bcv%y(0:n(1)+1,0:n(3)+1,0:1), &
+    !          bcw%y(0:n(1)+1,0:n(3)+1,0:1), &
+    !          bcu%z(0:n(1)+1,0:n(2)+1,0:1), &
+    !          bcv%z(0:n(1)+1,0:n(2)+1,0:1), &
+    !          bcw%z(0:n(1)+1,0:n(2)+1,0:1))
+    ! call comput_bcuvw(cbc,n,bc,is_bound,u,v,w,bcu,bcv,bcw)
     !
     impose_norm_bc = (.not.is_correc).or.(cbc(0,1,1)//cbc(1,1,1) == 'PP')
     if(is_bound(0,1)) then
@@ -349,7 +360,7 @@ module mod_bound
               !$acc kernels default(present) async(1)
               !$OMP PARALLEL WORKSHARE
               !p(:,:,n) = 1./3.*(-2.*factor+4.*p(:,:,n-1)-p(:,:,n-2))
-              p(:,:,n+1) = p(:,:,n)
+              p(:,:,n+1) = p(:,:,n)! unused
               p(:,:,n+dh) = 1.*factor + p(:,:,n-1-dh)
               !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
