@@ -12,12 +12,13 @@
 *dSYM
 *.xdmf
 *.xmf
-*.nml
 cans*
 run/
 src/data/*.*
 run/data/*.*
 !src/data/readme.txt
 tests/
-build.conf
 docs/
+build/
+build.conf
+Makefile
