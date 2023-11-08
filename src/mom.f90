@@ -751,8 +751,8 @@ module mod_mom
           !
           uuip  = 0.25*(u_pcc+u_ccc)*(u_pcc+u_ccc)
           uuim  = 0.25*(u_mcc+u_ccc)*(u_mcc+u_ccc)
-          uvjp  = 0.25*(u_cpc+u_ccc)*(v_pcc+v_ccc)
-          uvjm  = 0.25*(u_cmc+u_ccc)*(v_pmc+v_cmc)
+          uvjp  = 0.25*(u_cpc+u_ccc)*(v_pcc+v_ccc) !0.25*(u(i,j+1)+u(i,j))*(v(i+1,j)*v(i,j,k))
+          uvjm  = 0.25*(u_cmc+u_ccc)*(v_pmc+v_cmc) !0.25*(u(i,j-1)+u(i,j))*(v(i+1,j-1)*v(i,j-1))
           uwkp  = 0.25*(u_ccp+u_ccc)*(w_pcc+w_ccc)
           uwkm  = 0.25*(u_ccm+u_ccc)*(w_pcm+w_ccm)
           !
@@ -777,7 +777,7 @@ module mod_mom
           !
           ! y advection
           !
-          uvip  = 0.25*(v_ccc+v_pcc)*(u_ccc+u_cpc)
+          uvip  = 0.25*(v_ccc+v_pcc)*(u_ccc+u_cpc) !0.25*(v(i,j,k)+v(i+1,j,k))*(u(i,j,k)*u(i,j+1,k))
           uvim  = 0.25*(v_ccc+v_mcc)*(u_mcc+u_mpc)
           vvjp  = 0.25*(v_ccc+v_cpc)*(v_ccc+v_cpc)
           vvjm  = 0.25*(v_ccc+v_cmc)*(v_ccc+v_cmc)

@@ -181,6 +181,7 @@ module mod_initmpi
     do l=1,3
       call makehalo(l,1,n(:),halo(l))
     end do
+    print*,halo(:)
     nb(:,ipencil) = MPI_PROC_NULL
     call MPI_CART_SHIFT(comm_cart,0,1,nb(0,ipencil_t(1)),nb(1,ipencil_t(1)),ierr)
     call MPI_CART_SHIFT(comm_cart,1,1,nb(0,ipencil_t(2)),nb(1,ipencil_t(2)),ierr)
@@ -198,11 +199,14 @@ module mod_initmpi
     select case(idir)
     case(1)
       call MPI_TYPE_VECTOR(nn(2)*nn(3),nh            ,nn(1)            ,MPI_REAL_RP,halo,ierr)
+      print*, nn(2)*nn(3),nh,nn(1)
     case(2)
       call MPI_TYPE_VECTOR(      nn(3),nh*nn(1)      ,nn(1)*nn(2)      ,MPI_REAL_RP,halo,ierr)
+      print*, nn(3),nh*nn(1),nn(1)*nn(2)
     case(3)
       call MPI_TYPE_VECTOR(          1,nh*nn(1)*nn(2),nn(1)*nn(2)*nn(3),MPI_REAL_RP,halo,ierr)
     end select
     call MPI_TYPE_COMMIT(halo,ierr)
+    !number of blocks, number of elements in each block, displacement between the blocks
   end subroutine makehalo
 end module mod_initmpi

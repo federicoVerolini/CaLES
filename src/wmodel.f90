@@ -24,7 +24,7 @@ module mod_wm
     real(rp), intent(in), dimension(0:,0:,0:) :: u,v,w
     type(cond_bound), intent(inout) :: bcu,bcv,bcw
     !
-    if(.false.) then
+    if(.true.) then
       if(is_bound(0,1)) then
         if(cbc(0,1,1)/='P') bcu%x(:,:,0) = bc(0,1,1)
         if(cbc(0,1,2)/='P') bcv%x(:,:,0) = bc(0,1,2)
@@ -77,7 +77,7 @@ module mod_wm
         if(cbc(1,2,3)/='P') bcw%y(:,:,1) = bc(1,2,3)
       end if
       if(is_bound(0,3)) then
-        if(cbc(0,3,1)/='P') bcu%z(:,:,0) = -1.*u(:,:,1   )
+        if(cbc(0,3,1)/='P') bcu%z(:,:,0) = -1.*u(:,:,1 )
         if(cbc(0,3,2)/='P') bcv%z(:,:,0) = -v(:,:,1   )
         if(cbc(0,3,3)/='P') bcw%z(:,:,0) =  w(:,:,1   )
       end if
@@ -90,7 +90,7 @@ module mod_wm
     !
   end subroutine comput_bcuvw
   !
-  subroutine comput_bcp(cbc,n,bc,is_bound,bcp)
+  subroutine comput_bcp(cbc,n,bc,is_bound,p,bcp)
     !
     ! bcp, determined via bcpre
     !
@@ -99,6 +99,7 @@ module mod_wm
     integer , intent(in), dimension(3) :: n
     real(rp), intent(in), dimension(0:1,3) :: bc
     logical , intent(in), dimension(0:1,3) :: is_bound
+    real(rp), intent(in), dimension(0:,0:,0:) :: p
     type(cond_bound), intent(inout) :: bcp
     !
     if(is_bound(0,1).and.cbc(0,1)/='P') bcp%x(:,:,0) = bc(0,1)
