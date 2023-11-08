@@ -4,7 +4,7 @@
 ! SPDX-License-Identifier: MIT
 !
 ! -
-module mod_wm
+module mod_wmodel
   use mod_const
   use mod_typedef, only: cond_bound
   implicit none
@@ -110,4 +110,4 @@ module mod_wm
     if(is_bound(1,3).and.cbc(1,3)/='P') bcp%z(:,:,1) = bc(1,3)
     !
   end subroutine comput_bcp
-end module mod_wm
+end module mod_wmodel

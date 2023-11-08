@@ -9,27 +9,24 @@ module mod_bound
   use mod_common_mpi, only: ierr,halo,ipencil_axis
   use mod_const
   use mod_typedef   , only: cond_bound
-  use mod_wm        , only: comput_bcuvw,comput_bcp
   implicit none
   private
   public boundp,bounduvw,updt_rhs_b
   contains
-  subroutine bounduvw(cbc,n,bc,nb,is_bound,is_correc,dl,dzc,dzf,u,v,w)
+  subroutine bounduvw(cbc,n,bcu,bcv,bcw,nb,is_bound,is_correc,dl,dzc,dzf,u,v,w)
     !
     ! imposes velocity boundary conditions
     !
     implicit none
     character(len=1), intent(in), dimension(0:1,3,3) :: cbc
     integer         , intent(in), dimension(3) :: n
-    ! type(cond_bound), intent(in) :: bcu,bcv,bcw
-    real(rp), intent(in), dimension(0:1,3,3) :: bc
+    type(cond_bound), intent(in) :: bcu,bcv,bcw
     integer , intent(in), dimension(0:1,3  ) :: nb
     logical , intent(in), dimension(0:1,3  ) :: is_bound
     logical , intent(in)                     :: is_correc
     real(rp), intent(in), dimension(3 ) :: dl
     real(rp), intent(in), dimension(0:) :: dzc,dzf
     real(rp), intent(inout), dimension(0:,0:,0:) :: u,v,w
-    type(cond_bound) :: bcu,bcv,bcw
     logical :: impose_norm_bc
     integer :: idir,nh
     !
@@ -46,17 +43,6 @@ module mod_bound
     call updthalo_gpu(nh,cbc(0,:,2)//cbc(1,:,2)==['PP','PP','PP'],v)
     call updthalo_gpu(nh,cbc(0,:,3)//cbc(1,:,3)==['PP','PP','PP'],w)
 #endif
-    !
-    allocate(bcu%x(0:n(2)+1,0:n(3)+1,0:1), &
-             bcv%x(0:n(2)+1,0:n(3)+1,0:1), &
-             bcw%x(0:n(2)+1,0:n(3)+1,0:1), &
-             bcu%y(0:n(1)+1,0:n(3)+1,0:1), &
-             bcv%y(0:n(1)+1,0:n(3)+1,0:1), &
-             bcw%y(0:n(1)+1,0:n(3)+1,0:1), &
-             bcu%z(0:n(1)+1,0:n(2)+1,0:1), &
-             bcv%z(0:n(1)+1,0:n(2)+1,0:1), &
-             bcw%z(0:n(1)+1,0:n(2)+1,0:1))
-    call comput_bcuvw(cbc,n,bc,is_bound,u,v,w,bcu,bcv,bcw)
     !
     impose_norm_bc = (.not.is_correc).or.(cbc(0,1,1)//cbc(1,1,1) == 'PP')
     if(is_bound(0,1)) then
@@ -93,21 +79,19 @@ module mod_bound
     end if
   end subroutine bounduvw
   !
-  subroutine boundp(cbc,n,bc,nb,is_bound,dl,dzc,p)
+  subroutine boundp(cbc,n,bcp,nb,is_bound,dl,dzc,p)
     !
     ! imposes pressure boundary conditions
     !
     implicit none
     character(len=1), intent(in), dimension(0:1,3) :: cbc
     integer         , intent(in), dimension(3) :: n
-    ! type(cond_bound), intent(in) :: bcp
-    real(rp), intent(in), dimension(0:1,3) :: bc
+    type(cond_bound), intent(in) :: bcp
     integer , intent(in), dimension(0:1,3) :: nb
     logical , intent(in), dimension(0:1,3) :: is_bound
     real(rp), intent(in), dimension(3 ) :: dl
     real(rp), intent(in), dimension(0:) :: dzc
     real(rp), intent(inout), dimension(0:,0:,0:) :: p
-    type(cond_bound) :: bcp
     integer :: idir,nh
     !
     nh = 1
@@ -119,11 +103,6 @@ module mod_bound
 #else
     call updthalo_gpu(nh,cbc(0,:)//cbc(1,:)==['PP','PP','PP'],p)
 #endif
-    !
-    allocate(bcp%x(0:n(2)+1,0:n(3)+1,0:1), &
-             bcp%y(0:n(1)+1,0:n(3)+1,0:1), &
-             bcp%z(0:n(1)+1,0:n(2)+1,0:1))
-    call comput_bcp(cbc,n,bc,is_bound,p,bcp)
     !
     if(is_bound(0,1)) then
       call set_bc(cbc(0,1),0,1,nh,.true.,bcp%x,dl(1),p)
