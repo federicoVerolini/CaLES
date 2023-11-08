@@ -336,12 +336,10 @@ program cans
     if(myid == 0) print*, '*** Checkpoint loaded at time = ', time, 'time step = ', istep, '. ***'
   end if
   !$acc enter data copyin(u,v,w,p) create(pp)
-  call comput_bcuvw(cbcvel,n,bcvel,is_bound,u,v,w,bcu,bcv,bcw)
-  call comput_bcp  (cbcpre,n,bcpre,is_bound,p    ,bcp)
-  call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
-  ! call bounduvw(cbcvel,n,bcvel,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
-  call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
-  ! call boundp(cbcpre,n,bcpre,nb,is_bound,dl,dzc,p)
+  ! call comput_bcuvw(cbcvel,n,bcvel,is_bound,u,v,w,bcu,bcv,bcw)
+  ! call comput_bcp  (cbcpre,n,bcpre,is_bound,p    ,bcp)
+  call bounduvw(cbcvel,n,bcvel,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
+  call boundp(cbcpre,n,bcpre,nb,is_bound,dl,dzc,p)
   !
   ! post-process and write initial condition
   !
@@ -457,22 +455,20 @@ program cans
       call solver_gaussel_z(n                    ,aa,bb,cc,cbcvel(:,3,3),['c','c','f'],w)
 #endif
 #endif
-      dpdl(:) = dpdl(:) + f(:)
-      call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
-      ! call bounduvw(cbcvel,n,bcvel,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
+      dpdl(:) = dpdl(:) + f(:) !f is change of dpdl
+      call bounduvw(cbcvel,n,bcvel,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
       call fillps(n,dli,dzfi,dtrki,u,v,w,pp)
       call updt_rhs_b(['c','c','c'],cbcpre,n,is_bound,rhsbp%x,rhsbp%y,rhsbp%z,pp)
       call solver(n,ng,arrplanp,normfftp,lambdaxyp,ap,bp,cp,cbcpre,['c','c','c'],pp)
-      call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,pp)
+      call boundp(cbcpre,n,bcpre,nb,is_bound,dl,dzc,pp)
       call correc(n,dli,dzci,dtrk,pp,u,v,w)
-      call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,.true.,dl,dzc,dzf,u,v,w)
-      ! call bounduvw(cbcvel,n,bcvel,nb,is_bound,.true.,dl,dzc,dzf,u,v,w)
+      call bounduvw(cbcvel,n,bcvel,nb,is_bound,.true.,dl,dzc,dzf,u,v,w)
       call updatep(n,dli,dzci,dzfi,alpha,pp,p)
-      call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
-      if(irk == 3) then
-        call comput_bcuvw(cbcvel,n,bcvel,is_bound,u,v,w,bcu,bcv,bcw)
-        call comput_bcp  (cbcpre,n,bcpre,is_bound,p    ,bcp)
-      end if
+      call boundp(cbcpre,n,bcpre,nb,is_bound,dl,dzc,p)
+      ! if(irk == 3) then
+      !   call comput_bcuvw(cbcvel,n,bcvel,is_bound,u,v,w,bcu,bcv,bcw)
+      !   call comput_bcp  (cbcpre,n,bcpre,is_bound,p    ,bcp)
+      ! end if
     end do !irk=1,3
     dpdl(:) = -dpdl(:)*dti
     !
