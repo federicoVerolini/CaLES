@@ -1,6 +1,5 @@
 *.o
 *.d
-!src/.depend.mk
 *.a
 *.mod
 *.smod
@@ -13,10 +12,6 @@
 *.xdmf
 *.xmf
 cans*
-run/
-src/data/*.*
-run/data/*.*
-!src/data/readme.txt
 tests/
 docs/
 build/
