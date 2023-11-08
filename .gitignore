@@ -12,6 +12,7 @@
 *dSYM
 *.xdmf
 *.xmf
+*.nml
 cans*
 run/
 src/data/*.*
