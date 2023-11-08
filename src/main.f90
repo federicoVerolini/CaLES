@@ -336,7 +336,7 @@ program cans
     if(myid == 0) print*, '*** Checkpoint loaded at time = ', time, 'time step = ', istep, '. ***'
   end if
   !$acc enter data copyin(u,v,w,p) create(pp)
-  ! call comput_bcuvw(cbcvel,n,bcvel,is_bound,u,v,w,bcu,bcv,bcw)
+  !call comput_bcuvw(cbcvel,n,bcvel,is_bound,u,v,w,bcu,bcv,bcw)
   ! call comput_bcp  (cbcpre,n,bcpre,is_bound,p    ,bcp)
   call bounduvw(cbcvel,n,bcvel,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
   call boundp(cbcpre,n,bcpre,nb,is_bound,dl,dzc,p)
