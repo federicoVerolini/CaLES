@@ -52,6 +52,8 @@ character(len=1), protected, dimension(0:1,3,3) ::  cbcvel
 real(rp)        , protected, dimension(0:1,3,3) ::   bcvel
 character(len=1), protected, dimension(0:1,3)   ::  cbcpre
 real(rp)        , protected, dimension(0:1,3)   ::   bcpre
+character(len=1), dimension(0:1,3,3) :: cbcvel_wm
+character(len=1), dimension(0:1,3)   :: cbcpre_wm
 !
 real(rp), protected, dimension(3) :: bforce
 logical , protected, dimension(3) :: is_forced

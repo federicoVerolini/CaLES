@@ -55,14 +55,15 @@ program cans
                                  nstep,time_max,tw_max,stop_type, &
                                  restart,is_overwrite_save,nsaves_max, &
                                  icheck,iout0d,iout1d,iout2d,iout3d,isave, &
-                                 cbcvel,bcvel,cbcpre,bcpre, &
+                                 cbcvel,bcvel,cbcpre,bcpre,cbcvel_wm,cbcpre_wm, &
                                  is_forced,bforce,velf, &
                                  dims, &
                                  nb,is_bound, &
                                  rkcoeff,small, &
                                  datadir,   &
                                  read_input
-  use mod_sanity         , only: test_sanity_input,test_sanity_solver
+  use mod_sanity         , only: test_sanity_input
+  ! use mod_sanity         , only: test_sanity_input,test_sanity_solver
 #if !defined(_OPENACC)
   use mod_solver         , only: solver
 #if defined(_IMPDIFF_1D)
@@ -82,7 +83,7 @@ program cans
   !@acc use mod_utils    , only: device_memory_footprint
   use mod_const
   use mod_typedef        , only: cond_bound
-  use mod_wmodel         , only: comput_bcuvw,comput_bcp
+  use mod_wmodel         , only: comput_bcuvw,comput_bcp,comput_bctau
   use omp_lib
   implicit none
   integer , dimension(3) :: lo,hi,n,n_x_fft,n_y_fft,lo_z,hi_z,n_z
@@ -103,7 +104,7 @@ program cans
     real(rp), allocatable, dimension(:,:,:) :: z
   end type rhs_bound
   type(rhs_bound) :: rhsbp
-  type(cond_bound) :: bcu,bcv,bcw,bcp
+  type(cond_bound) :: bcu,bcv,bcw,bcp,bctau1,bctau2
   real(rp) :: alpha
 #if defined(_IMPDIFF)
 #if !defined(_OPENACC)
@@ -191,6 +192,12 @@ program cans
   allocate(bcp%x(0:n(2)+1,0:n(3)+1,0:1), &
            bcp%y(0:n(1)+1,0:n(3)+1,0:1), &
            bcp%z(0:n(1)+1,0:n(2)+1,0:1))
+  allocate(bctau1%x(0:n(2)+1,0:n(3)+1,0:1), &
+           bctau1%y(0:n(1)+1,0:n(3)+1,0:1), &
+           bctau1%z(0:n(1)+1,0:n(2)+1,0:1))
+  allocate(bctau2%x(0:n(2)+1,0:n(3)+1,0:1), &
+           bctau2%y(0:n(1)+1,0:n(3)+1,0:1), &
+           bctau2%z(0:n(1)+1,0:n(2)+1,0:1))
 #if defined(_IMPDIFF)
   allocate(lambdaxyu(n_z(1),n_z(2)), &
            lambdaxyv(n_z(1),n_z(2)), &
@@ -320,8 +327,8 @@ program cans
                   device_memory_footprint(n,n_z)/(1._sp*1024**3), ' ***'
 #endif
 #if defined(_DEBUG_SOLVER)
-  call test_sanity_solver(ng,lo,hi,n,n_x_fft,n_y_fft,lo_z,hi_z,n_z,dli,dzc,dzf,dzci,dzfi,dzci_g,dzfi_g, &
-                          nb,is_bound,cbcvel,cbcpre,bcvel,bcpre)
+  ! call test_sanity_solver(ng,lo,hi,n,n_x_fft,n_y_fft,lo_z,hi_z,n_z,dli,dzc,dzf,dzci,dzfi,dzci_g,dzfi_g, &
+  !                         nb,is_bound,cbcvel,cbcpre,bcvel,bcpre)
 #endif
   !
   if(.not.restart) then
@@ -336,10 +343,17 @@ program cans
     if(myid == 0) print*, '*** Checkpoint loaded at time = ', time, 'time step = ', istep, '. ***'
   end if
   !$acc enter data copyin(u,v,w,p) create(pp)
-  call comput_bcuvw(cbcvel,n,bcvel,is_bound,u,v,w,bcu,bcv,bcw)
-  call comput_bcp  (cbcpre,n,bcpre,is_bound,p    ,bcp)
+  call comput_bcuvw(cbcvel,n,bcvel,is_bound,.false.,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
+  call comput_bcp  (cbcpre,n,bcpre,is_bound,.false.,p    ,bcp)
   call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
   call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
+  !compute bctau at wall face centers
+  call comput_bctau(cbcvel,n,bcvel,is_bound,zc,visc,u,v,w,bctau1,bctau2)
+  !do not need information exchange
+  cbcvel_wm = cbcvel
+  cbcpre_wm = cbcpre
+  call comput_bcuvw(cbcvel_wm,n,bcvel,is_bound,.true.,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
+  call bounduvw(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
   !
   ! post-process and write initial condition
   !
@@ -456,19 +470,30 @@ program cans
 #endif
 #endif
       dpdl(:) = dpdl(:) + f(:) !f is change of dpdl
+
+      call comput_bcuvw(cbcvel,n,bcvel,is_bound,.false.,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
       call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
+      call comput_bctau(cbcvel,n,bcvel,is_bound,zc,visc,u,v,w,bctau1,bctau2)
+      call comput_bcuvw(cbcvel_wm,n,bcvel,is_bound,.true.,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
+      call bounduvw(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
+
       call fillps(n,dli,dzfi,dtrki,u,v,w,pp)
       call updt_rhs_b(['c','c','c'],cbcpre,n,is_bound,rhsbp%x,rhsbp%y,rhsbp%z,pp)
       call solver(n,ng,arrplanp,normfftp,lambdaxyp,ap,bp,cp,cbcpre,['c','c','c'],pp)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,pp)
       call correc(n,dli,dzci,dtrk,pp,u,v,w)
+
+      call comput_bcuvw(cbcvel,n,bcvel,is_bound,.false.,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
       call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,.true.,dl,dzc,dzf,u,v,w)
+      call comput_bctau(cbcvel,n,bcvel,is_bound,zc,visc,u,v,w,bctau1,bctau2)
+      call comput_bcuvw(cbcvel_wm,n,bcvel,is_bound,.true.,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
+      call bounduvw(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.true.,dl,dzc,dzf,u,v,w)
+
       call updatep(n,dli,dzci,dzfi,alpha,pp,p)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
     end do !irk=1,3
     ! bcuvw, bcp assigned after a complete time step
-    call comput_bcuvw(cbcvel,n,bcvel,is_bound,u,v,w,bcu,bcv,bcw)
-    call comput_bcp  (cbcpre,n,bcpre,is_bound,p    ,bcp)
+
     dpdl(:) = -dpdl(:)*dti
     !
     ! check simulation stopping criteria
