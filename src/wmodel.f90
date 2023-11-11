@@ -12,7 +12,7 @@ module mod_wmodel
   public comput_bcuvw,comput_bcp,comput_bctau
   contains
     !
-  subroutine comput_bcuvw(cbc,n,bc,is_bound,is_wm,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
+  subroutine comput_bcuvw(cbc,n,bc,is_bound,is_wm,visc,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
     !
     ! bcu,bcv,bcw, determined via bcvel or wall model
     !
@@ -22,6 +22,7 @@ module mod_wmodel
     real(rp), intent(in), dimension(0:1,3,3) :: bc
     logical , intent(in), dimension(0:1,3) :: is_bound
     logical , intent(in) :: is_wm
+    real(rp), intent(in) :: visc
     real(rp), intent(in), dimension(0:,0:,0:) :: u,v,w
     type(cond_bound), intent(in) :: bctau1,bctau2
     type(cond_bound), intent(inout) :: bcu,bcv,bcw
@@ -62,14 +63,14 @@ module mod_wmodel
       if(is_bound(0,3)) then
         cbc(0,3,1) = 'N'
         cbc(0,3,2) = 'N'
-        if(cbc(0,3,1)/='P') bcu%z(1:n(1),1:n(2),0) =  0.5_rp*(bctau1%z(1:n(1),1:n(2),0) + bctau1%z(2:n(1)+1,1:n(2)  ,0)) !du/dz= tauw(1)
-        if(cbc(0,3,2)/='P') bcv%z(1:n(1),1:n(2),0) =  0.5_rp*(bctau2%z(1:n(1),1:n(2),0) + bctau2%z(1:n(1)  ,2:n(2)+1,0)) !dv/dz= tauw(2)
+        if(cbc(0,3,1)/='P') bcu%z(1:n(1),1:n(2),0) =  0.5_rp/visc*(bctau1%z(1:n(1),1:n(2),0) + bctau1%z(2:n(1)+1,1:n(2)  ,0))
+        if(cbc(0,3,2)/='P') bcv%z(1:n(1),1:n(2),0) =  0.5_rp/visc*(bctau2%z(1:n(1),1:n(2),0) + bctau2%z(1:n(1)  ,2:n(2)+1,0))
       end if
       if(is_bound(1,3)) then
         cbc(1,3,1) = 'N'
         cbc(1,3,2) = 'N'
-        if(cbc(1,3,1)/='P') bcu%z(1:n(1),1:n(2),1) = -0.5_rp*(bctau1%z(1:n(1),1:n(2),1) + bctau1%z(2:n(1)+1,1:n(2)  ,1)) !du/dz=-tauw(1)
-        if(cbc(1,3,2)/='P') bcv%z(1:n(1),1:n(2),1) = -0.5_rp*(bctau2%z(1:n(1),1:n(2),1) + bctau2%z(1:n(1)  ,2:n(2)+1,1)) !du/dz=-tauw(2)
+        if(cbc(1,3,1)/='P') bcu%z(1:n(1),1:n(2),1) = -0.5_rp/visc*(bctau1%z(1:n(1),1:n(2),1) + bctau1%z(2:n(1)+1,1:n(2)  ,1))
+        if(cbc(1,3,2)/='P') bcv%z(1:n(1),1:n(2),1) = -0.5_rp/visc*(bctau2%z(1:n(1),1:n(2),1) + bctau2%z(1:n(1)  ,2:n(2)+1,1))
       end if
     end if
     !
@@ -150,7 +151,7 @@ module mod_wmodel
         vc = (1._rp - wei)*(v(i  ,j-1,k1) + v(i,j,k1)) &
                     + wei *(v(i  ,j-1,k2) + v(i,j,k2))
         uc = uc*0.5_rp
-        vc = uc*0.5_rp
+        vc = vc*0.5_rp
         call wallmodel(uc,vc,h,visc,tauw)
         bctau1%z(i,j,1) = tauw(1)
         bctau2%z(i,j,1) = tauw(2)
@@ -161,27 +162,30 @@ module mod_wmodel
   subroutine wallmodel(uh,vh,h,visc,tauw)
     real(rp), intent(in)  :: uh,vh,h,visc
     real(rp), intent(out), dimension(2) :: tauw
-    real(rp) :: upar,utau,utau_old,f,fp,conver,tauw_tot
+    real(rp) :: upar,utau,f,fp,conv,tauw_old,tauw_tot
     real(rp) :: umax
     !provide, at one point, u,v,w, height
     !kap=0.41 B=5.2
     if(.false.) then
+      !log-law profile
       upar = sqrt(uh*uh+vh*vh)
       utau = sqrt(upar/h*visc)
-      do while(conver > 1.e-4)
-        utau_old = utau
+      conv = 1._rp
+      do while(conv > 1.e-4)
+        tauw_old = utau*utau
         f  = upar/utau - 1._rp/0.41_rp*log(h*utau/visc) - 5.2_rp
         fp = -1._rp/utau*(upar/utau + 1._rp/0.41_rp)
-        utau   = utau - f/fp
-        conver = (utau-utau_old)/utau_old
+        utau = abs(utau - f/fp)  !to be improved
+        tauw_tot = utau*utau
+        conv = abs(tauw_tot-tauw_old)/tauw_old
       end do
-      tauw_tot = utau*utau/visc !tauw_tot = dupar/dz
-      tauw(1)  = tauw_tot*uh/upar !=(+/-)du/dz
-      tauw(2)  = tauw_tot*vh/upar !=(+/-)dv/dz
-    else !parabolic profile
+      tauw(1)  = tauw_tot*uh/upar
+      tauw(2)  = tauw_tot*vh/upar
+    else
+      !parabolic profile
       upar = sqrt(uh*uh+vh*vh)
       umax = upar/(1._rp-((h-0.5_rp)/0.5_rp)**2)
-      tauw_tot = 4._rp*umax
+      tauw_tot = 4._rp*umax*visc
       tauw(1)  = tauw_tot*uh/upar
       tauw(2)  = tauw_tot*vh/upar
     end if

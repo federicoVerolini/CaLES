@@ -342,8 +342,9 @@ program cans
     call load_all('r',trim(datadir)//'fld.bin',MPI_COMM_WORLD,ng,[1,1,1],lo,hi,u,v,w,p,time,istep)
     if(myid == 0) print*, '*** Checkpoint loaded at time = ', time, 'time step = ', istep, '. ***'
   end if
+  open(99,file=trim(datadir)//'debug.dat')
   !$acc enter data copyin(u,v,w,p) create(pp)
-  call comput_bcuvw(cbcvel,n,bcvel,is_bound,.false.,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
+  call comput_bcuvw(cbcvel,n,bcvel,is_bound,.false.,visc,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
   call comput_bcp  (cbcpre,n,bcpre,is_bound,.false.,p    ,bcp)
   call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
   call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
@@ -352,7 +353,7 @@ program cans
   !do not need information exchange
   cbcvel_wm = cbcvel
   cbcpre_wm = cbcpre
-  call comput_bcuvw(cbcvel_wm,n,bcvel,is_bound,.true.,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
+  call comput_bcuvw(cbcvel_wm,n,bcvel,is_bound,.true.,visc,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
   call bounduvw(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
   !
   ! post-process and write initial condition
@@ -471,10 +472,10 @@ program cans
 #endif
       dpdl(:) = dpdl(:) + f(:) !f is change of dpdl
 
-      call comput_bcuvw(cbcvel,n,bcvel,is_bound,.false.,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
+      call comput_bcuvw(cbcvel,n,bcvel,is_bound,.false.,visc,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
       call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
       call comput_bctau(cbcvel,n,bcvel,is_bound,zc,visc,u,v,w,bctau1,bctau2)
-      call comput_bcuvw(cbcvel_wm,n,bcvel,is_bound,.true.,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
+      call comput_bcuvw(cbcvel_wm,n,bcvel,is_bound,.true.,visc,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
       call bounduvw(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
 
       call fillps(n,dli,dzfi,dtrki,u,v,w,pp)
@@ -483,10 +484,10 @@ program cans
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,pp)
       call correc(n,dli,dzci,dtrk,pp,u,v,w)
 
-      call comput_bcuvw(cbcvel,n,bcvel,is_bound,.false.,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
+      call comput_bcuvw(cbcvel,n,bcvel,is_bound,.false.,visc,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
       call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,.true.,dl,dzc,dzf,u,v,w)
       call comput_bctau(cbcvel,n,bcvel,is_bound,zc,visc,u,v,w,bctau1,bctau2)
-      call comput_bcuvw(cbcvel_wm,n,bcvel,is_bound,.true.,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
+      call comput_bcuvw(cbcvel_wm,n,bcvel,is_bound,.true.,visc,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
       call bounduvw(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.true.,dl,dzc,dzf,u,v,w)
 
       call updatep(n,dli,dzci,dzfi,alpha,pp,p)
