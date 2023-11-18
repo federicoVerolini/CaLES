@@ -10,7 +10,7 @@ module mod_load
 #endif
   use mpi
   use mod_common_mpi, only: myid,ierr
-  use mod_const
+  use mod_precision
   use mod_utils, only: f_sizeof
   implicit none
   private

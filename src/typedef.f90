@@ -5,7 +5,7 @@
 !
 ! -
 module mod_typedef
-  use mod_const
+  use mod_precision
   type cond_bound
   real(rp), allocatable, dimension(:,:,:) :: x
   real(rp), allocatable, dimension(:,:,:) :: y

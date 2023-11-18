@@ -7,7 +7,7 @@
 module mod_chkdiv
   use mpi
   use mod_common_mpi, only: ierr
-  use mod_const
+  use mod_precision
   implicit none
   private
   public chkdiv

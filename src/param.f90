@@ -5,7 +5,7 @@
 !
 ! -
 module mod_param
-use mod_const
+use mod_precision
 !@acc use cudecomp
 implicit none
 public
@@ -24,6 +24,8 @@ real(rp), parameter, dimension(2,3) :: rkcoeff = reshape([32._rp/60._rp,  0._rp 
                                                           25._rp/60._rp, -17._rp/60._rp, &
                                                           45._rp/60._rp, -25._rp/60._rp], shape(rkcoeff))
 real(rp), parameter, dimension(3)   :: rkcoeff12 = rkcoeff(1,:)+rkcoeff(2,:)
+real(rp), parameter :: karman    = 0.41_rp
+real(rp), parameter :: intercept = 5.2_rp
 !
 ! variables to be determined from the input file
 !
@@ -52,7 +54,7 @@ character(len=1), protected, dimension(0:1,3,3) ::  cbcvel
 real(rp)        , protected, dimension(0:1,3,3) ::   bcvel
 character(len=1), protected, dimension(0:1,3)   ::  cbcpre
 real(rp)        , protected, dimension(0:1,3)   ::   bcpre
-character(len=1), dimension(0:1,3,3) :: cbcvel_wm
+character(len=1), dimension(0:1,3,3) :: cbcvel_wm !to be improved
 character(len=1), dimension(0:1,3)   :: cbcpre_wm
 !
 real(rp), protected, dimension(3) :: bforce
@@ -61,6 +63,8 @@ real(rp), protected, dimension(3) :: velf
 !
 real(rp), protected, dimension(3) :: dl,dli
 real(rp), protected :: visc
+!
+real(rp), protected :: hwm
 #if defined(_OPENACC)
 !
 ! cuDecomp input parameters
@@ -95,6 +99,8 @@ contains
                   is_forced, &
                   velf, &
                   dims
+    namelist /les/ &
+                  hwm
 #if defined(_OPENACC)
     namelist /cudecomp/ &
                        cudecomp_t_comm_backend,cudecomp_is_t_enable_nccl,cudecomp_is_t_enable_nvshmem, &
@@ -114,6 +120,18 @@ contains
     dl(:) = l(:)/(1.*ng(:))
     dli(:) = dl(:)**(-1)
     visc = visci**(-1)
+    !
+    open(newunit=iunit,file='input.nml',status='old',action='read',iostat=ierr)
+      if( ierr == 0 ) then
+        read(iunit,nml=les,iostat=ierr)
+      else
+        if(myid == 0) print*, 'Error reading the input file'
+        if(myid == 0) print*, 'Aborting...'
+        call MPI_FINALIZE(ierr)
+        error stop
+      end if
+    close(iunit)
+    !
 #if defined(_OPENACC)
     !
     ! read cuDecomp parameter file cudecomp.in, if it exists

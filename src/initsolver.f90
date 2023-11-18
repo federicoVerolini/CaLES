@@ -7,7 +7,7 @@
 module mod_initsolver
   use, intrinsic :: iso_c_binding, only: C_PTR
   use mod_fft  , only: fftini
-  use mod_const
+  use mod_precision
   implicit none
   private
   public initsolver

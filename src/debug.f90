@@ -8,7 +8,7 @@ module mod_debug
   use mpi
   use mod_common_mpi, only: myid,ierr
   use mod_param     , only: dims
-  use mod_const
+  use mod_precision
   implicit none
   private
   public chk_helmholtz

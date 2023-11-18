@@ -5,7 +5,7 @@
 !
 ! -
 module mod_updatep
-  use mod_const
+  use mod_precision
   implicit none
   private
   public updatep

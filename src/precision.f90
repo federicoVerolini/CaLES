@@ -4,7 +4,7 @@
 ! SPDX-License-Identifier: MIT
 !
 ! -
-module mod_const
+module mod_precision
   use mpi, only: MPI_REAL,MPI_DOUBLE_PRECISION
   integer, parameter, public :: sp = selected_real_kind(6 , 37), &
                                 dp = selected_real_kind(15,307), &
@@ -16,4 +16,4 @@ module mod_const
   integer, parameter, public :: rp = dp
   integer, parameter, public :: MPI_REAL_RP = MPI_DOUBLE_PRECISION
 #endif
-end module mod_const
+end module mod_precision

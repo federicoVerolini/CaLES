@@ -7,7 +7,7 @@
 module mod_bound
   use mpi
   use mod_common_mpi, only: ierr,halo,ipencil_axis
-  use mod_const
+  use mod_precision
   use mod_typedef   , only: cond_bound
   implicit none
   private
@@ -534,7 +534,7 @@ module mod_bound
   end subroutine updthalo
 #if defined(_OPENACC)
   subroutine updthalo_gpu(nh,periods,p)
-    use mod_const
+    use mod_precision
     use cudecomp
     use mod_common_cudecomp, only: work => work_halo, &
                                    ch => handle,gd => gd_halo, &

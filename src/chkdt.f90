@@ -7,7 +7,7 @@
 module mod_chkdt
   use mpi
   use mod_common_mpi, only:ierr
-  use mod_const
+  use mod_precision
   implicit none
   private
   public chkdt

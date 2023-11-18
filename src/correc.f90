@@ -5,7 +5,7 @@
 !
 ! -
 module mod_correc
-  use mod_const
+  use mod_precision
   implicit none
   private
   public correc

@@ -6,7 +6,7 @@
 ! -
 module mod_gpu_utils
 #if 0
-  use mod_const
+  use mod_precision
   !@cuf use cudafor, only:cudaMemcpyAsync,cudaMemcpyHostToDevice,cudaMemcpyDeviceToHost
   implicit none
   private

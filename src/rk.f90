@@ -18,7 +18,7 @@ module mod_rk
 #endif
   use mod_scal , only: scal,cmpt_scalflux
   use mod_utils, only: bulk_mean,swap
-  use mod_const
+  use mod_precision
   implicit none
   private
   public rk

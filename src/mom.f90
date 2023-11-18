@@ -7,7 +7,7 @@
 module mod_mom
   use mpi
   use mod_common_mpi, only: ierr
-  use mod_const
+  use mod_precision
   implicit none
   private
   public momx_a,momy_a,momz_a, &
