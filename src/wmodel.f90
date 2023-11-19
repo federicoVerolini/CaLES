@@ -9,10 +9,10 @@ module mod_wmodel
   use mod_typedef, only: cond_bound
   implicit none
   private
-  public cmpt_bcuvw,cmpt_bcp,cmpt_bctau
+  public cmpt_bcuvw,cmpt_bcp
   contains
     !
-  subroutine cmpt_bcuvw(cbc,n,bc,is_bound,is_wm,visc,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
+  subroutine cmpt_bcuvw(cbc,n,bc,is_bound,is_wm,zc,visc,kap,b,h,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
     !
     ! bcu,bcv,bcw, determined via bcvel or wall model
     !
@@ -22,10 +22,13 @@ module mod_wmodel
     real(rp), intent(in), dimension(0:1,3,3) :: bc
     logical , intent(in), dimension(0:1,3) :: is_bound
     logical , intent(in) :: is_wm
-    real(rp), intent(in) :: visc
+    real(rp), intent(in), dimension(0:) :: zc
+    real(rp), intent(in) :: visc,kap,b,h
     real(rp), intent(in), dimension(0:,0:,0:) :: u,v,w
-    type(cond_bound), intent(in) :: bctau1,bctau2
+    type(cond_bound), intent(inout) :: bctau1,bctau2
     type(cond_bound), intent(inout) :: bcu,bcv,bcw
+    real(rp) :: wei,uh,vh,u1,u2,v1,v2,tauw(2)
+    integer  :: i,j,k,k1,k2
     !
     if(.not.is_wm) then
       !bcu,bcv,bcw, determined via bcvel
@@ -60,17 +63,87 @@ module mod_wmodel
         if(cbc(1,3,3)/='P') bcw%z(:,:,1) = bc(1,3,3)
       end if
     else
+      ! to be improved
       if(is_bound(0,3)) then
         cbc(0,3,1) = 'N'
         cbc(0,3,2) = 'N'
-        if(cbc(0,3,1)/='P') bcu%z(1:n(1),1:n(2),0) =  0.5_rp/visc*(bctau1%z(1:n(1),1:n(2),0) + bctau1%z(2:n(1)+1,1:n(2)  ,0))
-        if(cbc(0,3,2)/='P') bcv%z(1:n(1),1:n(2),0) =  0.5_rp/visc*(bctau2%z(1:n(1),1:n(2),0) + bctau2%z(1:n(1)  ,2:n(2)+1,0))
+        !lower wall
+        k = 1
+        do while(zc(k) < h)
+          k = k + 1
+        end do
+        if(k > n(3)) print *, 'error with wall model'
+        k2 = k
+        k1 = k - 1
+        wei= (h-zc(k1))/(zc(k2)-zc(k1))
+        do j = 1,n(2)
+          do i = 1,n(1)
+            u1 = u(i,j,k1)
+            u2 = u(i,j,k2)
+            v1 = 0.25_rp*(v(i,j  ,k1) + v(i+1,j  ,k1) + &
+                          v(i,j-1,k1) + v(i+1,j-1,k1))
+            v2 = 0.25_rp*(v(i,j  ,k2) + v(i+1,j  ,k2) + &
+                          v(i,j-1,k2) + v(i+1,j-1,k2))
+            uh = (1._rp - wei)*u1 + wei*u2
+            vh = (1._rp - wei)*v1 + wei*v2
+            call wallmodel(uh,vh,h,visc,kap,b,tauw)
+            bcu%z(i,j,0) = 1._rp/visc*tauw(1) !tauw, x direction
+            
+            u1 = 0.25_rp*(u(i-1,j  ,k1) + u(i,j  ,k1) + &
+                          u(i-1,j+1,k1) + u(i,j+1,k1))
+            u2 = 0.25_rp*(u(i-1,j  ,k1) + u(i,j  ,k1) + &
+                          u(i-1,j+1,k1) + u(i,j+1,k1))
+            v1 = v(i,j,k1)
+            v2 = v(i,j,k2)
+            uh = (1._rp - wei)*u1 + wei*u2
+            vh = (1._rp - wei)*v1 + wei*v2
+            call wallmodel(uh,vh,h,visc,kap,b,tauw)
+            bcv%z(i,j,0) = 1._rp/visc*tauw(2) !tauw, y direction
+          end do
+        end do
+        ! if(cbc(0,3,1)/='P') bcu%z(1:n(1),1:n(2),0) =  0.5_rp/visc*(bctau1%z(1:n(1),1:n(2),0) + bctau1%z(2:n(1)+1,1:n(2)  ,0))
+        ! if(cbc(0,3,2)/='P') bcv%z(1:n(1),1:n(2),0) =  0.5_rp/visc*(bctau2%z(1:n(1),1:n(2),0) + bctau2%z(1:n(1)  ,2:n(2)+1,0))
       end if
       if(is_bound(1,3)) then
         cbc(1,3,1) = 'N'
         cbc(1,3,2) = 'N'
-        if(cbc(1,3,1)/='P') bcu%z(1:n(1),1:n(2),1) = -0.5_rp/visc*(bctau1%z(1:n(1),1:n(2),1) + bctau1%z(2:n(1)+1,1:n(2)  ,1))
-        if(cbc(1,3,2)/='P') bcv%z(1:n(1),1:n(2),1) = -0.5_rp/visc*(bctau2%z(1:n(1),1:n(2),1) + bctau2%z(1:n(1)  ,2:n(2)+1,1))
+        !upper wall
+        k = n(3)
+        do while(zc(k) > 1._rp-h)
+          k = k - 1
+        end do
+        if(k < 1) print *, 'error with wall model'
+        k2 = k
+        k1 = k + 1
+        wei= ((1._rp-h)-zc(k1))/(zc(k2)-zc(k1))
+        
+        do j = 1,n(2)
+          do i = 1,n(1)
+            u1 = u(i,j,k1)
+            u2 = u(i,j,k2)
+            v1 = 0.25_rp*(v(i,j  ,k1) + v(i+1,j  ,k1) + &
+                          v(i,j-1,k1) + v(i+1,j-1,k1))
+            v2 = 0.25_rp*(v(i,j  ,k2) + v(i+1,j  ,k2) + &
+                          v(i,j-1,k2) + v(i+1,j-1,k2))
+            uh = (1._rp - wei)*u1 + wei*u2
+            vh = (1._rp - wei)*v1 + wei*v2
+            call wallmodel(uh,vh,h,visc,kap,b,tauw)
+            bcu%z(i,j,1) = -1._rp/visc*tauw(1) !tauw, x direction
+            
+            u1 = 0.25_rp*(u(i-1,j  ,k1) + u(i,j  ,k1) + &
+                          u(i-1,j+1,k1) + u(i,j+1,k1))
+            u2 = 0.25_rp*(u(i-1,j  ,k1) + u(i,j  ,k1) + &
+                          u(i-1,j+1,k1) + u(i,j+1,k1))
+            v1 = v(i,j,k1)
+            v2 = v(i,j,k2)
+            uh = (1._rp - wei)*u1 + wei*u2
+            vh = (1._rp - wei)*v1 + wei*v2
+            call wallmodel(uh,vh,h,visc,kap,b,tauw)
+            bcv%z(i,j,1) = -1._rp/visc*tauw(2) !tauw, y direction
+          end do
+        end do
+        ! if(cbc(1,3,1)/='P') bcu%z(1:n(1),1:n(2),1) = -0.5_rp/visc*(bctau1%z(1:n(1),1:n(2),1) + bctau1%z(2:n(1)+1,1:n(2)  ,1))
+        ! if(cbc(1,3,2)/='P') bcv%z(1:n(1),1:n(2),1) = -0.5_rp/visc*(bctau2%z(1:n(1),1:n(2),1) + bctau2%z(1:n(1)  ,2:n(2)+1,1))
       end if
     end if
     !
@@ -98,64 +171,64 @@ module mod_wmodel
     !
   end subroutine cmpt_bcp
   !
-  subroutine cmpt_bctau(cbc,n,bc,is_bound,zc,visc,kap,b,h,u,v,w,bctau1,bctau2)
-    !
-    ! compute bctau at cell centers via wall models
-    !
-    implicit none
-    character(len=1), intent(in), dimension(0:1,3,3) :: cbc
-    integer , intent(in), dimension(3) :: n
-    real(rp), intent(in), dimension(0:1,3,3) :: bc
-    logical , intent(in), dimension(0:1,3) :: is_bound
-    real(rp), intent(in), dimension(0:) :: zc
-    real(rp), intent(in) :: visc,kap,b,h
-    real(rp), intent(in), dimension(0:,0:,0:) :: u,v,w
-    type(cond_bound), intent(inout) :: bctau1,bctau2
-    real(rp) :: wei,uc,vc,tauw(2)
-    integer  :: i,j,k,k1,k2
-    !lower wall
-    k = 1
-    do while(zc(k) < h)
-      k = k + 1
-    end do
-    k2 = k
-    k1 = k - 1
-    wei= (h-zc(k1))/(zc(k2)-zc(k1))
-    do j = 1,n(2)+1
-      do i = 1,n(1)+1
-        uc = (1._rp - wei)*(u(i-1,j  ,k1) + u(i,j,k1)) &
-                    + wei *(u(i-1,j  ,k2) + u(i,j,k2))
-        vc = (1._rp - wei)*(v(i  ,j-1,k1) + v(i,j,k1)) &
-                    + wei *(v(i  ,j-1,k2) + v(i,j,k2))
-        uc = uc*0.5_rp
-        vc = vc*0.5_rp
-        call wallmodel(uc,vc,h,visc,kap,b,tauw)
-        bctau1%z(i,j,0) = tauw(1)
-        bctau2%z(i,j,0) = tauw(2)
-      end do
-    end do
-    !upper wall
-    k = n(3)
-    do while(zc(k) > 1._rp-h)
-      k = k - 1
-    end do
-    k2 = k
-    k1 = k + 1
-    wei= ((1._rp-h)-zc(k1))/(zc(k2)-zc(k1))
-    do j = 1,n(2)+1
-      do i = 1,n(1)+1
-        uc = (1._rp - wei)*(u(i-1,j  ,k1) + u(i,j,k1)) &
-                    + wei *(u(i-1,j  ,k2) + u(i,j,k2))
-        vc = (1._rp - wei)*(v(i  ,j-1,k1) + v(i,j,k1)) &
-                    + wei *(v(i  ,j-1,k2) + v(i,j,k2))
-        uc = uc*0.5_rp
-        vc = vc*0.5_rp
-        call wallmodel(uc,vc,h,visc,kap,b,tauw)
-        bctau1%z(i,j,1) = tauw(1)
-        bctau2%z(i,j,1) = tauw(2)
-      end do
-    end do
-  end subroutine cmpt_bctau
+  ! subroutine cmpt_bctau(cbc,n,bc,is_bound,zc,visc,kap,b,h,u,v,w,bctau1,bctau2)
+  !   !
+  !   ! compute bctau at cell centers via wall models
+  !   !
+  !   implicit none
+  !   character(len=1), intent(in), dimension(0:1,3,3) :: cbc
+  !   integer , intent(in), dimension(3) :: n
+  !   real(rp), intent(in), dimension(0:1,3,3) :: bc
+  !   logical , intent(in), dimension(0:1,3) :: is_bound
+  !   real(rp), intent(in), dimension(0:) :: zc
+  !   real(rp), intent(in) :: visc,kap,b,h
+  !   real(rp), intent(in), dimension(0:,0:,0:) :: u,v,w
+  !   type(cond_bound), intent(inout) :: bctau1,bctau2
+  !   real(rp) :: wei,uc,vc,tauw(2)
+  !   integer  :: i,j,k,k1,k2
+  !   !lower wall
+  !   k = 1
+  !   do while(zc(k) < h)
+  !     k = k + 1
+  !   end do
+  !   k2 = k
+  !   k1 = k - 1
+  !   wei= (h-zc(k1))/(zc(k2)-zc(k1))
+  !   do j = 1,n(2)+1
+  !     do i = 1,n(1)+1
+  !       uc = (1._rp - wei)*(u(i-1,j  ,k1) + u(i,j,k1)) &
+  !                   + wei *(u(i-1,j  ,k2) + u(i,j,k2))
+  !       vc = (1._rp - wei)*(v(i  ,j-1,k1) + v(i,j,k1)) &
+  !                   + wei *(v(i  ,j-1,k2) + v(i,j,k2))
+  !       uc = uc*0.5_rp
+  !       vc = vc*0.5_rp
+  !       call wallmodel(uc,vc,h,visc,kap,b,tauw)
+  !       bctau1%z(i,j,0) = tauw(1)
+  !       bctau2%z(i,j,0) = tauw(2)
+  !     end do
+  !   end do
+  !   !upper wall
+  !   k = n(3)
+  !   do while(zc(k) > 1._rp-h)
+  !     k = k - 1
+  !   end do
+  !   k2 = k
+  !   k1 = k + 1
+  !   wei= ((1._rp-h)-zc(k1))/(zc(k2)-zc(k1))
+  !   do j = 1,n(2)+1
+  !     do i = 1,n(1)+1
+  !       uc = (1._rp - wei)*(u(i-1,j  ,k1) + u(i,j,k1)) &
+  !                   + wei *(u(i-1,j  ,k2) + u(i,j,k2))
+  !       vc = (1._rp - wei)*(v(i  ,j-1,k1) + v(i,j,k1)) &
+  !                   + wei *(v(i  ,j-1,k2) + v(i,j,k2))
+  !       uc = uc*0.5_rp
+  !       vc = vc*0.5_rp
+  !       call wallmodel(uc,vc,h,visc,kap,b,tauw)
+  !       bctau1%z(i,j,1) = tauw(1)
+  !       bctau2%z(i,j,1) = tauw(2)
+  !     end do
+  !   end do
+  ! end subroutine cmpt_bctau
   !
   subroutine wallmodel(uh,vh,h,visc,kap,b,tauw)
     real(rp), intent(in)  :: uh,vh,h,visc,kap,b

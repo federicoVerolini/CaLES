@@ -24,8 +24,8 @@ real(rp), parameter, dimension(2,3) :: rkcoeff = reshape([32._rp/60._rp,  0._rp 
                                                           25._rp/60._rp, -17._rp/60._rp, &
                                                           45._rp/60._rp, -25._rp/60._rp], shape(rkcoeff))
 real(rp), parameter, dimension(3)   :: rkcoeff12 = rkcoeff(1,:)+rkcoeff(2,:)
-real(rp), parameter :: karman    = 0.41_rp
-real(rp), parameter :: intercept = 5.2_rp
+real(rp), parameter :: kap_log = 0.41_rp
+real(rp), parameter :: b_log = 5.2_rp
 !
 ! variables to be determined from the input file
 !

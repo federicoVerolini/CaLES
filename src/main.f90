@@ -32,7 +32,7 @@ program cans
   use, intrinsic :: ieee_arithmetic, only: is_nan => ieee_is_nan
   use mpi
   use decomp_2d
-  use mod_bound          , only: boundp,bounduvw,updt_rhs_b
+  use mod_bound          , only: boundp,bounduvw,updt_rhs_b,bounduvw_wm
   use mod_chkdiv         , only: chkdiv
   use mod_chkdt          , only: chkdt
   use mod_common_mpi     , only: myid,ierr
@@ -62,7 +62,7 @@ program cans
                                  rkcoeff,small, &
                                  datadir, &
                                  read_input, &
-                                 hwm,karman,intercept
+                                 hwm,kap_log,b_log
   use mod_sanity         , only: test_sanity_input
   ! use mod_sanity         , only: test_sanity_input,test_sanity_solver
 #if !defined(_OPENACC)
@@ -84,7 +84,7 @@ program cans
   !@acc use mod_utils    , only: device_memory_footprint
   use mod_precision
   use mod_typedef        , only: cond_bound
-  use mod_wmodel         , only: cmpt_bcuvw,cmpt_bcp,cmpt_bctau
+  use mod_wmodel         , only: cmpt_bcuvw,cmpt_bcp
   use omp_lib
   implicit none
   integer , dimension(3) :: lo,hi,n,n_x_fft,n_y_fft,lo_z,hi_z,n_z
@@ -345,28 +345,27 @@ program cans
   end if
   open(99,file=trim(datadir)//'debug.dat')
   !$acc enter data copyin(u,v,w,p) create(pp)
-  call cmpt_bcuvw(cbcvel,n,bcvel,is_bound,.false.,visc,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
+  call cmpt_bcuvw(cbcvel,n,bcvel,is_bound,.false.,zc,visc,kap_log,b_log,hwm,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
   call cmpt_bcp  (cbcpre,n,bcpre,is_bound,.false.,p    ,bcp)
   call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
   call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
-  !compute bctau at wall face centers
-  call cmpt_bctau(cbcvel,n,bcvel,is_bound,zc,visc,karman,intercept,hwm,u,v,w,bctau1,bctau2)
-  !do not need information exchange
   cbcvel_wm = cbcvel
   cbcpre_wm = cbcpre
-  call cmpt_bcuvw(cbcvel_wm,n,bcvel,is_bound,.true.,visc,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
-  call bounduvw(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
-
-  !0 cmpt_bcuvw (all bcs) do this just once for a simulation
-
-  !1 bounduvw (all bcs)
-  !2 cmpt_bcuvw (only walls) (cmpt_bctau included, change the way of computing bctau to be consistent with staggering)
-  !3 bounduvw (only walls)
+  call cmpt_bcuvw(cbcvel_wm,n,bcvel,is_bound,.true.,zc,visc,kap_log,b_log,hwm,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
+  call bounduvw_wm(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
+  ! call bounduvw(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
 
   !how about update periodic and halo first
   !then compute wall model
   !then update wall bcs
   !does this work for channels, couette(two wall), ducts(four walls), cavities (six walls)?
+
+  !1 change the way of computing bctau to be consistent with staggering, passed
+  !2 remove halo and periodic in the 2nd call of bounduvw, and 
+  !  use different cases to validate
+  !  selected validation cases, just 1 step, three initializations, mpi/not
+  !3 remove wall in the 1st call of bounduvw
+  !4 handle bcp
  
   !
   ! post-process and write initial condition
@@ -485,29 +484,26 @@ program cans
 #endif
       dpdl(:) = dpdl(:) + f(:) !f is change of dpdl
 
-      call cmpt_bcuvw(cbcvel,n,bcvel,is_bound,.false.,visc,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
+      call cmpt_bcuvw(cbcvel,n,bcvel,is_bound,.false.,zc,visc,kap_log,b_log,hwm,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
       call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
-      call cmpt_bctau(cbcvel,n,bcvel,is_bound,zc,visc,karman,intercept,hwm,u,v,w,bctau1,bctau2)
-      call cmpt_bcuvw(cbcvel_wm,n,bcvel,is_bound,.true.,visc,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
-      call bounduvw(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
+      call cmpt_bcuvw(cbcvel_wm,n,bcvel,is_bound,.true.,zc,visc,kap_log,b_log,hwm,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
+      call bounduvw_wm(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
+      ! call bounduvw(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
 
       call fillps(n,dli,dzfi,dtrki,u,v,w,pp)
       call updt_rhs_b(['c','c','c'],cbcpre,n,is_bound,rhsbp%x,rhsbp%y,rhsbp%z,pp)
       call solver(n,ng,arrplanp,normfftp,lambdaxyp,ap,bp,cp,cbcpre,['c','c','c'],pp)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,pp)
       call correc(n,dli,dzci,dtrk,pp,u,v,w)
-
-      call cmpt_bcuvw(cbcvel,n,bcvel,is_bound,.false.,visc,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
+      call cmpt_bcuvw(cbcvel,n,bcvel,is_bound,.false.,zc,visc,kap_log,b_log,hwm,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
       call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,.true.,dl,dzc,dzf,u,v,w)
-      call cmpt_bctau(cbcvel,n,bcvel,is_bound,zc,visc,karman,intercept,hwm,u,v,w,bctau1,bctau2)
-      call cmpt_bcuvw(cbcvel_wm,n,bcvel,is_bound,.true.,visc,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
-      call bounduvw(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.true.,dl,dzc,dzf,u,v,w)
+      call cmpt_bcuvw(cbcvel_wm,n,bcvel,is_bound,.true.,zc,visc,kap_log,b_log,hwm,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
+      call bounduvw_wm(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.true.,dl,dzc,dzf,u,v,w)
+      ! call bounduvw(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.true.,dl,dzc,dzf,u,v,w)
 
       call updatep(n,dli,dzci,dzfi,alpha,pp,p)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
     end do !irk=1,3
-    ! bcuvw, bcp assigned after a complete time step
-
     dpdl(:) = -dpdl(:)*dti
     !
     ! check simulation stopping criteria
