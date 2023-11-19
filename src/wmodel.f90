@@ -12,7 +12,7 @@ module mod_wmodel
   public cmpt_bcuvw,cmpt_bcp
   contains
     !
-  subroutine cmpt_bcuvw(cbc,n,bc,is_bound,is_wm,dl,zc,visc,kap,b,h,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
+  subroutine cmpt_bcuvw(cbc,n,bc,is_bound,is_wm,lo,l,dl,zc,visc,kap,b,h,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
     !
     ! bcu,bcv,bcw, determined via bcvel or wall model
     !
@@ -22,7 +22,8 @@ module mod_wmodel
     real(rp), intent(in), dimension(0:1,3,3) :: bc
     logical , intent(in), dimension(0:1,3) :: is_bound
     logical , intent(in) :: is_wm
-    real(rp), intent(in), dimension(3) :: dl
+    integer , intent(in), dimension(3) :: lo
+    real(rp), intent(in), dimension(3) :: l,dl
     real(rp), intent(in), dimension(0:) :: zc
     real(rp), intent(in) :: visc,kap,b,h
     real(rp), intent(in), dimension(0:,0:,0:) :: u,v,w
@@ -108,14 +109,13 @@ module mod_wmodel
         cbc(1,3,2) = 'N'
         !upper wall
         k = n(3)
-        do while(zc(k) > 1._rp-h)
+        do while(zc(k) > l(3)-h)
           k = k - 1
         end do
         if(k < 1) print *, 'error with wall model'
         k2 = k
         k1 = k + 1
         wei= ((1._rp-h)-zc(k1))/(zc(k2)-zc(k1))
-        
         do j = 1,n(2)
           do i = 1,n(1)
             u1 = u(i,j,k1)
@@ -186,7 +186,7 @@ module mod_wmodel
         cbc(1,2,3) = 'N'
         !upper wall
         j = n(2)
-        do while((j-0.5)*dl(2) > 1._rp-h)
+        do while(((j-1+lo(2))-0.5)*dl(2) > l(2)-h)
           j = j - 1
         end do
         if(j < 1) print *, 'error with wall model'
