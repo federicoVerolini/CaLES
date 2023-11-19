@@ -83,7 +83,6 @@ module mod_bound
   end subroutine bounduvw
 
 
-
   subroutine bounduvw_wm(cbc,n,bcu,bcv,bcw,nb,is_bound,is_correc,dl,dzc,dzf,u,v,w)
     !
     ! imposes velocity boundary conditions
@@ -122,26 +121,26 @@ module mod_bound
     !                      call set_bc(cbc(1,1,2),1,1,nh,.true. ,bcv%x,dl(1),v)
     !                      call set_bc(cbc(1,1,3),1,1,nh,.true. ,bcw%x,dl(1),w)
     ! end if
-    ! if(is_bound(0,2)) then
-    !                      call set_bc(cbc(0,2,1),0,2,nh,.true. ,bcu%y,dl(2),u)
-    !                      call set_bc(cbc(0,2,2),0,2,nh,.false.,bcv%y,dl(2),v)
-    !                      call set_bc(cbc(0,2,3),0,2,nh,.true. ,bcw%y,dl(2),w)
-    !  end if
-    ! if(is_bound(1,2)) then
-    !                      call set_bc(cbc(1,2,1),1,2,nh,.true. ,bcu%y,dl(2),u)
-    !                      call set_bc(cbc(1,2,2),1,2,nh,.false.,bcv%y,dl(2),v)
-    !                      call set_bc(cbc(1,2,3),1,2,nh,.true. ,bcw%y,dl(2),w)
+    if(is_bound(0,2)) then
+                         call set_bc(cbc(0,2,1),0,2,nh,.true. ,bcu%y,dl(2),u)
+                        !  call set_bc(cbc(0,2,2),0,2,nh,.false.,bcv%y,dl(2),v)
+                         call set_bc(cbc(0,2,3),0,2,nh,.true. ,bcw%y,dl(2),w)
+    end if
+    if(is_bound(1,2)) then
+                         call set_bc(cbc(1,2,1),1,2,nh,.true. ,bcu%y,dl(2),u)
+                        !  call set_bc(cbc(1,2,2),1,2,nh,.false.,bcv%y,dl(2),v)
+                         call set_bc(cbc(1,2,3),1,2,nh,.true. ,bcw%y,dl(2),w)
+    end if
+    ! if(is_bound(0,3)) then
+    !                      call set_bc(cbc(0,3,1),0,3,nh,.true. ,bcu%z,dzc(0)   ,u)
+    !                      call set_bc(cbc(0,3,2),0,3,nh,.true. ,bcv%z,dzc(0)   ,v)
+    !                     !  call set_bc(cbc(0,3,3),0,3,nh,.false.,bcw%z,dzf(0)   ,w)
     ! end if
-    if(is_bound(0,3)) then
-                         call set_bc(cbc(0,3,1),0,3,nh,.true. ,bcu%z,dzc(0)   ,u)
-                         call set_bc(cbc(0,3,2),0,3,nh,.true. ,bcv%z,dzc(0)   ,v)
-                        !  call set_bc(cbc(0,3,3),0,3,nh,.false.,bcw%z,dzf(0)   ,w)
-    end if
-    if(is_bound(1,3)) then
-                         call set_bc(cbc(1,3,1),1,3,nh,.true. ,bcu%z,dzc(n(3)),u)
-                         call set_bc(cbc(1,3,2),1,3,nh,.true. ,bcv%z,dzc(n(3)),v)
-                        !  call set_bc(cbc(1,3,3),1,3,nh,.false.,bcw%z,dzf(n(3)),w)
-    end if
+    ! if(is_bound(1,3)) then
+    !                      call set_bc(cbc(1,3,1),1,3,nh,.true. ,bcu%z,dzc(n(3)),u)
+    !                      call set_bc(cbc(1,3,2),1,3,nh,.true. ,bcv%z,dzc(n(3)),v)
+    !                     !  call set_bc(cbc(1,3,3),1,3,nh,.false.,bcw%z,dzf(n(3)),w)
+    ! end if
   end subroutine bounduvw_wm
 
   !

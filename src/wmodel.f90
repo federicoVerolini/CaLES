@@ -12,7 +12,7 @@ module mod_wmodel
   public cmpt_bcuvw,cmpt_bcp
   contains
     !
-  subroutine cmpt_bcuvw(cbc,n,bc,is_bound,is_wm,zc,visc,kap,b,h,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
+  subroutine cmpt_bcuvw(cbc,n,bc,is_bound,is_wm,dl,zc,visc,kap,b,h,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
     !
     ! bcu,bcv,bcw, determined via bcvel or wall model
     !
@@ -22,13 +22,14 @@ module mod_wmodel
     real(rp), intent(in), dimension(0:1,3,3) :: bc
     logical , intent(in), dimension(0:1,3) :: is_bound
     logical , intent(in) :: is_wm
+    real(rp), intent(in), dimension(3) :: dl
     real(rp), intent(in), dimension(0:) :: zc
     real(rp), intent(in) :: visc,kap,b,h
     real(rp), intent(in), dimension(0:,0:,0:) :: u,v,w
     type(cond_bound), intent(inout) :: bctau1,bctau2
     type(cond_bound), intent(inout) :: bcu,bcv,bcw
-    real(rp) :: wei,uh,vh,u1,u2,v1,v2,tauw(2)
-    integer  :: i,j,k,k1,k2
+    real(rp) :: wei,uh,vh,wh,u1,u2,v1,v2,w1,w2,tauw(2)
+    integer  :: i,j,k,j1,j2,k1,k2
     !
     if(.not.is_wm) then
       !bcu,bcv,bcw, determined via bcvel
@@ -63,7 +64,7 @@ module mod_wmodel
         if(cbc(1,3,3)/='P') bcw%z(:,:,1) = bc(1,3,3)
       end if
     else
-      ! to be improved
+      ! to be simplified
       if(is_bound(0,3)) then
         cbc(0,3,1) = 'N'
         cbc(0,3,2) = 'N'
@@ -101,8 +102,6 @@ module mod_wmodel
             bcv%z(i,j,0) = 1._rp/visc*tauw(2) !tauw, y direction
           end do
         end do
-        ! if(cbc(0,3,1)/='P') bcu%z(1:n(1),1:n(2),0) =  0.5_rp/visc*(bctau1%z(1:n(1),1:n(2),0) + bctau1%z(2:n(1)+1,1:n(2)  ,0))
-        ! if(cbc(0,3,2)/='P') bcv%z(1:n(1),1:n(2),0) =  0.5_rp/visc*(bctau2%z(1:n(1),1:n(2),0) + bctau2%z(1:n(1)  ,2:n(2)+1,0))
       end if
       if(is_bound(1,3)) then
         cbc(1,3,1) = 'N'
@@ -142,8 +141,83 @@ module mod_wmodel
             bcv%z(i,j,1) = -1._rp/visc*tauw(2) !tauw, y direction
           end do
         end do
-        ! if(cbc(1,3,1)/='P') bcu%z(1:n(1),1:n(2),1) = -0.5_rp/visc*(bctau1%z(1:n(1),1:n(2),1) + bctau1%z(2:n(1)+1,1:n(2)  ,1))
-        ! if(cbc(1,3,2)/='P') bcv%z(1:n(1),1:n(2),1) = -0.5_rp/visc*(bctau2%z(1:n(1),1:n(2),1) + bctau2%z(1:n(1)  ,2:n(2)+1,1))
+      end if
+      !used in square duct (four walls)
+      if(is_bound(0,2)) then
+        cbc(0,2,1) = 'N'
+        cbc(0,2,3) = 'N'
+        !lower wall
+        j = 1
+        do while((j-0.5)*dl(2) < h)
+          j = j + 1
+        end do
+        if(j > n(2)) print *, 'error with wall model'
+        j2 = j
+        j1 = j - 1
+        wei= (h-(j1-0.5)*dl(2))/((j2-j1)*dl(2))
+        do k = 1,n(3)
+          do i = 1,n(1)
+            u1 = u(i,j1,k)
+            u2 = u(i,j2,k)
+            w1 = 0.25_rp*(w(i,j1,k  ) + w(i+1,j1,k) + &
+                          w(i,j1,k-1) + w(i+1,j1,k))
+            w2 = 0.25_rp*(w(i,j2,k  ) + w(i+1,j2,k) + &
+                          w(i,j2,k-1) + w(i+1,j2,k))
+            uh = (1._rp - wei)*u1 + wei*u2
+            wh = (1._rp - wei)*w1 + wei*w2
+            call wallmodel(uh,wh,h,visc,kap,b,tauw)
+            bcu%y(i,k,0) = 1._rp/visc*tauw(1) !tauw, x direction
+            
+            u1 = 0.25_rp*(u(i-1,j1,k  ) + u(i,j1,k  ) + &
+                          u(i-1,j1,k+1) + u(i,j1,k+1))
+            u2 = 0.25_rp*(u(i-1,j2,k  ) + u(i,j2,k  ) + &
+                          u(i-1,j2,k+1) + u(i,j2,k+1))
+            w1 = w(i,j1,k)
+            w2 = w(i,j2,k)
+            uh = (1._rp - wei)*u1 + wei*u2
+            wh = (1._rp - wei)*w1 + wei*w2
+            call wallmodel(uh,wh,h,visc,kap,b,tauw)
+            bcw%y(i,k,0) = 1._rp/visc*tauw(2) !tauw, z direction
+          end do
+        end do
+      end if
+      if(is_bound(1,2)) then
+        cbc(0,2,1) = 'N'
+        cbc(1,2,3) = 'N'
+        !upper wall
+        j = n(2)
+        do while((j-0.5)*dl(2) > 1._rp-h)
+          j = j - 1
+        end do
+        if(j < 1) print *, 'error with wall model'
+        j2 = j
+        j1 = j + 1
+        wei= ((1._rp-h)-(j1-0.5)*dl(2))/((j2-j1)*dl(2))
+        do k = 1,n(3)
+          do i = 1,n(1)
+            u1 = u(i,j1,k)
+            u2 = u(i,j2,k)
+            w1 = 0.25_rp*(w(i,j1,k  ) + w(i+1,j1,k) + &
+                          w(i,j1,k-1) + w(i+1,j1,k))
+            w2 = 0.25_rp*(w(i,j2,k  ) + w(i+1,j2,k) + &
+                          w(i,j2,k-1) + w(i+1,j2,k))
+            uh = (1._rp - wei)*u1 + wei*u2
+            wh = (1._rp - wei)*w1 + wei*w2
+            call wallmodel(uh,wh,h,visc,kap,b,tauw)
+            bcu%y(i,k,1) = -1._rp/visc*tauw(1) !tauw, x direction
+            
+            u1 = 0.25_rp*(u(i-1,j1,k  ) + u(i,j1,k  ) + &
+                          u(i-1,j1,k+1) + u(i,j1,k+1))
+            u2 = 0.25_rp*(u(i-1,j2,k  ) + u(i,j2,k  ) + &
+                          u(i-1,j2,k+1) + u(i,j2,k+1))
+            w1 = w(i,j1,k)
+            w2 = w(i,j2,k)
+            uh = (1._rp - wei)*u1 + wei*u2
+            wh = (1._rp - wei)*w1 + wei*w2
+            call wallmodel(uh,wh,h,visc,kap,b,tauw)
+            bcw%y(i,k,1) = -1._rp/visc*tauw(2) !tauw, z direction
+          end do
+        end do
       end if
     end if
     !
