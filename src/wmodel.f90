@@ -182,7 +182,7 @@ module mod_wmodel
         end do
       end if
       if(is_bound(1,2)) then
-        cbc(0,2,1) = 'N'
+        cbc(1,2,1) = 'N'
         cbc(1,2,3) = 'N'
         !upper wall
         j = n(2)

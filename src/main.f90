@@ -351,8 +351,8 @@ program cans
   call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
   cbcvel_wm = cbcvel
   cbcpre_wm = cbcpre
-  ! call cmpt_bcuvw(cbcvel_wm,n,bcvel,is_bound,.true.,dl,zc,visc,kap_log,b_log,hwm,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
-  ! call bounduvw_wm(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
+  call cmpt_bcuvw(cbcvel_wm,n,bcvel,is_bound,.true.,dl,zc,visc,kap_log,b_log,hwm,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
+  call bounduvw_wm(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
   ! call bounduvw(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
 
   !how about update periodic and halo first
@@ -367,9 +367,9 @@ program cans
   !3 remove wall in the 1st call of bounduvw
   !4 handle bcp
 
-  !test using a channel with wall normal direction (y)
-  !then test four walls
- 
+  !test using a channel with wall normal direction (y), not work
+  !test four walls, z wall model, y wall model, symmetric   passed
+  !use mpi same?
   !
   ! post-process and write initial condition
   !
@@ -489,8 +489,8 @@ program cans
 
       call cmpt_bcuvw(cbcvel,n,bcvel,is_bound,.false.,dl,zc,visc,kap_log,b_log,hwm,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
       call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
-      ! call cmpt_bcuvw(cbcvel_wm,n,bcvel,is_bound,.true.,dl,zc,visc,kap_log,b_log,hwm,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
-      ! call bounduvw_wm(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
+      call cmpt_bcuvw(cbcvel_wm,n,bcvel,is_bound,.true.,dl,zc,visc,kap_log,b_log,hwm,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
+      call bounduvw_wm(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
       ! call bounduvw(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
 
       call fillps(n,dli,dzfi,dtrki,u,v,w,pp)
@@ -500,8 +500,8 @@ program cans
       call correc(n,dli,dzci,dtrk,pp,u,v,w)
       call cmpt_bcuvw(cbcvel,n,bcvel,is_bound,.false.,dl,zc,visc,kap_log,b_log,hwm,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
       call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,.true.,dl,dzc,dzf,u,v,w)
-      ! call cmpt_bcuvw(cbcvel_wm,n,bcvel,is_bound,.true.,dl,zc,visc,kap_log,b_log,hwm,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
-      ! call bounduvw_wm(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.true.,dl,dzc,dzf,u,v,w)
+      call cmpt_bcuvw(cbcvel_wm,n,bcvel,is_bound,.true.,dl,zc,visc,kap_log,b_log,hwm,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
+      call bounduvw_wm(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.true.,dl,dzc,dzf,u,v,w)
       ! call bounduvw(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.true.,dl,dzc,dzf,u,v,w)
 
       call updatep(n,dli,dzci,dzfi,alpha,pp,p)

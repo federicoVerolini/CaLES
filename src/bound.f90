@@ -131,16 +131,16 @@ module mod_bound
                         !  call set_bc(cbc(1,2,2),1,2,nh,.false.,bcv%y,dl(2),v)
                          call set_bc(cbc(1,2,3),1,2,nh,.true. ,bcw%y,dl(2),w)
     end if
-    ! if(is_bound(0,3)) then
-    !                      call set_bc(cbc(0,3,1),0,3,nh,.true. ,bcu%z,dzc(0)   ,u)
-    !                      call set_bc(cbc(0,3,2),0,3,nh,.true. ,bcv%z,dzc(0)   ,v)
-    !                     !  call set_bc(cbc(0,3,3),0,3,nh,.false.,bcw%z,dzf(0)   ,w)
-    ! end if
-    ! if(is_bound(1,3)) then
-    !                      call set_bc(cbc(1,3,1),1,3,nh,.true. ,bcu%z,dzc(n(3)),u)
-    !                      call set_bc(cbc(1,3,2),1,3,nh,.true. ,bcv%z,dzc(n(3)),v)
-    !                     !  call set_bc(cbc(1,3,3),1,3,nh,.false.,bcw%z,dzf(n(3)),w)
-    ! end if
+    if(is_bound(0,3)) then
+                         call set_bc(cbc(0,3,1),0,3,nh,.true. ,bcu%z,dzc(0)   ,u)
+                         call set_bc(cbc(0,3,2),0,3,nh,.true. ,bcv%z,dzc(0)   ,v)
+                        !  call set_bc(cbc(0,3,3),0,3,nh,.false.,bcw%z,dzf(0)   ,w)
+    end if
+    if(is_bound(1,3)) then
+                         call set_bc(cbc(1,3,1),1,3,nh,.true. ,bcu%z,dzc(n(3)),u)
+                         call set_bc(cbc(1,3,2),1,3,nh,.true. ,bcv%z,dzc(n(3)),v)
+                        !  call set_bc(cbc(1,3,3),1,3,nh,.false.,bcw%z,dzf(n(3)),w)
+    end if
   end subroutine bounduvw_wm
 
   !
