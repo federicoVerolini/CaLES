@@ -367,10 +367,6 @@ program cans
   !  selected validation cases, just 1 step, three initializations, mpi/not
   !3 remove wall in the 1st call of bounduvw
   !4 handle bcp
-
-  !test using a channel with wall normal direction (y), not work
-  !test four walls, z wall model, y wall model, symmetric   passed
-  !compare new and old, exactly the same passed
   !
   ! post-process and write initial condition
   !

@@ -148,6 +148,8 @@ module mod_sanity
       print*, 'ERROR: pressure BCs in directions x and y must be homogeneous (value = 0.).'
     passed = passed.and.passed_loc
 #if defined(_IMPDIFF)
+    !implicit(1d): bcs in x and y must be 'D' or 'P', If 'D', bcvel=0
+    !that is, implicit mode must be used for WMLES of square ducts
     passed_loc = .true.
     do ivel = 1,3
       do idir=1,2
