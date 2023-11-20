@@ -29,7 +29,8 @@ module mod_output
     !
     if (myid  ==  0) then
       open(newunit=iunit,file=fname,position='append')
-      write(iunit,'(*(E16.7e3))') var(1:n)
+      ! write(iunit,'(*(E16.7e3))') var(1:n)
+      write(iunit,'(*(E30.15e3))') var(1:n)   !!!!!tmp
       close(iunit)
     end if
   end subroutine out0d

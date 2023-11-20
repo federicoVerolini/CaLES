@@ -67,7 +67,7 @@ module mod_wmodel
     else
       ! to be simplified
       ! modify bc 1, consistent with bc 0, using h, rather than l-h
-      if(is_bound(0,3)) then
+      if(is_bound(0,3).and.cbc(0,3,1)/='P') then  !to be improved by modifying input.nml straightly
         cbc(0,3,1) = 'N'
         cbc(0,3,2) = 'N'
         !lower wall
@@ -104,9 +104,8 @@ module mod_wmodel
             bcv%z(i,j,0) = 1._rp/visc*tauw(2) !tauw, y direction
           end do
         end do
-        print*,'k',k1,k2
       end if
-      if(is_bound(1,3)) then
+      if(is_bound(1,3).and.cbc(1,3,1)/='P') then
         cbc(1,3,1) = 'N'
         cbc(1,3,2) = 'N'
         !upper wall
@@ -143,10 +142,9 @@ module mod_wmodel
             bcv%z(i,j,1) = -1._rp/visc*tauw(2) !tauw, y direction
           end do
         end do
-        print*,'k',k1,k2
       end if
       !used in square duct (four walls)
-      if(is_bound(0,2)) then
+      if(is_bound(0,2).and.cbc(0,2,1)/='P') then
         cbc(0,2,1) = 'N'
         cbc(0,2,3) = 'N'
         !lower wall
@@ -183,9 +181,8 @@ module mod_wmodel
             bcw%y(i,k,0) = 1._rp/visc*tauw(2) !tauw, z direction
           end do
         end do
-        print*,'j',j1,j2
       end if
-      if(is_bound(1,2)) then
+      if(is_bound(1,2).and.cbc(1,2,1)/='P') then
         cbc(1,2,1) = 'N'
         cbc(1,2,3) = 'N'
         !upper wall
@@ -222,7 +219,6 @@ module mod_wmodel
             bcw%y(i,k,1) = -1._rp/visc*tauw(2) !tauw, z direction
           end do
         end do
-        print*,'j',j1,j2
       end if
     end if
     !
