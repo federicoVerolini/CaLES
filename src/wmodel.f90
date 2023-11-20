@@ -66,6 +66,7 @@ module mod_wmodel
       end if
     else
       ! to be simplified
+      ! modify bc 1, consistent with bc 0, using h, rather than l-h
       if(is_bound(0,3)) then
         cbc(0,3,1) = 'N'
         cbc(0,3,2) = 'N'
@@ -103,6 +104,7 @@ module mod_wmodel
             bcv%z(i,j,0) = 1._rp/visc*tauw(2) !tauw, y direction
           end do
         end do
+        print*,'k',k1,k2
       end if
       if(is_bound(1,3)) then
         cbc(1,3,1) = 'N'
@@ -115,7 +117,7 @@ module mod_wmodel
         if(k < 1) print *, 'error with wall model'
         k2 = k
         k1 = k + 1
-        wei= ((1._rp-h)-zc(k1))/(zc(k2)-zc(k1))
+        wei= ((l(3)-h)-zc(k1))/(zc(k2)-zc(k1))
         do j = 1,n(2)
           do i = 1,n(1)
             u1 = u(i,j,k1)
@@ -141,6 +143,7 @@ module mod_wmodel
             bcv%z(i,j,1) = -1._rp/visc*tauw(2) !tauw, y direction
           end do
         end do
+        print*,'k',k1,k2
       end if
       !used in square duct (four walls)
       if(is_bound(0,2)) then
@@ -180,6 +183,7 @@ module mod_wmodel
             bcw%y(i,k,0) = 1._rp/visc*tauw(2) !tauw, z direction
           end do
         end do
+        print*,'j',j1,j2
       end if
       if(is_bound(1,2)) then
         cbc(1,2,1) = 'N'
@@ -192,7 +196,7 @@ module mod_wmodel
         if(j < 1) print *, 'error with wall model'
         j2 = j
         j1 = j + 1
-        wei= ((1._rp-h)-(j1-0.5)*dl(2))/((j2-j1)*dl(2))
+        wei= ((l(2)-h)-((j1-1+lo(2))-0.5)*dl(2))/((j2-j1)*dl(2))
         do k = 1,n(3)
           do i = 1,n(1)
             u1 = u(i,j1,k)
@@ -218,6 +222,7 @@ module mod_wmodel
             bcw%y(i,k,1) = -1._rp/visc*tauw(2) !tauw, z direction
           end do
         end do
+        print*,'j',j1,j2
       end if
     end if
     !
