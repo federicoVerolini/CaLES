@@ -80,34 +80,6 @@ module mod_bound
                          call set_bc(cbc(1,3,2),1,3,nh,.true. ,bcv%z,dzc(n(3)),v)
       if(impose_norm_bc) call set_bc(cbc(1,3,3),1,3,nh,.false.,bcw%z,dzf(n(3)),w)
     end if
-  end subroutine bounduvw
-
-
-  subroutine bounduvw_wm(cbc,n,bcu,bcv,bcw,nb,is_bound,is_correc,dl,dzc,dzf,u,v,w)
-    !
-    ! imposes velocity boundary conditions
-    !
-    implicit none
-    character(len=1), intent(in), dimension(0:1,3,3) :: cbc
-    integer         , intent(in), dimension(3) :: n
-    type(cond_bound), intent(in) :: bcu,bcv,bcw
-    integer , intent(in), dimension(0:1,3  ) :: nb
-    logical , intent(in), dimension(0:1,3  ) :: is_bound
-    logical , intent(in)                     :: is_correc
-    real(rp), intent(in), dimension(3 ) :: dl
-    real(rp), intent(in), dimension(0:) :: dzc,dzf
-    real(rp), intent(inout), dimension(0:,0:,0:) :: u,v,w
-    logical :: impose_norm_bc
-    integer :: idir,nh
-    !
-    nh = 1
-    !
-    ! do idir = 1,3
-    !   call updthalo(nh,halo(idir),nb(:,idir),idir,u)
-    !   call updthalo(nh,halo(idir),nb(:,idir),idir,v)
-    !   call updthalo(nh,halo(idir),nb(:,idir),idir,w)
-    ! end do
-    !
     !impose_norm_bc=1, the corrected wall-normal component retains
     !the prediction value for homogeneous pressure wall bc
     !this hold even if a wall model is used, due to Dirichlet bc on the wall-normal component
@@ -144,6 +116,34 @@ module mod_bound
                         !  call set_bc(cbc(1,3,2),1,3,nh,.true. ,bcv%z,dzc(n(3)),v)
       if(impose_norm_bc) call set_bc(cbc(1,3,3),1,3,nh,.false.,bcw%z,dzf(n(3)),w)
     end if
+  end subroutine bounduvw
+
+
+  subroutine bounduvw_wm(cbc,n,bcu,bcv,bcw,nb,is_bound,is_correc,dl,dzc,dzf,u,v,w)
+    !
+    ! imposes velocity boundary conditions
+    !
+    implicit none
+    character(len=1), intent(in), dimension(0:1,3,3) :: cbc
+    integer         , intent(in), dimension(3) :: n
+    type(cond_bound), intent(in) :: bcu,bcv,bcw
+    integer , intent(in), dimension(0:1,3  ) :: nb
+    logical , intent(in), dimension(0:1,3  ) :: is_bound
+    logical , intent(in)                     :: is_correc
+    real(rp), intent(in), dimension(3 ) :: dl
+    real(rp), intent(in), dimension(0:) :: dzc,dzf
+    real(rp), intent(inout), dimension(0:,0:,0:) :: u,v,w
+    logical :: impose_norm_bc
+    integer :: idir,nh
+    !
+    nh = 1
+    !
+    ! do idir = 1,3
+    !   call updthalo(nh,halo(idir),nb(:,idir),idir,u)
+    !   call updthalo(nh,halo(idir),nb(:,idir),idir,v)
+    !   call updthalo(nh,halo(idir),nb(:,idir),idir,w)
+    ! end do
+    !
     !!!!!!!!!!!!!!!!!!!!!!!
     if(is_bound(0,1).and.cbc(0,1,1)/='P') then !modify this after using 'M' for wall model bc 
                         !  call set_bc(cbc(0,1,1),0,1,nh,.false.,bcu%x,dl(1),u)
