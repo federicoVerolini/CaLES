@@ -354,13 +354,8 @@ program cans
   cbcpre_wm = cbcpre
   call cmpt_bcuvw(cbcvel_wm,n,bcvel,is_bound,.true.,lo,l,dl,zc,visc,kap_log,b_log,hwm,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
   call bounduvw_wm(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
+  ! call bounduvw(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
 
-  write(99,*) 'u'
-  write(99,'(e20.10)') u(0:n(1)+1,0:n(2)+1,0:n(3)+1)
-  write(99,*) 'v'
-  write(99,'(e20.10)') v(0:n(1)+1,0:n(2)+1,0:n(3)+1)
-  write(99,*) 'w'
-  write(99,'(e20.10)') w(0:n(1)+1,0:n(2)+1,0:n(3)+1)
 
   !how about update periodic and halo first
   !then compute wall model
@@ -372,7 +367,6 @@ program cans
   !  use different cases to validate
   !  selected validation cases, just 1 step, three initializations, mpi/not
   !3 remove wall in the 1st call of bounduvw
-  !  first non-penetrative then wall model
   !4 handle bcp
   !
   ! post-process and write initial condition
@@ -495,7 +489,15 @@ program cans
       call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
       call cmpt_bcuvw(cbcvel_wm,n,bcvel,is_bound,.true.,lo,l,dl,zc,visc,kap_log,b_log,hwm,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
       call bounduvw_wm(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
-
+      ! call bounduvw(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
+      if(irk==1) then
+        write(99,*) 'u'
+        write(99,'(e20.10)') u(0:n(1)+1,0:n(2)+1,0:n(3)+1)
+        write(99,*) 'v'
+        write(99,'(e20.10)') v(0:n(1)+1,0:n(2)+1,0:n(3)+1)
+        write(99,*) 'w'
+        write(99,'(e20.10)') w(0:n(1)+1,0:n(2)+1,0:n(3)+1)
+      end if
       call fillps(n,dli,dzfi,dtrki,u,v,w,pp)
       call updt_rhs_b(['c','c','c'],cbcpre,n,is_bound,rhsbp%x,rhsbp%y,rhsbp%z,pp)
       call solver(n,ng,arrplanp,normfftp,lambdaxyp,ap,bp,cp,cbcpre,['c','c','c'],pp)
@@ -505,6 +507,7 @@ program cans
       call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,.true.,dl,dzc,dzf,u,v,w)
       call cmpt_bcuvw(cbcvel_wm,n,bcvel,is_bound,.true.,lo,l,dl,zc,visc,kap_log,b_log,hwm,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
       call bounduvw_wm(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.true.,dl,dzc,dzf,u,v,w)
+      ! call bounduvw(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.true.,dl,dzc,dzf,u,v,w)
 
       call updatep(n,dli,dzci,dzfi,alpha,pp,p)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
