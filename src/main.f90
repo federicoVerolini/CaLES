@@ -504,7 +504,7 @@ program cans
 
       call updatep(n,dli,dzci,dzfi,alpha,pp,p)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
-      if(irk==3) then
+      if(irk==1) then
         ! write(55,*) 'u'
         ! write(55,'(e20.10)') u(0:n(1)+1,0:n(2)+1,0:n(3)+1)
         ! write(55,*) 'v'
