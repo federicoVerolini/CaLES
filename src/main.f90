@@ -343,7 +343,7 @@ program cans
     call load_all('r',trim(datadir)//'fld.bin',MPI_COMM_WORLD,ng,[1,1,1],lo,hi,u,v,w,p,time,istep)
     if(myid == 0) print*, '*** Checkpoint loaded at time = ', time, 'time step = ', istep, '. ***'
   end if
-  open(55,file=trim(datadir)//'debug.dat',access='stream')
+  open(55,file=trim(datadir)//'debug.dat')
   !$acc enter data copyin(u,v,w,p) create(pp)
   call cmpt_bcuvw(cbcvel,n,bcvel,is_bound,.false.,lo,l,dl,zc,visc,kap_log,b_log,hwm,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
   call cmpt_bcp  (cbcpre,n,bcpre,is_bound,.false.,p    ,bcp)
@@ -505,15 +505,15 @@ program cans
       call updatep(n,dli,dzci,dzfi,alpha,pp,p)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
       if(irk==3) then
-        ! write(55,*) 'u'
-        ! write(55,'(e20.10)') u(0:n(1)+1,0:n(2)+1,0:n(3)+1)
-        ! write(55,*) 'v'
-        ! write(55,'(e20.10)') v(0:n(1)+1,0:n(2)+1,0:n(3)+1)
-        ! write(55,*) 'w'
-        ! write(55,'(e20.10)') w(0:n(1)+1,0:n(2)+1,0:n(3)+1)
-        write(55) u(0:n(1)+1,0:n(2)+1,0:n(3)+1)
-        write(55) v(0:n(1)+1,0:n(2)+1,0:n(3)+1)
-        write(55) w(0:n(1)+1,0:n(2)+1,0:n(3)+1)
+        write(55,*) 'u'
+        write(55,'(e20.10)') u(0:n(1)+1,0:n(2)+1,0:n(3)+1)
+        write(55,*) 'v'
+        write(55,'(e20.10)') v(0:n(1)+1,0:n(2)+1,0:n(3)+1)
+        write(55,*) 'w'
+        write(55,'(e20.10)') w(0:n(1)+1,0:n(2)+1,0:n(3)+1)
+        ! write(55) u(0:n(1)+1,0:n(2)+1,0:n(3)+1)
+        ! write(55) v(0:n(1)+1,0:n(2)+1,0:n(3)+1)
+        ! write(55) w(0:n(1)+1,0:n(2)+1,0:n(3)+1)
       end if
     end do !irk=1,3
     dpdl(:) = -dpdl(:)*dti
