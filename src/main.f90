@@ -356,11 +356,11 @@ program cans
   call bounduvw_wm(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
 
   write(99,*) 'u'
-  write(99,*) u(0:n(1)+1,0:n(2)+1,0:n(3)+1)
+  write(99,'(e20.10)') u(0:n(1)+1,0:n(2)+1,0:n(3)+1)
   write(99,*) 'v'
-  write(99,*) v(0:n(1)+1,0:n(2)+1,0:n(3)+1)
+  write(99,'(e20.10)') v(0:n(1)+1,0:n(2)+1,0:n(3)+1)
   write(99,*) 'w'
-  write(99,*) w(0:n(1)+1,0:n(2)+1,0:n(3)+1)
+  write(99,'(e20.10)') w(0:n(1)+1,0:n(2)+1,0:n(3)+1)
 
   !how about update periodic and halo first
   !then compute wall model
