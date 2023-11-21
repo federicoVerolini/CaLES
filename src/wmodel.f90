@@ -129,16 +129,6 @@ module mod_wmodel
             vh = (1._rp - wei)*v1 + wei*v2
             call wallmodel(uh,vh,h,visc,kap,b,tauw)
             bcu%z(i,j,1) = -1._rp/visc*tauw(1) !tauw, x direction
-! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!             if(i==2.and.j==16) then
-!               write(333,*) i,j,tauw(1)
-!               write(333,*) uh,vh
-!               write(333,*) u1,u2,v1,v2
-!               write(333,*) u(i,j,k1),u(i,j,k2)
-!               write(333,*) v(i,j,k1),v(i+1,j,k1),v(i,j-1,k1),v(i+1,j-1,k1)
-!               write(333,*) v(i,j,k2),v(i+1,j,k2),v(i,j-1,k2),v(i+1,j-1,k2)
-!             end if
-! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             u1 = 0.25_rp*(u(i-1,j  ,k1) + u(i,j  ,k1) + &
                           u(i-1,j+1,k1) + u(i,j+1,k1))
             u2 = 0.25_rp*(u(i-1,j  ,k1) + u(i,j  ,k1) + &
