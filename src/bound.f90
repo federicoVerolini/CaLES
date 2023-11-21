@@ -111,7 +111,6 @@ module mod_bound
     !impose_norm_bc=1, the corrected wall-normal component retains
     !the prediction value for homogeneous pressure wall bc
     !this hold even if a wall model is used, due to Dirichlet bc on the wall-normal component
-    
     impose_norm_bc = (.not.is_correc).or.(cbc(0,1,1)//cbc(1,1,1) == 'PP')
     if(is_bound(0,1).and.cbc(0,1,1)/='P') then !modify this after using 'M' for wall model bc 
       if(impose_norm_bc) call set_bc(cbc(0,1,1),0,1,nh,.false.,bcu%x,dl(1),u)
@@ -145,7 +144,7 @@ module mod_bound
                         !  call set_bc(cbc(1,3,2),1,3,nh,.true. ,bcv%z,dzc(n(3)),v)
       if(impose_norm_bc) call set_bc(cbc(1,3,3),1,3,nh,.false.,bcw%z,dzf(n(3)),w)
     end if
-    !!!!!!!!!!!!!!!!!!!!!
+    !!!!!!!!!!!!!!!!!!!!!!!
     if(is_bound(0,1).and.cbc(0,1,1)/='P') then !modify this after using 'M' for wall model bc 
                         !  call set_bc(cbc(0,1,1),0,1,nh,.false.,bcu%x,dl(1),u)
                          call set_bc(cbc(0,1,2),0,1,nh,.true. ,bcv%x,dl(1),v)
