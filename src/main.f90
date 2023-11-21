@@ -358,6 +358,9 @@ program cans
   write(55) u(0:n(1)+1,0:n(2)+1,0:n(3)+1)
   write(55) v(0:n(1)+1,0:n(2)+1,0:n(3)+1)
   write(55) w(0:n(1)+1,0:n(2)+1,0:n(3)+1)
+  call MPI_FINALIZE(ierr)
+  error stop
+
   !how about update periodic and halo first
   !then compute wall model
   !then update wall bcs
