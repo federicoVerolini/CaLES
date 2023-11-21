@@ -355,7 +355,9 @@ program cans
   call cmpt_bcuvw(cbcvel_wm,n,bcvel,is_bound,.true.,lo,l,dl,zc,visc,kap_log,b_log,hwm,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
   call bounduvw_wm(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
   ! call bounduvw(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
-
+  write(55) u(1:n(1)+0,1:n(2)+0,1:n(3)+0)
+  write(55) v(1:n(1)+0,1:n(2)+0,1:n(3)+0)
+  write(55) w(1:n(1)+0,1:n(2)+0,1:n(3)+0)
 
   !how about update periodic and halo first
   !then compute wall model
@@ -504,17 +506,17 @@ program cans
 
       call updatep(n,dli,dzci,dzfi,alpha,pp,p)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
-      if(irk==1) then
-        ! write(55,*) 'u'
-        ! write(55,'(e20.10)') u(0:n(1)+1,0:n(2)+1,0:n(3)+1)
-        ! write(55,*) 'v'
-        ! write(55,'(e20.10)') v(0:n(1)+1,0:n(2)+1,0:n(3)+1)
-        ! write(55,*) 'w'
-        ! write(55,'(e20.10)') w(0:n(1)+1,0:n(2)+1,0:n(3)+1)
-        write(55) u(1:n(1)+0,1:n(2)+0,1:n(3)+0)
-        write(55) v(1:n(1)+0,1:n(2)+0,1:n(3)+0)
-        write(55) w(1:n(1)+0,1:n(2)+0,1:n(3)+0)
-      end if
+      ! if(irk==1) then
+      !   ! write(55,*) 'u'
+      !   ! write(55,'(e20.10)') u(0:n(1)+1,0:n(2)+1,0:n(3)+1)
+      !   ! write(55,*) 'v'
+      !   ! write(55,'(e20.10)') v(0:n(1)+1,0:n(2)+1,0:n(3)+1)
+      !   ! write(55,*) 'w'
+      !   ! write(55,'(e20.10)') w(0:n(1)+1,0:n(2)+1,0:n(3)+1)
+      !   write(55) u(1:n(1)+0,1:n(2)+0,1:n(3)+0)
+      !   write(55) v(1:n(1)+0,1:n(2)+0,1:n(3)+0)
+      !   write(55) w(1:n(1)+0,1:n(2)+0,1:n(3)+0)
+      ! end if
     end do !irk=1,3
     dpdl(:) = -dpdl(:)*dti
     !
