@@ -501,7 +501,10 @@ program cans
       call cmpt_bcuvw(cbcvel_wm,n,bcvel,is_bound,.true.,lo,l,dl,zc,visc,kap_log,b_log,hwm,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
       call bounduvw_wm(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.true.,dl,dzc,dzf,u,v,w)
       ! call bounduvw(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.true.,dl,dzc,dzf,u,v,w)
-      if(irk==1) then
+
+      call updatep(n,dli,dzci,dzfi,alpha,pp,p)
+      call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
+      if(irk==3) then
         write(99,*) 'u'
         write(99,'(e20.10)') u(0:n(1)+1,0:n(2)+1,0:n(3)+1)
         write(99,*) 'v'
@@ -509,8 +512,6 @@ program cans
         write(99,*) 'w'
         write(99,'(e20.10)') w(0:n(1)+1,0:n(2)+1,0:n(3)+1)
       end if
-      call updatep(n,dli,dzci,dzfi,alpha,pp,p)
-      call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
     end do !irk=1,3
     dpdl(:) = -dpdl(:)*dti
     !
