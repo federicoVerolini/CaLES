@@ -32,7 +32,7 @@ program cans
   use, intrinsic :: ieee_arithmetic, only: is_nan => ieee_is_nan
   use mpi
   use decomp_2d
-  use mod_bound          , only: boundp,bounduvw,updt_rhs_b,bounduvw_wm
+  use mod_bound          , only: boundp,bounduvw,updt_rhs_b,initbc
   use mod_chkdiv         , only: chkdiv
   use mod_chkdt          , only: chkdt
   use mod_common_mpi     , only: myid,ierr
@@ -55,14 +55,14 @@ program cans
                                  nstep,time_max,tw_max,stop_type, &
                                  restart,is_overwrite_save,nsaves_max, &
                                  icheck,iout0d,iout1d,iout2d,iout3d,isave, &
-                                 cbcvel,bcvel,cbcpre,bcpre,cbcvel_wm,cbcpre_wm, &
+                                 cbcvel,bcvel,cbcpre,bcpre, &
                                  is_forced,bforce,velf, &
                                  dims, &
                                  nb,is_bound, &
                                  rkcoeff,small, &
                                  datadir, &
                                  read_input, &
-                                 hwm,kap_log,b_log
+                                 lwm,hwm
   use mod_sanity         , only: test_sanity_input
   ! use mod_sanity         , only: test_sanity_input,test_sanity_solver
 #if !defined(_OPENACC)
@@ -84,7 +84,6 @@ program cans
   !@acc use mod_utils    , only: device_memory_footprint
   use mod_precision
   use mod_typedef        , only: cond_bound
-  use mod_wmodel         , only: cmpt_bcuvw,cmpt_bcp
   use omp_lib
   implicit none
   integer , dimension(3) :: lo,hi,n,n_x_fft,n_y_fft,lo_z,hi_z,n_z
@@ -105,7 +104,7 @@ program cans
     real(rp), allocatable, dimension(:,:,:) :: z
   end type rhs_bound
   type(rhs_bound) :: rhsbp
-  type(cond_bound) :: bcu,bcv,bcw,bcp,bctau1,bctau2
+  type(cond_bound) :: bcu,bcv,bcw,bcp
   real(rp) :: alpha
 #if defined(_IMPDIFF)
 #if !defined(_OPENACC)
@@ -136,7 +135,7 @@ program cans
   character(len=7  ) :: fldnum
   character(len=4  ) :: chkptnum
   character(len=100) :: filename
-  integer :: k,kk
+  integer :: i,j,k,kk
   logical :: is_done,kill
   integer :: rlen
   !
@@ -180,8 +179,8 @@ program cans
   allocate(rhsbp%x(n(2),n(3),0:1), &
            rhsbp%y(n(1),n(3),0:1), &
            rhsbp%z(n(1),n(2),0:1))
-  !defined as (0:n+1), consistent with halo cells, for fast set_bc
-  allocate(bcu%x(0:n(2)+1,0:n(3)+1,0:1), & 
+  !defined as (0:n+1), consistent with halo cells
+  allocate(bcu%x(0:n(2)+1,0:n(3)+1,0:1), &
            bcv%x(0:n(2)+1,0:n(3)+1,0:1), &
            bcw%x(0:n(2)+1,0:n(3)+1,0:1), &
            bcu%y(0:n(1)+1,0:n(3)+1,0:1), &
@@ -189,16 +188,10 @@ program cans
            bcw%y(0:n(1)+1,0:n(3)+1,0:1), &
            bcu%z(0:n(1)+1,0:n(2)+1,0:1), &
            bcv%z(0:n(1)+1,0:n(2)+1,0:1), &
-           bcw%z(0:n(1)+1,0:n(2)+1,0:1))
-  allocate(bcp%x(0:n(2)+1,0:n(3)+1,0:1), &
+           bcw%z(0:n(1)+1,0:n(2)+1,0:1), &
+           bcp%x(0:n(2)+1,0:n(3)+1,0:1), &
            bcp%y(0:n(1)+1,0:n(3)+1,0:1), &
            bcp%z(0:n(1)+1,0:n(2)+1,0:1))
-  allocate(bctau1%x(0:n(2)+1,0:n(3)+1,0:1), &
-           bctau1%y(0:n(1)+1,0:n(3)+1,0:1), &
-           bctau1%z(0:n(1)+1,0:n(2)+1,0:1))
-  allocate(bctau2%x(0:n(2)+1,0:n(3)+1,0:1), &
-           bctau2%y(0:n(1)+1,0:n(3)+1,0:1), &
-           bctau2%z(0:n(1)+1,0:n(2)+1,0:1))
 #if defined(_IMPDIFF)
   allocate(lambdaxyu(n_z(1),n_z(2)), &
            lambdaxyv(n_z(1),n_z(2)), &
@@ -282,7 +275,7 @@ program cans
   !
   ! test input files before proceeding with the calculation
   !
-  call test_sanity_input(ng,dims,stop_type,cbcvel,cbcpre,bcvel,bcpre,is_forced)
+  call test_sanity_input(ng,dims,stop_type,cbcvel,cbcpre,bcvel,bcpre,lwm,is_forced)
   !
   ! initialize Poisson solver
   !
@@ -343,30 +336,13 @@ program cans
     call load_all('r',trim(datadir)//'fld.bin',MPI_COMM_WORLD,ng,[1,1,1],lo,hi,u,v,w,p,time,istep)
     if(myid == 0) print*, '*** Checkpoint loaded at time = ', time, 'time step = ', istep, '. ***'
   end if
-  open(55,file=trim(datadir)//'debug.dat',access='stream',status='replace')
+  !
+  call initbc(bcvel,bcpre,bcu,bcv,bcw,bcp)
+  !
+  open(55,file=trim(datadir)//'debug.dat',status='replace')
   !$acc enter data copyin(u,v,w,p) create(pp)
-  call cmpt_bcuvw(cbcvel,n,bcvel,is_bound,.false.,lo,l,dl,zc,visc,kap_log,b_log,hwm,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
-  call cmpt_bcp  (cbcpre,n,bcpre,is_bound,.false.,p    ,bcp)
-  call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
+  call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,lo,l,dl,zc,visc,hwm,.false.,dzc,dzf,u,v,w)
   call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
-  print *,is_bound(0:1,1:3)
-  cbcvel_wm = cbcvel
-  cbcpre_wm = cbcpre
-  call cmpt_bcuvw(cbcvel_wm,n,bcvel,is_bound,.true.,lo,l,dl,zc,visc,kap_log,b_log,hwm,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
-  call bounduvw_wm(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
-  ! call bounduvw(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
-
-  !how about update periodic and halo first
-  !then compute wall model
-  !then update wall bcs
-  !does this work for channels, couette(two wall), ducts(four walls), cavities (six walls)?
-
-  !1 change the way of computing bctau to be consistent with staggering, passed
-  !2 remove halo and periodic in the 2nd call of bounduvw, and
-  !  use different cases to validate
-  !  selected validation cases, just 1 step, three initializations, mpi/not
-  !3 remove wall in the 1st call of bounduvw
-  !4 handle bcp
   !
   ! post-process and write initial condition
   !
@@ -481,29 +457,19 @@ program cans
 #else
       call solver_gaussel_z(n                    ,aa,bb,cc,cbcvel(:,3,3),['c','c','f'],w)
 #endif
-#endif
+#endif  
+      !#endif defined(_IMPDIFF)
       dpdl(:) = dpdl(:) + f(:) !f is change of dpdl
-
-      call cmpt_bcuvw(cbcvel,n,bcvel,is_bound,.false.,lo,l,dl,zc,visc,kap_log,b_log,hwm,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
-      call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
-      call cmpt_bcuvw(cbcvel_wm,n,bcvel,is_bound,.true.,lo,l,dl,zc,visc,kap_log,b_log,hwm,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
-      call bounduvw_wm(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
-      ! call bounduvw(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
-      
+      call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,lo,l,dl,zc,visc,hwm,.false.,dzc,dzf,u,v,w)
       call fillps(n,dli,dzfi,dtrki,u,v,w,pp)
       call updt_rhs_b(['c','c','c'],cbcpre,n,is_bound,rhsbp%x,rhsbp%y,rhsbp%z,pp)
       call solver(n,ng,arrplanp,normfftp,lambdaxyp,ap,bp,cp,cbcpre,['c','c','c'],pp)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,pp)
       call correc(n,dli,dzci,dtrk,pp,u,v,w)
-      call cmpt_bcuvw(cbcvel,n,bcvel,is_bound,.false.,lo,l,dl,zc,visc,kap_log,b_log,hwm,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
-      call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,.true.,dl,dzc,dzf,u,v,w)
-      call cmpt_bcuvw(cbcvel_wm,n,bcvel,is_bound,.true.,lo,l,dl,zc,visc,kap_log,b_log,hwm,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
-      call bounduvw_wm(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.true.,dl,dzc,dzf,u,v,w)
-      ! call bounduvw(cbcvel_wm,n,bcu,bcv,bcw,nb,is_bound,.true.,dl,dzc,dzf,u,v,w)
-
+      call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,lo,l,dl,zc,visc,hwm,.true.,dzc,dzf,u,v,w)
       call updatep(n,dli,dzci,dzfi,alpha,pp,p)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
-    end do !irk=1,3
+    end do
     dpdl(:) = -dpdl(:)*dti
     !
     ! check simulation stopping criteria

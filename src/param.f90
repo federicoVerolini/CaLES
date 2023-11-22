@@ -64,6 +64,7 @@ real(rp), protected, dimension(3) :: velf
 real(rp), protected, dimension(3) :: dl,dli
 real(rp), protected :: visc
 !
+integer, protected, dimension(0:1,3) :: lwm
 real(rp), protected :: hwm
 #if defined(_OPENACC)
 !
@@ -100,6 +101,7 @@ contains
                   velf, &
                   dims
     namelist /les/ &
+                  lwm, &
                   hwm
 #if defined(_OPENACC)
     namelist /cudecomp/ &
@@ -131,6 +133,7 @@ contains
         error stop
       end if
     close(iunit)
+    !
     !
 #if defined(_OPENACC)
     !

@@ -32,7 +32,7 @@ module mod_sanity
   public test_sanity_input
   ! public test_sanity_input,test_sanity_solver
   contains
-  subroutine test_sanity_input(ng,dims,stop_type,cbcvel,cbcpre,bcvel,bcpre,is_forced)
+  subroutine test_sanity_input(ng,dims,stop_type,cbcvel,cbcpre,bcvel,bcpre,lwm,is_forced)
     !
     ! performs some a priori checks of the input files before the calculation starts
     !
@@ -44,13 +44,14 @@ module mod_sanity
     character(len=1), intent(in), dimension(0:1,3)   :: cbcpre
     real(rp)        , intent(in), dimension(0:1,3,3) :: bcvel
     real(rp)        , intent(in), dimension(0:1,3)   :: bcpre
+    integer         , intent(in), dimension(0:1,3)   :: lwm
     logical         , intent(in), dimension(3)       :: is_forced
     logical :: passed
     !
-    call chk_dims(ng,dims,passed);                 if(.not.passed) call abortit
-    call chk_stop_type(stop_type,passed);          if(.not.passed) call abortit
-    call chk_bc(cbcvel,cbcpre,bcvel,bcpre,passed); if(.not.passed) call abortit
-    call chk_forcing(cbcpre,is_forced,passed);     if(.not.passed) call abortit
+    call chk_dims(ng,dims,passed);                     if(.not.passed) call abortit
+    call chk_stop_type(stop_type,passed);              if(.not.passed) call abortit
+    call chk_bc(cbcvel,cbcpre,bcvel,bcpre,lwm,passed); if(.not.passed) call abortit
+    call chk_forcing(cbcpre,is_forced,passed);         if(.not.passed) call abortit
 #if defined(_IMPDIFF_1D) && !defined(_IMPDIFF)
     if(myid == 0)  print*, 'ERROR: `_IMPDIFF_1D` cpp macro requires building with `_IMPDIFF` too.'; call abortit
 #endif
@@ -86,15 +87,16 @@ module mod_sanity
     passed = passed.and.passed_loc
   end subroutine chk_dims
   !
-  subroutine chk_bc(cbcvel,cbcpre,bcvel,bcpre,passed)
+  subroutine chk_bc(cbcvel,cbcpre,bcvel,bcpre,lwm,passed)
     implicit none
     character(len=1), intent(in), dimension(0:1,3,3) :: cbcvel
     character(len=1), intent(in), dimension(0:1,3  ) :: cbcpre
     real(rp)        , intent(in), dimension(0:1,3,3) :: bcvel
     real(rp)        , intent(in), dimension(0:1,3  ) :: bcpre
+    integer         , intent(in), dimension(0:1,3  ) :: lwm
     logical         , intent(out) :: passed
     character(len=2) :: bc01v,bc01p
-    integer :: ivel,idir
+    integer :: i,ivel,idir
     logical :: passed_loc
     passed = .true.
     !
@@ -146,6 +148,17 @@ module mod_sanity
     end do
     if(myid == 0.and.(.not.passed_loc)) &
       print*, 'ERROR: pressure BCs in directions x and y must be homogeneous (value = 0.).'
+    passed = passed.and.passed_loc
+    !
+    print*,lwm 
+    passed_loc = .true.
+    do idir = 1,3
+      do i = 0,1
+        if(lwm(i,idir)>0) passed_loc = passed_loc.and.any(cbcvel(i,idir,1:3)/='P')
+      end do
+    end do
+    if(myid == 0.and.(.not.passed_loc)) &
+    print*, 'ERROR: wall model can be imposed on periodic BCs.'
     passed = passed.and.passed_loc
 #if defined(_IMPDIFF)
     !implicit(1d): bcs in x and y must be 'D' or 'P', If 'D', bcvel=0

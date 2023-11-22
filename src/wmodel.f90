@@ -4,221 +4,177 @@
 ! SPDX-License-Identifier: MIT
 !
 ! -
-module mod_wmodel
+module mod_wmodel    !!!!!rename as wallstress
   use mod_precision
   use mod_typedef, only: cond_bound
+  use mod_param, only: kap_log,b_log
   implicit none
   private
   public cmpt_bcuvw,cmpt_bcp
   contains
     !
-  subroutine cmpt_bcuvw(cbc,n,bc,is_bound,is_wm,lo,l,dl,zc,visc,kap,b,h,u,v,w,bctau1,bctau2,bcu,bcv,bcw)
+  subroutine cmpt_bcuvw(n,is_bound,lwm,lo,l,dl,zc,visc,h,u,v,w,bcu,bcv,bcw)
     !
     ! bcu,bcv,bcw, determined via bcvel or wall model
     !
     implicit none
-    character(len=1), intent(inout), dimension(0:1,3,3) :: cbc
     integer , intent(in), dimension(3) :: n
-    real(rp), intent(in), dimension(0:1,3,3) :: bc
     logical , intent(in), dimension(0:1,3) :: is_bound
-    logical , intent(in) :: is_wm
+    integer , intent(in), dimension(0:1,3) :: lwm
     integer , intent(in), dimension(3) :: lo
     real(rp), intent(in), dimension(3) :: l,dl
     real(rp), intent(in), dimension(0:) :: zc
-    real(rp), intent(in) :: visc,kap,b,h
+    real(rp), intent(in) :: visc,h
     real(rp), intent(in), dimension(0:,0:,0:) :: u,v,w
-    type(cond_bound), intent(inout) :: bctau1,bctau2
     type(cond_bound), intent(inout) :: bcu,bcv,bcw
     real(rp) :: wei,uh,vh,wh,u1,u2,v1,v2,w1,w2,tauw(2)
     integer  :: i,j,k,j1,j2,k1,k2
     !
-    if(.not.is_wm) then
-      !bcu,bcv,bcw, determined via bcvel
-      if(is_bound(0,1)) then
-        if(cbc(0,1,1)/='P') bcu%x(:,:,0) = bc(0,1,1)
-        if(cbc(0,1,2)/='P') bcv%x(:,:,0) = bc(0,1,2)
-        if(cbc(0,1,3)/='P') bcw%x(:,:,0) = bc(0,1,3)
-      end if
-      if(is_bound(1,1)) then
-        if(cbc(1,1,1)/='P') bcu%x(:,:,1) = bc(1,1,1)
-        if(cbc(1,1,2)/='P') bcv%x(:,:,1) = bc(1,1,2)
-        if(cbc(1,1,3)/='P') bcw%x(:,:,1) = bc(1,1,3)
-      end if
-      if(is_bound(0,2)) then
-        if(cbc(0,2,1)/='P') bcu%y(:,:,0) = bc(0,2,1)
-        if(cbc(0,2,2)/='P') bcv%y(:,:,0) = bc(0,2,2)
-        if(cbc(0,2,3)/='P') bcw%y(:,:,0) = bc(0,2,3)
-      end if
-      if(is_bound(1,2)) then
-        if(cbc(1,2,1)/='P') bcu%y(:,:,1) = bc(1,2,1)
-        if(cbc(1,2,2)/='P') bcv%y(:,:,1) = bc(1,2,2)
-        if(cbc(1,2,3)/='P') bcw%y(:,:,1) = bc(1,2,3)
-      end if
-      if(is_bound(0,3)) then
-        if(cbc(0,3,1)/='P') bcu%z(:,:,0) = bc(0,3,1)
-        if(cbc(0,3,2)/='P') bcv%z(:,:,0) = bc(0,3,2)
-        if(cbc(0,3,3)/='P') bcw%z(:,:,0) = bc(0,3,3)
-      end if
-      if(is_bound(1,3)) then
-        if(cbc(1,3,1)/='P') bcu%z(:,:,1) = bc(1,3,1)
-        if(cbc(1,3,2)/='P') bcv%z(:,:,1) = bc(1,3,2)
-        if(cbc(1,3,3)/='P') bcw%z(:,:,1) = bc(1,3,3)
-      end if
-    else
-      ! to be simplified
-      ! modify bc 1, consistent with bc 0, using h, rather than l-h
-      if(is_bound(0,3).and.cbc(0,3,1)/='P') then  !to be improved by modifying input.nml straightly
-        cbc(0,3,1) = 'N'
-        cbc(0,3,2) = 'N'
-        !lower wall
-        k = 1
-        do while(zc(k) < h)
-          k = k + 1
+    ! to be simplified
+    ! modify bc 1, consistent with bc 0, using h, rather than l-h
+    if(is_bound(0,3).and.lwm(0,3)>0) then  !to be improved by modifying input.nml straightly
+      !lower wall
+      k = 1
+      do while(zc(k) < h)
+        k = k + 1
+      end do
+      if(k > n(3)) print *, 'error with wall model'
+      k2 = k
+      k1 = k - 1
+      wei= (h-zc(k1))/(zc(k2)-zc(k1))
+      do j = 1,n(2)
+        do i = 1,n(1)
+          u1 = u(i,j,k1)
+          u2 = u(i,j,k2)
+          v1 = 0.25_rp*(v(i,j  ,k1) + v(i+1,j  ,k1) + &
+                        v(i,j-1,k1) + v(i+1,j-1,k1))
+          v2 = 0.25_rp*(v(i,j  ,k2) + v(i+1,j  ,k2) + &
+                        v(i,j-1,k2) + v(i+1,j-1,k2))
+          uh = (1._rp - wei)*u1 + wei*u2
+          vh = (1._rp - wei)*v1 + wei*v2
+          call wallmodel(uh,vh,h,visc,tauw)
+          bcu%z(i,j,0) = 1._rp/visc*tauw(1) !tauw, x direction
+          
+          u1 = 0.25_rp*(u(i-1,j  ,k1) + u(i,j  ,k1) + &
+                        u(i-1,j+1,k1) + u(i,j+1,k1))
+          u2 = 0.25_rp*(u(i-1,j  ,k1) + u(i,j  ,k1) + &
+                        u(i-1,j+1,k1) + u(i,j+1,k1))
+          v1 = v(i,j,k1)
+          v2 = v(i,j,k2)
+          uh = (1._rp - wei)*u1 + wei*u2
+          vh = (1._rp - wei)*v1 + wei*v2
+          call wallmodel(uh,vh,h,visc,tauw)
+          bcv%z(i,j,0) = 1._rp/visc*tauw(2) !tauw, y direction
         end do
-        if(k > n(3)) print *, 'error with wall model'
-        k2 = k
-        k1 = k - 1
-        wei= (h-zc(k1))/(zc(k2)-zc(k1))
-        do j = 1,n(2)
-          do i = 1,n(1)
-            u1 = u(i,j,k1)
-            u2 = u(i,j,k2)
-            v1 = 0.25_rp*(v(i,j  ,k1) + v(i+1,j  ,k1) + &
-                          v(i,j-1,k1) + v(i+1,j-1,k1))
-            v2 = 0.25_rp*(v(i,j  ,k2) + v(i+1,j  ,k2) + &
-                          v(i,j-1,k2) + v(i+1,j-1,k2))
-            uh = (1._rp - wei)*u1 + wei*u2
-            vh = (1._rp - wei)*v1 + wei*v2
-            call wallmodel(uh,vh,h,visc,kap,b,tauw)
-            bcu%z(i,j,0) = 1._rp/visc*tauw(1) !tauw, x direction
-            
-            u1 = 0.25_rp*(u(i-1,j  ,k1) + u(i,j  ,k1) + &
-                          u(i-1,j+1,k1) + u(i,j+1,k1))
-            u2 = 0.25_rp*(u(i-1,j  ,k1) + u(i,j  ,k1) + &
-                          u(i-1,j+1,k1) + u(i,j+1,k1))
-            v1 = v(i,j,k1)
-            v2 = v(i,j,k2)
-            uh = (1._rp - wei)*u1 + wei*u2
-            vh = (1._rp - wei)*v1 + wei*v2
-            call wallmodel(uh,vh,h,visc,kap,b,tauw)
-            bcv%z(i,j,0) = 1._rp/visc*tauw(2) !tauw, y direction
-          end do
+      end do
+    end if
+    if(is_bound(1,3).and.lwm(1,3)>0) then
+      !upper wall
+      k = n(3)
+      do while(zc(k) > l(3)-h)
+        k = k - 1
+      end do
+      if(k < 1) print *, 'error with wall model'
+      k2 = k
+      k1 = k + 1
+      wei= ((l(3)-h)-zc(k1))/(zc(k2)-zc(k1))
+      do j = 1,n(2)
+        do i = 1,n(1)
+          u1 = u(i,j,k1)
+          u2 = u(i,j,k2)
+          v1 = 0.25_rp*(v(i,j  ,k1) + v(i+1,j  ,k1) + &
+                        v(i,j-1,k1) + v(i+1,j-1,k1))
+          v2 = 0.25_rp*(v(i,j  ,k2) + v(i+1,j  ,k2) + &
+                        v(i,j-1,k2) + v(i+1,j-1,k2))
+          uh = (1._rp - wei)*u1 + wei*u2
+          vh = (1._rp - wei)*v1 + wei*v2
+          call wallmodel(uh,vh,h,visc,tauw)
+          bcu%z(i,j,1) = -1._rp/visc*tauw(1) !tauw, x direction
+          u1 = 0.25_rp*(u(i-1,j  ,k1) + u(i,j  ,k1) + &
+                        u(i-1,j+1,k1) + u(i,j+1,k1))
+          u2 = 0.25_rp*(u(i-1,j  ,k1) + u(i,j  ,k1) + &
+                        u(i-1,j+1,k1) + u(i,j+1,k1))
+          v1 = v(i,j,k1)
+          v2 = v(i,j,k2)
+          uh = (1._rp - wei)*u1 + wei*u2
+          vh = (1._rp - wei)*v1 + wei*v2
+          call wallmodel(uh,vh,h,visc,tauw)
+          bcv%z(i,j,1) = -1._rp/visc*tauw(2) !tauw, y direction
         end do
-      end if
-      if(is_bound(1,3).and.cbc(1,3,1)/='P') then
-        cbc(1,3,1) = 'N'
-        cbc(1,3,2) = 'N'
-        !upper wall
-        k = n(3)
-        do while(zc(k) > l(3)-h)
-          k = k - 1
+      end do
+    end if
+    !used in square duct (four walls)
+    if(is_bound(0,2).and.lwm(0,2)>0) then
+      !lower wall
+      j = 1
+      do while((j-0.5)*dl(2) < h)
+        j = j + 1
+      end do
+      if(j > n(2)) print *, 'error with wall model'
+      j2 = j
+      j1 = j - 1
+      wei= (h-(j1-0.5)*dl(2))/((j2-j1)*dl(2))
+      do k = 1,n(3)
+        do i = 1,n(1)
+          u1 = u(i,j1,k)
+          u2 = u(i,j2,k)
+          w1 = 0.25_rp*(w(i,j1,k  ) + w(i+1,j1,k) + &
+                        w(i,j1,k-1) + w(i+1,j1,k))
+          w2 = 0.25_rp*(w(i,j2,k  ) + w(i+1,j2,k) + &
+                        w(i,j2,k-1) + w(i+1,j2,k))
+          uh = (1._rp - wei)*u1 + wei*u2
+          wh = (1._rp - wei)*w1 + wei*w2
+          call wallmodel(uh,wh,h,visc,tauw)
+          bcu%y(i,k,0) = 1._rp/visc*tauw(1) !tauw, x direction
+          
+          u1 = 0.25_rp*(u(i-1,j1,k  ) + u(i,j1,k  ) + &
+                        u(i-1,j1,k+1) + u(i,j1,k+1))
+          u2 = 0.25_rp*(u(i-1,j2,k  ) + u(i,j2,k  ) + &
+                        u(i-1,j2,k+1) + u(i,j2,k+1))
+          w1 = w(i,j1,k)
+          w2 = w(i,j2,k)
+          uh = (1._rp - wei)*u1 + wei*u2
+          wh = (1._rp - wei)*w1 + wei*w2
+          call wallmodel(uh,wh,h,visc,tauw)
+          bcw%y(i,k,0) = 1._rp/visc*tauw(2) !tauw, z direction
         end do
-        if(k < 1) print *, 'error with wall model'
-        k2 = k
-        k1 = k + 1
-        wei= ((l(3)-h)-zc(k1))/(zc(k2)-zc(k1))
-        do j = 1,n(2)
-          do i = 1,n(1)
-            u1 = u(i,j,k1)
-            u2 = u(i,j,k2)
-            v1 = 0.25_rp*(v(i,j  ,k1) + v(i+1,j  ,k1) + &
-                          v(i,j-1,k1) + v(i+1,j-1,k1))
-            v2 = 0.25_rp*(v(i,j  ,k2) + v(i+1,j  ,k2) + &
-                          v(i,j-1,k2) + v(i+1,j-1,k2))
-            uh = (1._rp - wei)*u1 + wei*u2
-            vh = (1._rp - wei)*v1 + wei*v2
-            call wallmodel(uh,vh,h,visc,kap,b,tauw)
-            bcu%z(i,j,1) = -1._rp/visc*tauw(1) !tauw, x direction
-            u1 = 0.25_rp*(u(i-1,j  ,k1) + u(i,j  ,k1) + &
-                          u(i-1,j+1,k1) + u(i,j+1,k1))
-            u2 = 0.25_rp*(u(i-1,j  ,k1) + u(i,j  ,k1) + &
-                          u(i-1,j+1,k1) + u(i,j+1,k1))
-            v1 = v(i,j,k1)
-            v2 = v(i,j,k2)
-            uh = (1._rp - wei)*u1 + wei*u2
-            vh = (1._rp - wei)*v1 + wei*v2
-            call wallmodel(uh,vh,h,visc,kap,b,tauw)
-            bcv%z(i,j,1) = -1._rp/visc*tauw(2) !tauw, y direction
-          end do
+      end do
+    end if
+    if(is_bound(1,2).and.lwm(1,2)>0) then
+      !upper wall
+      j = n(2)
+      do while(((j-1+lo(2))-0.5)*dl(2) > l(2)-h)
+        j = j - 1
+      end do
+      if(j < 1) print *, 'error with wall model'
+      j2 = j
+      j1 = j + 1
+      wei= ((l(2)-h)-((j1-1+lo(2))-0.5)*dl(2))/((j2-j1)*dl(2))
+      do k = 1,n(3)
+        do i = 1,n(1)
+          u1 = u(i,j1,k)
+          u2 = u(i,j2,k)
+          w1 = 0.25_rp*(w(i,j1,k  ) + w(i+1,j1,k) + &
+                        w(i,j1,k-1) + w(i+1,j1,k))
+          w2 = 0.25_rp*(w(i,j2,k  ) + w(i+1,j2,k) + &
+                        w(i,j2,k-1) + w(i+1,j2,k))
+          uh = (1._rp - wei)*u1 + wei*u2
+          wh = (1._rp - wei)*w1 + wei*w2
+          call wallmodel(uh,wh,h,visc,tauw)
+          bcu%y(i,k,1) = -1._rp/visc*tauw(1) !tauw, x direction
+          
+          u1 = 0.25_rp*(u(i-1,j1,k  ) + u(i,j1,k  ) + &
+                        u(i-1,j1,k+1) + u(i,j1,k+1))
+          u2 = 0.25_rp*(u(i-1,j2,k  ) + u(i,j2,k  ) + &
+                        u(i-1,j2,k+1) + u(i,j2,k+1))
+          w1 = w(i,j1,k)
+          w2 = w(i,j2,k)
+          uh = (1._rp - wei)*u1 + wei*u2
+          wh = (1._rp - wei)*w1 + wei*w2
+          call wallmodel(uh,wh,h,visc,tauw)
+          bcw%y(i,k,1) = -1._rp/visc*tauw(2) !tauw, z direction
         end do
-      end if
-      !used in square duct (four walls)
-      if(is_bound(0,2).and.cbc(0,2,1)/='P') then
-        cbc(0,2,1) = 'N'
-        cbc(0,2,3) = 'N'
-        !lower wall
-        j = 1
-        do while((j-0.5)*dl(2) < h)
-          j = j + 1
-        end do
-        if(j > n(2)) print *, 'error with wall model'
-        j2 = j
-        j1 = j - 1
-        wei= (h-(j1-0.5)*dl(2))/((j2-j1)*dl(2))
-        do k = 1,n(3)
-          do i = 1,n(1)
-            u1 = u(i,j1,k)
-            u2 = u(i,j2,k)
-            w1 = 0.25_rp*(w(i,j1,k  ) + w(i+1,j1,k) + &
-                          w(i,j1,k-1) + w(i+1,j1,k))
-            w2 = 0.25_rp*(w(i,j2,k  ) + w(i+1,j2,k) + &
-                          w(i,j2,k-1) + w(i+1,j2,k))
-            uh = (1._rp - wei)*u1 + wei*u2
-            wh = (1._rp - wei)*w1 + wei*w2
-            call wallmodel(uh,wh,h,visc,kap,b,tauw)
-            bcu%y(i,k,0) = 1._rp/visc*tauw(1) !tauw, x direction
-            
-            u1 = 0.25_rp*(u(i-1,j1,k  ) + u(i,j1,k  ) + &
-                          u(i-1,j1,k+1) + u(i,j1,k+1))
-            u2 = 0.25_rp*(u(i-1,j2,k  ) + u(i,j2,k  ) + &
-                          u(i-1,j2,k+1) + u(i,j2,k+1))
-            w1 = w(i,j1,k)
-            w2 = w(i,j2,k)
-            uh = (1._rp - wei)*u1 + wei*u2
-            wh = (1._rp - wei)*w1 + wei*w2
-            call wallmodel(uh,wh,h,visc,kap,b,tauw)
-            bcw%y(i,k,0) = 1._rp/visc*tauw(2) !tauw, z direction
-          end do
-        end do
-      end if
-      if(is_bound(1,2).and.cbc(1,2,1)/='P') then
-        cbc(1,2,1) = 'N'
-        cbc(1,2,3) = 'N'
-        !upper wall
-        j = n(2)
-        do while(((j-1+lo(2))-0.5)*dl(2) > l(2)-h)
-          j = j - 1
-        end do
-        if(j < 1) print *, 'error with wall model'
-        j2 = j
-        j1 = j + 1
-        wei= ((l(2)-h)-((j1-1+lo(2))-0.5)*dl(2))/((j2-j1)*dl(2))
-        do k = 1,n(3)
-          do i = 1,n(1)
-            u1 = u(i,j1,k)
-            u2 = u(i,j2,k)
-            w1 = 0.25_rp*(w(i,j1,k  ) + w(i+1,j1,k) + &
-                          w(i,j1,k-1) + w(i+1,j1,k))
-            w2 = 0.25_rp*(w(i,j2,k  ) + w(i+1,j2,k) + &
-                          w(i,j2,k-1) + w(i+1,j2,k))
-            uh = (1._rp - wei)*u1 + wei*u2
-            wh = (1._rp - wei)*w1 + wei*w2
-            call wallmodel(uh,wh,h,visc,kap,b,tauw)
-            bcu%y(i,k,1) = -1._rp/visc*tauw(1) !tauw, x direction
-            
-            u1 = 0.25_rp*(u(i-1,j1,k  ) + u(i,j1,k  ) + &
-                          u(i-1,j1,k+1) + u(i,j1,k+1))
-            u2 = 0.25_rp*(u(i-1,j2,k  ) + u(i,j2,k  ) + &
-                          u(i-1,j2,k+1) + u(i,j2,k+1))
-            w1 = w(i,j1,k)
-            w2 = w(i,j2,k)
-            uh = (1._rp - wei)*u1 + wei*u2
-            wh = (1._rp - wei)*w1 + wei*w2
-            call wallmodel(uh,wh,h,visc,kap,b,tauw)
-            bcw%y(i,k,1) = -1._rp/visc*tauw(2) !tauw, z direction
-          end do
-        end do
-      end if
+      end do
     end if
     !
   end subroutine cmpt_bcuvw
@@ -304,8 +260,9 @@ module mod_wmodel
   !   end do
   ! end subroutine cmpt_bctau
   !
-  subroutine wallmodel(uh,vh,h,visc,kap,b,tauw)
-    real(rp), intent(in)  :: uh,vh,h,visc,kap,b
+  subroutine wallmodel(uh,vh,h,visc,tauw)
+    implicit none
+    real(rp), intent(in)  :: uh,vh,h,visc
     real(rp), intent(out), dimension(2) :: tauw
     real(rp) :: upar,utau,f,fp,conv,tauw_old,tauw_tot
     real(rp) :: umax
@@ -317,8 +274,8 @@ module mod_wmodel
       conv = 1._rp
       do while(conv > 1.e-4)
         tauw_old = utau*utau
-        f  = upar/utau - 1._rp/kap*log(h*utau/visc) - b
-        fp = -1._rp/utau*(upar/utau + 1._rp/kap)
+        f  = upar/utau - 1._rp/kap_log*log(h*utau/visc) - b_log
+        fp = -1._rp/utau*(upar/utau + 1._rp/kap_log)
         utau = abs(utau - f/fp)  !to be improved
         tauw_tot = utau*utau
         conv = abs(tauw_tot-tauw_old)/tauw_old

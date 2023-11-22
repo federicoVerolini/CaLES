@@ -9,28 +9,44 @@ module mod_bound
   use mod_common_mpi, only: ierr,halo,ipencil_axis
   use mod_precision
   use mod_typedef   , only: cond_bound
+  use mod_wmodel    , only: cmpt_bcuvw
   implicit none
   private
-  public boundp,bounduvw,updt_rhs_b,bounduvw_wm
+  public boundp,bounduvw,updt_rhs_b,initbc
   contains
-  subroutine bounduvw(cbc,n,bcu,bcv,bcw,nb,is_bound,is_correc,dl,dzc,dzf,u,v,w)
+  subroutine bounduvw(cbc,n,bcu,bcv,bcw,nb,is_bound,lwm,lo,l,dl,zc,visc,h,is_correc,dzc,dzf,u,v,w)
     !
     ! imposes velocity boundary conditions
     !
     implicit none
     character(len=1), intent(in), dimension(0:1,3,3) :: cbc
     integer         , intent(in), dimension(3) :: n
-    type(cond_bound), intent(in) :: bcu,bcv,bcw
-    integer , intent(in), dimension(0:1,3  ) :: nb
-    logical , intent(in), dimension(0:1,3  ) :: is_bound
-    logical , intent(in)                     :: is_correc
-    real(rp), intent(in), dimension(3 ) :: dl
+    type(cond_bound), intent(inout) :: bcu,bcv,bcw
+    integer , intent(in), dimension(0:1,3) :: nb
+    logical , intent(in), dimension(0:1,3) :: is_bound
+    integer , intent(in), dimension(0:1,3) :: lwm 
+    integer , intent(in), dimension(3) :: lo
+    real(rp), intent(in), dimension(3) :: l,dl
+    real(rp), intent(in), dimension(0:) :: zc
+    real(rp), intent(in) :: visc,h
+    logical , intent(in) :: is_correc
     real(rp), intent(in), dimension(0:) :: dzc,dzf
     real(rp), intent(inout), dimension(0:,0:,0:) :: u,v,w
+    character(len=1), dimension(0:1,3,3) :: cbc_w
     logical :: impose_norm_bc
-    integer :: idir,nh
+    integer :: i,j,idir,nh
     !
     nh = 1
+    !
+    cbc_w = cbc
+    do idir = 1,3
+      do i = 0,1
+        if(is_bound(i,idir).and.lwm(i,idir)>0) then
+          cbc_w(i,idir,1:3 ) = 'N'
+          cbc_w(i,idir,idir) = cbc(i,idir,idir)
+        end if
+      end do
+    end do
     !
 #if !defined(_OPENACC)
     do idir = 1,3
@@ -39,144 +55,175 @@ module mod_bound
       call updthalo(nh,halo(idir),nb(:,idir),idir,w)
     end do
 #else
-    call updthalo_gpu(nh,cbc(0,:,1)//cbc(1,:,1)==['PP','PP','PP'],u)
-    call updthalo_gpu(nh,cbc(0,:,2)//cbc(1,:,2)==['PP','PP','PP'],v)
-    call updthalo_gpu(nh,cbc(0,:,3)//cbc(1,:,3)==['PP','PP','PP'],w)
+    call updthalo_gpu(nh,cbc_w(0,:,1)//cbc_w(1,:,1)==['PP','PP','PP'],u)
+    call updthalo_gpu(nh,cbc_w(0,:,2)//cbc_w(1,:,2)==['PP','PP','PP'],v)
+    call updthalo_gpu(nh,cbc_w(0,:,3)//cbc_w(1,:,3)==['PP','PP','PP'],w)
 #endif
     !
-    !impose_norm_bc=1, the corrected wall-normal component retains
-    !the prediction values for homogeneous pressure wall bc
-    !this holds even if a wall model is used, due to Dirichlet bc on the wall-normal component
-    impose_norm_bc = (.not.is_correc).or.(cbc(0,1,1)//cbc(1,1,1) == 'PP')
-    if(is_bound(0,1).and.cbc(0,1,1)=='P') then
-      if(impose_norm_bc) call set_bc(cbc(0,1,1),0,1,nh,.false.,bcu%x,dl(1),u)
-                         call set_bc(cbc(0,1,2),0,1,nh,.true. ,bcv%x,dl(1),v)
-                         call set_bc(cbc(0,1,3),0,1,nh,.true. ,bcw%x,dl(1),w)
+    !impose_norm_bc=0, the correction does not change wall-normal velocity on walls
+    !this also holds when a wall model is used due to non-penetrating bc
+    if(is_bound(0,1)) then
+      if(cbc_w(0,1,1)=='P'.or.(cbc_w(0,1,1)/='P'.and..not.is_correc)) &
+                            call set_bc(cbc_w(0,1,1),0,1,nh,.false.,bcu%x,dl(1),u)
+      if(cbc_w(0,1,2)=='P') call set_bc(cbc_w(0,1,2),0,1,nh,.true. ,bcv%x,dl(1),v)
+      if(cbc_w(0,1,3)=='P') call set_bc(cbc_w(0,1,3),0,1,nh,.true. ,bcw%x,dl(1),w)
     end if
-    if(is_bound(1,1).and.cbc(1,1,1)=='P') then
-      if(impose_norm_bc) call set_bc(cbc(1,1,1),1,1,nh,.false.,bcu%x,dl(1),u)
-                         call set_bc(cbc(1,1,2),1,1,nh,.true. ,bcv%x,dl(1),v)
-                         call set_bc(cbc(1,1,3),1,1,nh,.true. ,bcw%x,dl(1),w)
+    if(is_bound(1,1)) then
+      if(cbc_w(1,1,1)=='P'.or.(cbc_w(1,1,1)/='P'.and..not.is_correc)) &
+                            call set_bc(cbc_w(1,1,1),1,1,nh,.false.,bcu%x,dl(1),u)
+      if(cbc_w(1,1,2)=='P') call set_bc(cbc_w(1,1,2),1,1,nh,.true. ,bcv%x,dl(1),v)
+      if(cbc_w(1,1,3)=='P') call set_bc(cbc_w(1,1,3),1,1,nh,.true. ,bcw%x,dl(1),w)
     end if
-    impose_norm_bc = (.not.is_correc).or.(cbc(0,2,2)//cbc(1,2,2) == 'PP')
-    if(is_bound(0,2).and.cbc(0,2,1)=='P') then
-                         call set_bc(cbc(0,2,1),0,2,nh,.true. ,bcu%y,dl(2),u)
-      if(impose_norm_bc) call set_bc(cbc(0,2,2),0,2,nh,.false.,bcv%y,dl(2),v)
-                         call set_bc(cbc(0,2,3),0,2,nh,.true. ,bcw%y,dl(2),w)
-     end if
-    if(is_bound(1,2).and.cbc(1,2,1)=='P') then
-                         call set_bc(cbc(1,2,1),1,2,nh,.true. ,bcu%y,dl(2),u)
-      if(impose_norm_bc) call set_bc(cbc(1,2,2),1,2,nh,.false.,bcv%y,dl(2),v)
-                         call set_bc(cbc(1,2,3),1,2,nh,.true. ,bcw%y,dl(2),w)
+    if(is_bound(0,2)) then
+      if(cbc_w(0,2,1)=='P') call set_bc(cbc_w(0,2,1),0,2,nh,.true. ,bcu%y,dl(2),u)
+      if(cbc_w(0,2,2)=='P'.or.(cbc_w(0,2,2)/='P'.and..not.is_correc)) &
+                            call set_bc(cbc_w(0,2,2),0,2,nh,.false.,bcv%y,dl(2),v)
+      if(cbc_w(0,2,3)=='P') call set_bc(cbc_w(0,2,3),0,2,nh,.true. ,bcw%y,dl(2),w)
     end if
-    impose_norm_bc = (.not.is_correc).or.(cbc(0,3,3)//cbc(1,3,3) == 'PP')
-    if(is_bound(0,3).and.cbc(0,3,1)=='P') then
-                         call set_bc(cbc(0,3,1),0,3,nh,.true. ,bcu%z,dzc(0)   ,u)
-                         call set_bc(cbc(0,3,2),0,3,nh,.true. ,bcv%z,dzc(0)   ,v)
-      if(impose_norm_bc) call set_bc(cbc(0,3,3),0,3,nh,.false.,bcw%z,dzf(0)   ,w)
+    if(is_bound(1,2)) then
+      if(cbc_w(1,2,1)=='P') call set_bc(cbc_w(1,2,1),1,2,nh,.true. ,bcu%y,dl(2),u)
+      if(cbc_w(1,2,2)=='P'.or.(cbc_w(1,2,2)/='P'.and..not.is_correc)) &
+                            call set_bc(cbc_w(1,2,2),1,2,nh,.false.,bcv%y,dl(2),v)
+      if(cbc_w(1,2,3)=='P') call set_bc(cbc_w(1,2,3),1,2,nh,.true. ,bcw%y,dl(2),w)
     end if
-    if(is_bound(1,3).and.cbc(1,3,1)=='P') then
-                         call set_bc(cbc(1,3,1),1,3,nh,.true. ,bcu%z,dzc(n(3)),u)
-                         call set_bc(cbc(1,3,2),1,3,nh,.true. ,bcv%z,dzc(n(3)),v)
-      if(impose_norm_bc) call set_bc(cbc(1,3,3),1,3,nh,.false.,bcw%z,dzf(n(3)),w)
+    if(is_bound(0,3)) then
+      if(cbc_w(0,3,1)=='P') call set_bc(cbc_w(0,3,1),0,3,nh,.true. ,bcu%z,dzc(0)   ,u)
+      if(cbc_w(0,3,2)=='P') call set_bc(cbc_w(0,3,2),0,3,nh,.true. ,bcv%z,dzc(0)   ,v)
+      if(cbc_w(0,3,3)=='P'.or.(cbc_w(0,3,3)/='P'.and..not.is_correc)) &
+                            call set_bc(cbc_w(0,3,3),0,3,nh,.false.,bcw%z,dzf(0)   ,w)
     end if
-    !impose_norm_bc=1, the corrected wall-normal component retains
-    !the prediction value for homogeneous pressure wall bc
-    !this hold even if a wall model is used, due to Dirichlet bc on the wall-normal component
-    impose_norm_bc = (.not.is_correc).or.(cbc(0,1,1)//cbc(1,1,1) == 'PP')
-    if(is_bound(0,1).and.cbc(0,1,1)/='P') then !modify this after using 'M' for wall model bc 
-      if(impose_norm_bc) call set_bc(cbc(0,1,1),0,1,nh,.false.,bcu%x,dl(1),u)
-                        !  call set_bc(cbc(0,1,2),0,1,nh,.true. ,bcv%x,dl(1),v)
-                        !  call set_bc(cbc(0,1,3),0,1,nh,.true. ,bcw%x,dl(1),w)
+    if(is_bound(1,3)) then
+      if(cbc_w(1,3,1)=='P') call set_bc(cbc_w(1,3,1),1,3,nh,.true. ,bcu%z,dzc(n(3)),u)
+      if(cbc_w(1,3,2)=='P') call set_bc(cbc_w(1,3,2),1,3,nh,.true. ,bcv%z,dzc(n(3)),v)
+      if(cbc_w(1,3,3)=='P'.or.(cbc_w(1,3,3)/='P'.and..not.is_correc)) &
+                            call set_bc(cbc_w(1,3,3),1,3,nh,.false.,bcw%z,dzf(n(3)),w)
     end if
-    if(is_bound(1,1).and.cbc(1,1,1)/='P') then
-      if(impose_norm_bc) call set_bc(cbc(1,1,1),1,1,nh,.false.,bcu%x,dl(1),u)
-                        !  call set_bc(cbc(1,1,2),1,1,nh,.true. ,bcv%x,dl(1),v)
-                        !  call set_bc(cbc(1,1,3),1,1,nh,.true. ,bcw%x,dl(1),w)
-    end if
-    impose_norm_bc = (.not.is_correc).or.(cbc(0,2,2)//cbc(1,2,2) == 'PP')
-    if(is_bound(0,2).and.cbc(0,2,1)/='P') then
-                        !  call set_bc(cbc(0,2,1),0,2,nh,.true. ,bcu%y,dl(2),u)
-      if(impose_norm_bc) call set_bc(cbc(0,2,2),0,2,nh,.false.,bcv%y,dl(2),v)
-                        !  call set_bc(cbc(0,2,3),0,2,nh,.true. ,bcw%y,dl(2),w)
-    end if
-    if(is_bound(1,2).and.cbc(1,2,1)/='P') then
-                        !  call set_bc(cbc(1,2,1),1,2,nh,.true. ,bcu%y,dl(2),u)
-      if(impose_norm_bc) call set_bc(cbc(1,2,2),1,2,nh,.false.,bcv%y,dl(2),v)
-                        !  call set_bc(cbc(1,2,3),1,2,nh,.true. ,bcw%y,dl(2),w)
-    end if
-    impose_norm_bc = (.not.is_correc).or.(cbc(0,3,3)//cbc(1,3,3) == 'PP')
-    if(is_bound(0,3).and.cbc(0,3,1)/='P') then
-                        !  call set_bc(cbc(0,3,1),0,3,nh,.true. ,bcu%z,dzc(0)   ,u)
-                        !  call set_bc(cbc(0,3,2),0,3,nh,.true. ,bcv%z,dzc(0)   ,v)
-      if(impose_norm_bc) call set_bc(cbc(0,3,3),0,3,nh,.false.,bcw%z,dzf(0)   ,w)
-    end if
-    if(is_bound(1,3).and.cbc(1,3,1)/='P') then
-                        !  call set_bc(cbc(1,3,1),1,3,nh,.true. ,bcu%z,dzc(n(3)),u)
-                        !  call set_bc(cbc(1,3,2),1,3,nh,.true. ,bcv%z,dzc(n(3)),v)
-      if(impose_norm_bc) call set_bc(cbc(1,3,3),1,3,nh,.false.,bcw%z,dzf(n(3)),w)
-    end if
-  end subroutine bounduvw
-
-
-  subroutine bounduvw_wm(cbc,n,bcu,bcv,bcw,nb,is_bound,is_correc,dl,dzc,dzf,u,v,w)
     !
-    ! imposes velocity boundary conditions
+    call cmpt_bcuvw(n,is_bound,lwm,lo,l,dl,zc,visc,h,u,v,w,bcu,bcv,bcw)
+    !
+    if(is_bound(0,1)) then
+      if(cbc_w(0,1,2)/='P') call set_bc(cbc_w(0,1,2),0,1,nh,.true. ,bcv%x,dl(1),v)
+      if(cbc_w(0,1,3)/='P') call set_bc(cbc_w(0,1,3),0,1,nh,.true. ,bcw%x,dl(1),w)
+    end if
+    if(is_bound(1,1)) then
+      if(cbc_w(1,1,2)/='P') call set_bc(cbc_w(1,1,2),1,1,nh,.true. ,bcv%x,dl(1),v)
+      if(cbc_w(1,1,3)/='P') call set_bc(cbc_w(1,1,3),1,1,nh,.true. ,bcw%x,dl(1),w)
+    end if
+    if(is_bound(0,2)) then
+      if(cbc_w(0,2,1)/='P') call set_bc(cbc_w(0,2,1),0,2,nh,.true. ,bcu%y,dl(2),u)
+      if(cbc_w(0,2,3)/='P') call set_bc(cbc_w(0,2,3),0,2,nh,.true. ,bcw%y,dl(2),w)
+    end if
+    if(is_bound(1,2)) then
+      if(cbc_w(1,2,1)/='P') call set_bc(cbc_w(1,2,1),1,2,nh,.true. ,bcu%y,dl(2),u)
+      if(cbc_w(1,2,3)/='P') call set_bc(cbc_w(1,2,3),1,2,nh,.true. ,bcw%y,dl(2),w)
+    end if
+    if(is_bound(0,3)) then
+      if(cbc_w(0,3,1)/='P') call set_bc(cbc_w(0,3,1),0,3,nh,.true. ,bcu%z,dzc(0)   ,u)
+      if(cbc_w(0,3,2)/='P') call set_bc(cbc_w(0,3,2),0,3,nh,.true. ,bcv%z,dzc(0)   ,v)
+    end if
+    if(is_bound(1,3)) then
+      if(cbc_w(1,3,1)/='P') call set_bc(cbc_w(1,3,1),1,3,nh,.true. ,bcu%z,dzc(0)   ,u)
+      if(cbc_w(1,3,2)/='P') call set_bc(cbc_w(1,3,2),1,3,nh,.true. ,bcv%z,dzc(n(3)),v)
+    end if
+    !
+  end subroutine bounduvw
+  !
+  ! subroutine bounduvw_wm(cbc,n,bcu,bcv,bcw,nb,is_bound,is_correc,dl,dzc,dzf,u,v,w)
+  !   !
+  !   ! imposes velocity boundary conditions
+  !   !
+  !   implicit none
+  !   character(len=1), intent(in), dimension(0:1,3,3) :: cbc
+  !   integer         , intent(in), dimension(3) :: n
+  !   type(cond_bound), intent(in) :: bcu,bcv,bcw
+  !   integer , intent(in), dimension(0:1,3  ) :: nb
+  !   logical , intent(in), dimension(0:1,3  ) :: is_bound
+  !   logical , intent(in)                     :: is_correc
+  !   real(rp), intent(in), dimension(3 ) :: dl
+  !   real(rp), intent(in), dimension(0:) :: dzc,dzf
+  !   real(rp), intent(inout), dimension(0:,0:,0:) :: u,v,w
+  !   logical :: impose_norm_bc
+  !   integer :: idir,nh
+  !   !
+  !   nh = 1
+  !   !
+  !   ! do idir = 1,3
+  !   !   call updthalo(nh,halo(idir),nb(:,idir),idir,u)
+  !   !   call updthalo(nh,halo(idir),nb(:,idir),idir,v)
+  !   !   call updthalo(nh,halo(idir),nb(:,idir),idir,w)
+  !   ! end do
+  !   !
+  !   !!!!!!!!!!!!!!!!!!!!!!!
+  !   if(is_bound(0,1).and.cbc(0,1,1)/='P') then !modify this after using 'M' for wall model bc 
+  !                       !  call set_bc(cbc(0,1,1),0,1,nh,.false.,bcu%x,dl(1),u)
+  !                        call set_bc(cbc(0,1,2),0,1,nh,.true. ,bcv%x,dl(1),v)
+  !                        call set_bc(cbc(0,1,3),0,1,nh,.true. ,bcw%x,dl(1),w)
+  !   end if
+  !   if(is_bound(1,1).and.cbc(1,1,1)/='P') then
+  !                       !  call set_bc(cbc(1,1,1),1,1,nh,.false.,bcu%x,dl(1),u)
+  !                        call set_bc(cbc(1,1,2),1,1,nh,.true. ,bcv%x,dl(1),v)
+  !                        call set_bc(cbc(1,1,3),1,1,nh,.true. ,bcw%x,dl(1),w)
+  !   end if
+  !   if(is_bound(0,2).and.cbc(0,2,1)/='P') then
+  !                        call set_bc(cbc(0,2,1),0,2,nh,.true. ,bcu%y,dl(2),u)
+  !                       !  call set_bc(cbc(0,2,2),0,2,nh,.false.,bcv%y,dl(2),v)
+  !                        call set_bc(cbc(0,2,3),0,2,nh,.true. ,bcw%y,dl(2),w)
+  !   end if
+  !   if(is_bound(1,2).and.cbc(1,2,1)/='P') then
+  !                        call set_bc(cbc(1,2,1),1,2,nh,.true. ,bcu%y,dl(2),u)
+  !                       !  call set_bc(cbc(1,2,2),1,2,nh,.false.,bcv%y,dl(2),v)
+  !                        call set_bc(cbc(1,2,3),1,2,nh,.true. ,bcw%y,dl(2),w)
+  !   end if
+  !   if(is_bound(0,3).and.cbc(0,3,1)/='P') then
+  !                        call set_bc(cbc(0,3,1),0,3,nh,.true. ,bcu%z,dzc(0)   ,u)
+  !                        call set_bc(cbc(0,3,2),0,3,nh,.true. ,bcv%z,dzc(0)   ,v)
+  !                       !  call set_bc(cbc(0,3,3),0,3,nh,.false.,bcw%z,dzf(0)   ,w)
+  !   end if
+  !   if(is_bound(1,3).and.cbc(1,3,1)/='P') then
+  !                        call set_bc(cbc(1,3,1),1,3,nh,.true. ,bcu%z,dzc(n(3)),u)
+  !                        call set_bc(cbc(1,3,2),1,3,nh,.true. ,bcv%z,dzc(n(3)),v)
+  !                       !  call set_bc(cbc(1,3,3),1,3,nh,.false.,bcw%z,dzf(n(3)),w)
+  !   end if
+  ! end subroutine bounduvw_wm
+  !
+  subroutine initbc(bc1,bc2,bcu,bcv,bcw,bcp)
+    !
+    ! initialize bcu,bcv,bcw,bcp
     !
     implicit none
-    character(len=1), intent(in), dimension(0:1,3,3) :: cbc
-    integer         , intent(in), dimension(3) :: n
-    type(cond_bound), intent(in) :: bcu,bcv,bcw
-    integer , intent(in), dimension(0:1,3  ) :: nb
-    logical , intent(in), dimension(0:1,3  ) :: is_bound
-    logical , intent(in)                     :: is_correc
-    real(rp), intent(in), dimension(3 ) :: dl
-    real(rp), intent(in), dimension(0:) :: dzc,dzf
-    real(rp), intent(inout), dimension(0:,0:,0:) :: u,v,w
-    logical :: impose_norm_bc
-    integer :: idir,nh
+    real(rp), intent(in), dimension(0:1,3,3) :: bc1
+    real(rp), intent(in), dimension(0:1,3) :: bc2
+    type(cond_bound), intent(inout) :: bcu,bcv,bcw,bcp
     !
-    nh = 1
+    !wall model not considered in this initialization
+    bcu%x(:,:,0) = bc1(0,1,1)
+    bcu%x(:,:,0) = bc1(0,1,1)
+    bcv%x(:,:,0) = bc1(0,1,2)
+    bcw%x(:,:,0) = bc1(0,1,3)
+    bcu%x(:,:,1) = bc1(1,1,1)
+    bcv%x(:,:,1) = bc1(1,1,2)
+    bcw%x(:,:,1) = bc1(1,1,3)
+    bcu%y(:,:,0) = bc1(0,2,1)
+    bcv%y(:,:,0) = bc1(0,2,2)
+    bcw%y(:,:,0) = bc1(0,2,3)
+    bcu%y(:,:,1) = bc1(1,2,1)
+    bcv%y(:,:,1) = bc1(1,2,2)
+    bcw%y(:,:,1) = bc1(1,2,3)
+    bcu%z(:,:,0) = bc1(0,3,1)
+    bcv%z(:,:,0) = bc1(0,3,2)
+    bcw%z(:,:,0) = bc1(0,3,3)
+    bcu%z(:,:,1) = bc1(1,3,1)
+    bcv%z(:,:,1) = bc1(1,3,2)
+    bcw%z(:,:,1) = bc1(1,3,3)
     !
-    ! do idir = 1,3
-    !   call updthalo(nh,halo(idir),nb(:,idir),idir,u)
-    !   call updthalo(nh,halo(idir),nb(:,idir),idir,v)
-    !   call updthalo(nh,halo(idir),nb(:,idir),idir,w)
-    ! end do
+    bcp%x(:,:,0) = bc2(0,1)
+    bcp%x(:,:,1) = bc2(1,1)
+    bcp%y(:,:,0) = bc2(0,2)
+    bcp%y(:,:,1) = bc2(1,2)
+    bcp%z(:,:,0) = bc2(0,3)
+    bcp%z(:,:,1) = bc2(1,3)
     !
-    !!!!!!!!!!!!!!!!!!!!!!!
-    if(is_bound(0,1).and.cbc(0,1,1)/='P') then !modify this after using 'M' for wall model bc 
-                        !  call set_bc(cbc(0,1,1),0,1,nh,.false.,bcu%x,dl(1),u)
-                         call set_bc(cbc(0,1,2),0,1,nh,.true. ,bcv%x,dl(1),v)
-                         call set_bc(cbc(0,1,3),0,1,nh,.true. ,bcw%x,dl(1),w)
-    end if
-    if(is_bound(1,1).and.cbc(1,1,1)/='P') then
-                        !  call set_bc(cbc(1,1,1),1,1,nh,.false.,bcu%x,dl(1),u)
-                         call set_bc(cbc(1,1,2),1,1,nh,.true. ,bcv%x,dl(1),v)
-                         call set_bc(cbc(1,1,3),1,1,nh,.true. ,bcw%x,dl(1),w)
-    end if
-    if(is_bound(0,2).and.cbc(0,2,1)/='P') then
-                         call set_bc(cbc(0,2,1),0,2,nh,.true. ,bcu%y,dl(2),u)
-                        !  call set_bc(cbc(0,2,2),0,2,nh,.false.,bcv%y,dl(2),v)
-                         call set_bc(cbc(0,2,3),0,2,nh,.true. ,bcw%y,dl(2),w)
-    end if
-    if(is_bound(1,2).and.cbc(1,2,1)/='P') then
-                         call set_bc(cbc(1,2,1),1,2,nh,.true. ,bcu%y,dl(2),u)
-                        !  call set_bc(cbc(1,2,2),1,2,nh,.false.,bcv%y,dl(2),v)
-                         call set_bc(cbc(1,2,3),1,2,nh,.true. ,bcw%y,dl(2),w)
-    end if
-    if(is_bound(0,3).and.cbc(0,3,1)/='P') then
-                         call set_bc(cbc(0,3,1),0,3,nh,.true. ,bcu%z,dzc(0)   ,u)
-                         call set_bc(cbc(0,3,2),0,3,nh,.true. ,bcv%z,dzc(0)   ,v)
-                        !  call set_bc(cbc(0,3,3),0,3,nh,.false.,bcw%z,dzf(0)   ,w)
-    end if
-    if(is_bound(1,3).and.cbc(1,3,1)/='P') then
-                         call set_bc(cbc(1,3,1),1,3,nh,.true. ,bcu%z,dzc(n(3)),u)
-                         call set_bc(cbc(1,3,2),1,3,nh,.true. ,bcv%z,dzc(n(3)),v)
-                        !  call set_bc(cbc(1,3,3),1,3,nh,.false.,bcw%z,dzf(n(3)),w)
-    end if
-  end subroutine bounduvw_wm
-
+  end subroutine initbc
   !
   subroutine boundp(cbc,n,bcp,nb,is_bound,dl,dzc,p)
     !
