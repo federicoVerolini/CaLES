@@ -180,6 +180,7 @@ program cans
            rhsbp%y(n(1),n(3),0:1), &
            rhsbp%z(n(1),n(2),0:1))
   !defined as (0:n+1), consistent with halo cells
+  !defined in read_input?
   allocate(bcu%x(0:n(2)+1,0:n(3)+1,0:1), &
            bcv%x(0:n(2)+1,0:n(3)+1,0:1), &
            bcw%x(0:n(2)+1,0:n(3)+1,0:1), &
@@ -276,6 +277,7 @@ program cans
   ! test input files before proceeding with the calculation
   !
   call test_sanity_input(ng,dims,stop_type,cbcvel,cbcpre,bcvel,bcpre,lwm,is_forced)
+  call initbc(bcvel,bcpre,bcu,bcv,bcw,bcp)
   !
   ! initialize Poisson solver
   !
@@ -336,8 +338,6 @@ program cans
     call load_all('r',trim(datadir)//'fld.bin',MPI_COMM_WORLD,ng,[1,1,1],lo,hi,u,v,w,p,time,istep)
     if(myid == 0) print*, '*** Checkpoint loaded at time = ', time, 'time step = ', istep, '. ***'
   end if
-  !
-  call initbc(bcvel,bcpre,bcu,bcv,bcw,bcp)
   !
   open(55,file=trim(datadir)//'debug.dat',status='replace')
   !$acc enter data copyin(u,v,w,p) create(pp)

@@ -70,7 +70,7 @@ module mod_initflow
       u1d(:) = 0.
     case('uni')
       u1d(:) = uref
-      is_noise = .true.  !!!!!tmp
+      ! is_noise = .true.  !!!!!tmp
     case('log')
       reb = ubulk*l(3)/visc
       call log_profile(n(3),zc/l(3),reb,u1d)
