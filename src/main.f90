@@ -42,7 +42,7 @@ program cans
   use mod_initflow       , only: initflow
   use mod_initgrid       , only: initgrid
   use mod_initmpi        , only: initmpi
-  use mod_initsolver     , only: initsolver
+  use mod_initsolver     , only: initsolver,cmpt_rhs_b
   use mod_load           , only: load_all
   use mod_mom            , only: bulk_forcing
   use mod_rk             , only: rk
@@ -115,7 +115,7 @@ program cans
   real(rp), allocatable, dimension(:,:) :: lambdaxyu,lambdaxyv,lambdaxyw,lambdaxy
   real(rp), allocatable, dimension(:) :: au,av,aw,bu,bv,bw,cu,cv,cw,aa,bb,cc
   real(rp) :: normfftu,normfftv,normfftw
-  type(rhs_bound) :: rhsbu,rhsbv,rhsbw
+  type(rhs_bound) :: rhsbu,rhsbv,rhsbw !used by implicit treatment
   real(rp), allocatable, dimension(:,:,:) :: rhsbx,rhsby,rhsbz
 #endif
   real(rp) :: dt,dti,dtmax,time,dtrk,dtrki,divtot,divmax
@@ -281,18 +281,22 @@ program cans
   !
   ! initialize Poisson solver
   !
-  call initsolver(ng,n_x_fft,n_y_fft,lo_z,hi_z,dli,dzci_g,dzfi_g,cbcpre,bcpre(:,:), &
-                  lambdaxyp,['c','c','c'],ap,bp,cp,arrplanp,normfftp,rhsbp%x,rhsbp%y,rhsbp%z)
+  call initsolver(ng,n_x_fft,n_y_fft,lo_z,hi_z,dli,dzci_g,dzfi_g,cbcpre,bcp, &
+                  lambdaxyp,['c','c','c'],ap,bp,cp,arrplanp,normfftp)
+  call cmpt_rhs_b(ng,dli,dzci_g,dzfi_g,cbcpre,bcp, ['c','c','c'],rhsbp%x,rhsbp%y,rhsbp%z)
   !$acc enter data copyin(lambdaxyp,ap,bp,cp) async
   !$acc enter data copyin(rhsbp,rhsbp%x,rhsbp%y,rhsbp%z) async
   !$acc wait
 #if defined(_IMPDIFF)
-  call initsolver(ng,n_x_fft,n_y_fft,lo_z,hi_z,dli,dzci_g,dzfi_g,cbcvel(:,:,1),bcvel(:,:,1), &
-                  lambdaxyu,['f','c','c'],au,bu,cu,arrplanu,normfftu,rhsbu%x,rhsbu%y,rhsbu%z)
-  call initsolver(ng,n_x_fft,n_y_fft,lo_z,hi_z,dli,dzci_g,dzfi_g,cbcvel(:,:,2),bcvel(:,:,2), &
-                  lambdaxyv,['c','f','c'],av,bv,cv,arrplanv,normfftv,rhsbv%x,rhsbv%y,rhsbv%z)
-  call initsolver(ng,n_x_fft,n_y_fft,lo_z,hi_z,dli,dzci_g,dzfi_g,cbcvel(:,:,3),bcvel(:,:,3), &
-                  lambdaxyw,['c','c','f'],aw,bw,cw,arrplanw,normfftw,rhsbw%x,rhsbw%y,rhsbw%z)
+  !
+  ! initialize Helmholtz solver, three velocities
+  !
+  call initsolver(ng,n_x_fft,n_y_fft,lo_z,hi_z,dli,dzci_g,dzfi_g,cbcvel(:,:,1),bcu, &
+                  lambdaxyu,['f','c','c'],au,bu,cu,arrplanu,normfftu)
+  call initsolver(ng,n_x_fft,n_y_fft,lo_z,hi_z,dli,dzci_g,dzfi_g,cbcvel(:,:,2),bcv, &
+                  lambdaxyv,['c','f','c'],av,bv,cv,arrplanv,normfftv)
+  call initsolver(ng,n_x_fft,n_y_fft,lo_z,hi_z,dli,dzci_g,dzfi_g,cbcvel(:,:,3),bcw, &
+                  lambdaxyw,['c','c','f'],aw,bw,cw,arrplanw,normfftw)
 #if defined(_IMPDIFF_1D)
   deallocate(lambdaxyu,lambdaxyv,lambdaxyw,lambdaxy)
   call fftend(arrplanu)
@@ -384,6 +388,7 @@ program cans
       alpha = -.5*visc*dtrk
       !$OMP PARALLEL WORKSHARE
       !$acc kernels present(rhsbx,rhsby,rhsbz,rhsbu) async(1)
+      call cmpt_rhs_b(ng,dli,dzci_g,dzfi_g,cbcvel(:,:,1),bcu,['f','c','c'],rhsbu%x,rhsbu%y,rhsbu%z)
 #if !defined(_IMPDIFF_1D)
       rhsbx(:,:,0:1) = rhsbu%x(:,:,0:1)*alpha
       rhsby(:,:,0:1) = rhsbu%y(:,:,0:1)*alpha
@@ -391,7 +396,7 @@ program cans
       rhsbz(:,:,0:1) = rhsbu%z(:,:,0:1)*alpha
       !$acc end kernels
       !$OMP END PARALLEL WORKSHARE
-      call updt_rhs_b(['f','c','c'],cbcvel(:,:,1),n,is_bound,rhsbx,rhsby,rhsbz,u)
+      call updt_rhs_b(['f','c','c'],cbcvel(:,:,1),n,is_bound,rhsbx,rhsby,rhsbz,u)   !additional rhs_b to u
       !$acc kernels default(present) async(1)
       !$OMP PARALLEL WORKSHARE
       aa(:) = au(:)*alpha
@@ -409,6 +414,7 @@ program cans
 #endif
       !$OMP PARALLEL WORKSHARE
       !$acc kernels present(rhsbx,rhsby,rhsbz,rhsbv) async(1)
+      call cmpt_rhs_b(ng,dli,dzci_g,dzfi_g,cbcvel(:,:,2),bcv,['c','f','c'],rhsbv%x,rhsbv%y,rhsbv%z)
 #if !defined(_IMPDIFF_1D)
       rhsbx(:,:,0:1) = rhsbv%x(:,:,0:1)*alpha
       rhsby(:,:,0:1) = rhsbv%y(:,:,0:1)*alpha
@@ -416,7 +422,7 @@ program cans
       rhsbz(:,:,0:1) = rhsbv%z(:,:,0:1)*alpha
       !$acc end kernels
       !$OMP END PARALLEL WORKSHARE
-      call updt_rhs_b(['c','f','c'],cbcvel(:,:,2),n,is_bound,rhsbx,rhsby,rhsbz,v)
+      call updt_rhs_b(['c','f','c'],cbcvel(:,:,2),n,is_bound,rhsbx,rhsby,rhsbz,v) !additional rhs_b to v
       !$acc kernels default(present) async(1)
       !$OMP PARALLEL WORKSHARE
       aa(:) = av(:)*alpha
@@ -434,6 +440,7 @@ program cans
 #endif
       !$OMP PARALLEL WORKSHARE
       !$acc kernels present(rhsbx,rhsby,rhsbz,rhsbw) async(1)
+      call cmpt_rhs_b(ng,dli,dzci_g,dzfi_g,cbcvel(:,:,3),bcw,['c','c','f'],rhsbw%x,rhsbw%y,rhsbw%z)
 #if !defined(_IMPDIFF_1D)
       rhsbx(:,:,0:1) = rhsbw%x(:,:,0:1)*alpha
       rhsby(:,:,0:1) = rhsbw%y(:,:,0:1)*alpha
@@ -441,7 +448,7 @@ program cans
       rhsbz(:,:,0:1) = rhsbw%z(:,:,0:1)*alpha
       !$acc end kernels
       !$OMP END PARALLEL WORKSHARE
-      call updt_rhs_b(['c','c','f'],cbcvel(:,:,3),n,is_bound,rhsbx,rhsby,rhsbz,w)
+      call updt_rhs_b(['c','c','f'],cbcvel(:,:,3),n,is_bound,rhsbx,rhsby,rhsbz,w) !additional rhs_b to w
       !$acc kernels default(present) async(1)
       !$OMP PARALLEL WORKSHARE
       aa(:) = aw(:)*alpha

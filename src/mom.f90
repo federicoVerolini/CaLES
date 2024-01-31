@@ -744,8 +744,8 @@ module mod_mom
           dudxm = (u_ccc-u_mcc)*dxi
           dudyp = (u_cpc-u_ccc)*dyi
           dudym = (u_ccc-u_cmc)*dyi
-          dudzp = (u_ccp-u_ccc)*dzci(k  )
-          dudzm = (u_ccc-u_ccm)*dzci(k-1)
+          dudzp = (u_ccp-u_ccc)*dzci(k  ) !(u(i,j,k+1)-u(i,j,k  ))*dzci(k)
+          dudzm = (u_ccc-u_ccm)*dzci(k-1) !(u(i,j,k  )-u(i,j,k-1))*dzci(k-1)
           !
           ! x advection
           !

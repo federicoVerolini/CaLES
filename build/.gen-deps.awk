@@ -1,1 +1,0 @@
-../src/.gen-deps.awk

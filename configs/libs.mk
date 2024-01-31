@@ -1,4 +1,4 @@
-override LIBS += -L$(LIBS_DIR)/2decomp-fft -ldecomp2d -L/home/soaringxmc/opt/fftw3/fftw-3.3.10/lib -lfftw3
+override LIBS += -L$(LIBS_DIR)/2decomp-fft -ldecomp2d -lfftw3
 override INCS += -I$(LIBS_DIR)/2decomp-fft/mod
 
 ifeq ($(strip $(GPU)),1)
@@ -7,7 +7,7 @@ override INCS += -I$(LIBS_DIR)/cuDecomp/build/include
 endif
 
 ifeq ($(strip $(USE_NVTX)),1)
-NVHPC_HOME ?= /opt/nvidia/hpc_sdk/Linux_x86_64/2022
+NVHPC_HOME ?= /opt/nvidia/hpc_sdk/Linux_x86_64/2022/
 override LIBS += -L$(NVHPC_HOME)/cuda/lib64 -lnvToolsExt
 endif
 

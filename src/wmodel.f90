@@ -46,19 +46,15 @@ module mod_wmodel    !!!!!rename as wallstress
         do i = 1,n(1)
           u1 = u(i,j,k1)
           u2 = u(i,j,k2)
-          v1 = 0.25_rp*(v(i,j  ,k1) + v(i+1,j  ,k1) + &
-                        v(i,j-1,k1) + v(i+1,j-1,k1))
-          v2 = 0.25_rp*(v(i,j  ,k2) + v(i+1,j  ,k2) + &
-                        v(i,j-1,k2) + v(i+1,j-1,k2))
+          v1 = 0.25_rp*(v(i,j,k1) + v(i+1,j,k1) + v(i,j-1,k1) + v(i+1,j-1,k1))
+          v2 = 0.25_rp*(v(i,j,k2) + v(i+1,j,k2) + v(i,j-1,k2) + v(i+1,j-1,k2))
           uh = (1._rp - wei)*u1 + wei*u2
           vh = (1._rp - wei)*v1 + wei*v2
           call wallmodel(uh,vh,h,visc,tauw)
           bcu%z(i,j,0) = 1._rp/visc*tauw(1) !tauw, x direction
-          
-          u1 = 0.25_rp*(u(i-1,j  ,k1) + u(i,j  ,k1) + &
-                        u(i-1,j+1,k1) + u(i,j+1,k1))
-          u2 = 0.25_rp*(u(i-1,j  ,k1) + u(i,j  ,k1) + &
-                        u(i-1,j+1,k1) + u(i,j+1,k1))
+          !
+          u1 = 0.25_rp*(u(i-1,j,k1) + u(i,j,k1) + u(i-1,j+1,k1) + u(i,j+1,k1))
+          u2 = 0.25_rp*(u(i-1,j,k1) + u(i,j,k1) + u(i-1,j+1,k1) + u(i,j+1,k1))
           v1 = v(i,j,k1)
           v2 = v(i,j,k2)
           uh = (1._rp - wei)*u1 + wei*u2
@@ -82,18 +78,15 @@ module mod_wmodel    !!!!!rename as wallstress
         do i = 1,n(1)
           u1 = u(i,j,k1)
           u2 = u(i,j,k2)
-          v1 = 0.25_rp*(v(i,j  ,k1) + v(i+1,j  ,k1) + &
-                        v(i,j-1,k1) + v(i+1,j-1,k1))
-          v2 = 0.25_rp*(v(i,j  ,k2) + v(i+1,j  ,k2) + &
-                        v(i,j-1,k2) + v(i+1,j-1,k2))
+          v1 = 0.25_rp*(v(i,j,k1) + v(i+1,j,k1) + v(i,j-1,k1) + v(i+1,j-1,k1))
+          v2 = 0.25_rp*(v(i,j,k2) + v(i+1,j,k2) + v(i,j-1,k2) + v(i+1,j-1,k2))
           uh = (1._rp - wei)*u1 + wei*u2
           vh = (1._rp - wei)*v1 + wei*v2
           call wallmodel(uh,vh,h,visc,tauw)
           bcu%z(i,j,1) = -1._rp/visc*tauw(1) !tauw, x direction
-          u1 = 0.25_rp*(u(i-1,j  ,k1) + u(i,j  ,k1) + &
-                        u(i-1,j+1,k1) + u(i,j+1,k1))
-          u2 = 0.25_rp*(u(i-1,j  ,k1) + u(i,j  ,k1) + &
-                        u(i-1,j+1,k1) + u(i,j+1,k1))
+          !
+          u1 = 0.25_rp*(u(i-1,j,k1) + u(i,j,k1) + u(i-1,j+1,k1) + u(i,j+1,k1))
+          u2 = 0.25_rp*(u(i-1,j,k1) + u(i,j,k1) + u(i-1,j+1,k1) + u(i,j+1,k1))
           v1 = v(i,j,k1)
           v2 = v(i,j,k2)
           uh = (1._rp - wei)*u1 + wei*u2
@@ -104,6 +97,7 @@ module mod_wmodel    !!!!!rename as wallstress
       end do
     end if
     !used in square duct (four walls)
+    !bug here, should consider non-uniform spacings in the z direction
     if(is_bound(0,2).and.lwm(0,2)>0) then
       !lower wall
       j = 1
@@ -118,19 +112,15 @@ module mod_wmodel    !!!!!rename as wallstress
         do i = 1,n(1)
           u1 = u(i,j1,k)
           u2 = u(i,j2,k)
-          w1 = 0.25_rp*(w(i,j1,k  ) + w(i+1,j1,k) + &
-                        w(i,j1,k-1) + w(i+1,j1,k))
-          w2 = 0.25_rp*(w(i,j2,k  ) + w(i+1,j2,k) + &
-                        w(i,j2,k-1) + w(i+1,j2,k))
+          w1 = 0.25_rp*(w(i,j1,k) + w(i+1,j1,k) + w(i,j1,k-1) + w(i+1,j1,k))
+          w2 = 0.25_rp*(w(i,j2,k) + w(i+1,j2,k) + w(i,j2,k-1) + w(i+1,j2,k))
           uh = (1._rp - wei)*u1 + wei*u2
           wh = (1._rp - wei)*w1 + wei*w2
           call wallmodel(uh,wh,h,visc,tauw)
           bcu%y(i,k,0) = 1._rp/visc*tauw(1) !tauw, x direction
-          
-          u1 = 0.25_rp*(u(i-1,j1,k  ) + u(i,j1,k  ) + &
-                        u(i-1,j1,k+1) + u(i,j1,k+1))
-          u2 = 0.25_rp*(u(i-1,j2,k  ) + u(i,j2,k  ) + &
-                        u(i-1,j2,k+1) + u(i,j2,k+1))
+          !
+          u1 = 0.25_rp*(u(i-1,j1,k) + u(i,j1,k) + u(i-1,j1,k+1) + u(i,j1,k+1))
+          u2 = 0.25_rp*(u(i-1,j2,k) + u(i,j2,k) + u(i-1,j2,k+1) + u(i,j2,k+1))
           w1 = w(i,j1,k)
           w2 = w(i,j2,k)
           uh = (1._rp - wei)*u1 + wei*u2
@@ -154,19 +144,15 @@ module mod_wmodel    !!!!!rename as wallstress
         do i = 1,n(1)
           u1 = u(i,j1,k)
           u2 = u(i,j2,k)
-          w1 = 0.25_rp*(w(i,j1,k  ) + w(i+1,j1,k) + &
-                        w(i,j1,k-1) + w(i+1,j1,k))
-          w2 = 0.25_rp*(w(i,j2,k  ) + w(i+1,j2,k) + &
-                        w(i,j2,k-1) + w(i+1,j2,k))
+          w1 = 0.25_rp*(w(i,j1,k  ) + w(i+1,j1,k) + w(i,j1,k-1) + w(i+1,j1,k))
+          w2 = 0.25_rp*(w(i,j2,k  ) + w(i+1,j2,k) + w(i,j2,k-1) + w(i+1,j2,k))
           uh = (1._rp - wei)*u1 + wei*u2
           wh = (1._rp - wei)*w1 + wei*w2
           call wallmodel(uh,wh,h,visc,tauw)
           bcu%y(i,k,1) = -1._rp/visc*tauw(1) !tauw, x direction
-          
-          u1 = 0.25_rp*(u(i-1,j1,k  ) + u(i,j1,k  ) + &
-                        u(i-1,j1,k+1) + u(i,j1,k+1))
-          u2 = 0.25_rp*(u(i-1,j2,k  ) + u(i,j2,k  ) + &
-                        u(i-1,j2,k+1) + u(i,j2,k+1))
+          !
+          u1 = 0.25_rp*(u(i-1,j1,k  ) + u(i,j1,k  ) + u(i-1,j1,k+1) + u(i,j1,k+1))
+          u2 = 0.25_rp*(u(i-1,j2,k  ) + u(i,j2,k  ) + u(i-1,j2,k+1) + u(i,j2,k+1))
           w1 = w(i,j1,k)
           w2 = w(i,j2,k)
           uh = (1._rp - wei)*u1 + wei*u2

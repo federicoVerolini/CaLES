@@ -6,14 +6,14 @@
 ! -
 module mod_initsolver
   use, intrinsic :: iso_c_binding, only: C_PTR
-  use mod_fft  , only: fftini
+  use mod_fft    , only: fftini
+  use mod_typedef, only: cond_bound
   use mod_precision
   implicit none
   private
-  public initsolver
+  public initsolver,cmpt_rhs_b
   contains
-  subroutine initsolver(ng,n_x_fft,n_y_fft,lo_z,hi_z,dli,dzci,dzfi,cbc,bc,lambdaxy,c_or_f,a,b,c,arrplan,normfft, &
-                        rhsbx,rhsby,rhsbz)
+  subroutine initsolver(ng,n_x_fft,n_y_fft,lo_z,hi_z,dli,dzci,dzfi,cbc,bc,lambdaxy,c_or_f,a,b,c,arrplan,normfft)
     !
     ! initializes the Poisson/Helmholtz solver
     !
@@ -22,7 +22,7 @@ module mod_initsolver
     real(rp), intent(in), dimension(3 ) :: dli
     real(rp), intent(in), dimension(0:) :: dzci,dzfi
     character(len=1), intent(in), dimension(0:1,3) :: cbc
-    real(rp)        , intent(in), dimension(0:1,3) :: bc
+    type(cond_bound), intent(in) :: bc
     real(rp), intent(out), dimension(lo_z(1):,lo_z(2):) :: lambdaxy
     character(len=1), intent(in), dimension(3) :: c_or_f
     real(rp), intent(out), dimension(:) :: a,b,c
@@ -31,9 +31,6 @@ module mod_initsolver
 #else
     integer    , intent(out), dimension(2,2) :: arrplan
 #endif
-    real(rp), intent(out), dimension(:,:,0:) :: rhsbx
-    real(rp), intent(out), dimension(:,:,0:) :: rhsby
-    real(rp), intent(out), dimension(:,:,0:) :: rhsbz
     real(rp), intent(out) :: normfft
     real(rp), dimension(3)        :: dl
     real(rp), dimension(0:ng(3)+1) :: dzc,dzf
@@ -60,23 +57,48 @@ module mod_initsolver
     !
     call tridmatrix(cbc(:,3),ng(3),dli(3),dzci,dzfi,c_or_f(3),a,b,c)
     !
-    ! compute values to be added to the right hand side
-    !
-    dl(:)  = dli( :)**(-1)
-    dzc(:) = dzci(:)**(-1)
-    dzf(:) = dzfi(:)**(-1)
-    call bc_rhs(cbc(:,1),bc(:,1),[dl(1) ,dl(1)      ],[dl(1) ,dl(1)    ],c_or_f(1),rhsbx)
-    call bc_rhs(cbc(:,2),bc(:,2),[dl(2) ,dl(2)      ],[dl(2) ,dl(2)    ],c_or_f(2),rhsby)
-    if(     c_or_f(3) == 'c') then
-      call bc_rhs(cbc(:,3),bc(:,3),[dzc(0),dzc(ng(3)  )],[dzf(1),dzf(ng(3))],c_or_f(3),rhsbz)
-    else if(c_or_f(3) == 'f') then
-      call bc_rhs(cbc(:,3),bc(:,3),[dzc(1),dzc(ng(3)-1)],[dzf(1),dzf(ng(3))],c_or_f(3),rhsbz)
-    end if
-    !
     ! prepare ffts
     !
     call fftini(ng,n_x_fft,n_y_fft,cbc(:,1:2),c_or_f(1:2),arrplan,normfft)
   end subroutine initsolver
+  !
+  subroutine cmpt_rhs_b(ng,dli,dzci,dzfi,cbc,bc,c_or_f,rhsbx,rhsby,rhsbz)
+  !
+  ! compute rhs_b
+  ! to be moved to a different file
+  !
+  implicit none
+  integer , intent(in), dimension(3) :: ng
+  real(rp), intent(in), dimension(3 ) :: dli
+  real(rp), intent(in), dimension(0:) :: dzci,dzfi
+  character(len=1), intent(in), dimension(0:1,3) :: cbc
+  type(cond_bound), intent(in) :: bc
+  character(len=1), intent(in), dimension(3) :: c_or_f
+  real(rp), intent(out), dimension(:,:,0:), optional :: rhsbx
+  real(rp), intent(out), dimension(:,:,0:), optional :: rhsby
+  real(rp), intent(out), dimension(:,:,0:), optional :: rhsbz
+  real(rp), dimension(3)        :: dl
+  real(rp), dimension(0:ng(3)+1) :: dzc,dzf
+  !
+  ! compute values to be added to the right hand side
+  !
+  dl(:)  = dli( :)**(-1)
+  dzc(:) = dzci(:)**(-1)
+  dzf(:) = dzfi(:)**(-1)
+  if(present(rhsbx)) &
+  call bc_rhs(cbc(:,1),bc%x,[dl(1) ,dl(1)      ],[dl(1) ,dl(1)    ],c_or_f(1),rhsbx) !x-direction
+  if(present(rhsby)) &
+  call bc_rhs(cbc(:,2),bc%y,[dl(2) ,dl(2)      ],[dl(2) ,dl(2)    ],c_or_f(2),rhsby) !y-direction
+  if(     c_or_f(3) == 'c') then
+    if(present(rhsbz)) &
+    call bc_rhs(cbc(:,3),bc%z,[dzc(0),dzc(ng(3)  )],[dzf(1),dzf(ng(3))],c_or_f(3),rhsbz) !z-direction
+  else if(c_or_f(3) == 'f') then
+    if(present(rhsbz)) &
+    call bc_rhs(cbc(:,3),bc%z,[dzc(1),dzc(ng(3)-1)],[dzf(1),dzf(ng(3))],c_or_f(3),rhsbz) !z-direction
+  end if
+  !
+  end subroutine cmpt_rhs_b
+
   !
   subroutine eigenvalues(n,bc,c_or_f,lambda)
     use mod_param, only: pi
@@ -185,45 +207,51 @@ module mod_initsolver
   subroutine bc_rhs(cbc,bc,dlc,dlf,c_or_f,rhs)
     implicit none
     character(len=1), intent(in), dimension(0:1) :: cbc
-    real(rp), intent(in), dimension(0:1) :: bc
+    real(rp), intent(in), dimension(0:,0:,0:) :: bc !bc, two faces
     real(rp), intent(in), dimension(0:1) :: dlc,dlf
     real(rp), intent(out), dimension(:,:,0:) :: rhs
     character(len=1), intent(in) :: c_or_f ! c -> cell-centered; f -> face-centered
-    real(rp), dimension(0:1) :: factor
+    real(rp), allocatable, dimension(:,:,:) :: factor
     real(rp) :: sgn
-    integer :: ibound
+    integer :: ibound,n1,n2
+    !
+    n1 = size(bc,1)-2
+    n2 = size(bc,2)-2
+    allocate(factor(0:n1+1, &
+                    0:n2+1, &
+                    0:1))
     !
     select case(c_or_f)
     case('c')
       do ibound = 0,1
         select case(cbc(ibound))
         case('P')
-          factor(ibound) = 0.
+          factor(:,:,ibound) = 0.
         case('D')
-          factor(ibound) = -2.*bc(ibound)
+          factor(:,:,ibound) = -2.*bc(:,:,ibound)
         case('N')
           if(ibound == 0) sgn =  1.
           if(ibound == 1) sgn = -1.
-          factor(ibound) = sgn*dlc(ibound)*bc(ibound)
+          factor(:,:,ibound) = sgn*dlc(ibound)*bc(:,:,ibound)
         end select
       end do
     case('f')
       do ibound = 0,1
         select case(cbc(ibound))
         case('P')
-          factor(ibound) = 0.
+          factor(:,:,ibound) = 0.
         case('D')
-          factor(ibound) = -bc(ibound)
+          factor(:,:,ibound) = -bc(:,:,ibound)
         case('N')
           if(ibound == 0) sgn =  1.
           if(ibound == 1) sgn = -1.
-          factor(ibound) = sgn*dlf(ibound)*bc(ibound)
+          factor(:,:,ibound) = sgn*dlf(ibound)*bc(:,:,ibound)
         end select
       end do
     end select
     do concurrent(ibound=0:1)
-      rhs(:,:,ibound) = factor(ibound)/dlc(ibound)/dlf(ibound)
-      rhs(:,:,ibound) = factor(ibound)/dlc(ibound)/dlf(ibound)
+      rhs(:,:,ibound) = factor(1:n1,1:n2,ibound)/dlc(ibound)/dlf(ibound)
+      rhs(:,:,ibound) = factor(1:n1,1:n2,ibound)/dlc(ibound)/dlf(ibound)
     end do
   end subroutine bc_rhs
 end module mod_initsolver

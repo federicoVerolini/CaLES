@@ -212,22 +212,24 @@ module mod_bound
     end if
   end subroutine boundp
   !
-  subroutine set_bc(ctype,ibound,idir,nh,centered,bcval,dr,p)
+  subroutine set_bc(ctype,ibound,idir,nh,centered,bc,dr,p)
     implicit none
     character(len=1), intent(in) :: ctype
     integer , intent(in) :: ibound,idir,nh
     logical , intent(in) :: centered
-    real(rp), intent(in), dimension(1-nh:,1-nh:,0:) :: bcval !bcval, two faces
+    real(rp), intent(in), dimension(1-nh:,1-nh:,0:) :: bc !bc, two faces
     real(rp), intent(in) :: dr
     real(rp), intent(inout), dimension(1-nh:,1-nh:,1-nh:) :: p
     real(rp), allocatable, dimension(:,:) :: factor
     real(rp) :: sgn
-    integer  :: n,dh
+    integer  :: n,dh,n1,n2
     !
     n = size(p,idir) - 2*nh
-    allocate(factor(0:size(bcval,1)-1, &
-                    0:size(bcval,2)-1))
-    factor = bcval(:,:,ibound)
+    n1= size(bc,1)-2
+    n2= size(bc,2)-2
+    allocate(factor(0:n1+1, &
+                    0:n2+1))
+    factor = bc(:,:,ibound)
     if(ctype == 'D'.and.centered) then
       factor = 2.*factor
       sgn    = -1.
