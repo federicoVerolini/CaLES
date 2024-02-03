@@ -253,7 +253,7 @@ module mod_wmodel    !!!!!rename as wallstress
     real(rp) :: upar,utau,f,fp,conv,tauw_old,tauw_tot
     real(rp) :: umax
     !
-    if(.false.) then
+    if(.true.) then
       !log-law profile
       upar = sqrt(uh*uh+vh*vh)
       utau = sqrt(upar/h*visc)

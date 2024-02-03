@@ -361,7 +361,7 @@ module mod_output
         do k=1,ng(3)
           write(iunit,'(8E16.7e3)') z_g(k),um(k),vm(k),wm(k), &
                                            u2(k),v2(k),w2(k), &
-                                           uw(k)
+                                           uw(k)   !uw is reynolds stress
         end do
         close(iunit)
       end if

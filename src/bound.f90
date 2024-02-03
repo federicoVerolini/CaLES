@@ -122,7 +122,7 @@ module mod_bound
       if(cbc_w(0,3,2)/='P') call set_bc(cbc_w(0,3,2),0,3,nh,.true. ,bcv%z,dzc(0)   ,v)
     end if
     if(is_bound(1,3)) then
-      if(cbc_w(1,3,1)/='P') call set_bc(cbc_w(1,3,1),1,3,nh,.true. ,bcu%z,dzc(0)   ,u)
+      if(cbc_w(1,3,1)/='P') call set_bc(cbc_w(1,3,1),1,3,nh,.true. ,bcu%z,dzc(n(3)),u)
       if(cbc_w(1,3,2)/='P') call set_bc(cbc_w(1,3,2),1,3,nh,.true. ,bcv%z,dzc(n(3)),v)
     end if
     !
@@ -376,7 +376,7 @@ module mod_bound
             if     (ibound == 0) then
               !$acc kernels default(present) async(1)
               !$OMP PARALLEL WORKSHARE
-              !p(0,:,:) = 1./3.*(-2.*factor+4.*p(1  ,:,:)-p(2  ,:,:))
+              !p(0,:,:) = 1./3.*(-2.*factor+4.*p(1  ,:,:)-p(2  ,:,:)) ! second-order approximation of the first derivative at the boundary
               p(0-dh,:,:) = 1.*factor + p(  1+dh,:,:)
               !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
