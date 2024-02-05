@@ -1,4 +1,4 @@
-override LIBS += -L$(LIBS_DIR)/2decomp-fft -ldecomp2d -lfftw3
+override LIBS += -L$(LIBS_DIR)/2decomp-fft -ldecomp2d
 override INCS += -I$(LIBS_DIR)/2decomp-fft/mod
 
 ifeq ($(strip $(GPU)),1)
