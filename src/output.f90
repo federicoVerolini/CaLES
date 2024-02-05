@@ -12,6 +12,7 @@ module mod_output
   implicit none
   private
   public out0d,gen_alias,out1d,out1d_chan,out2d,out3d,write_log_output,write_visu_2d,write_visu_3d
+  public out1d_single_point_chan
   contains
   subroutine out0d(fname,n,var)
     !
@@ -29,8 +30,7 @@ module mod_output
     !
     if (myid  ==  0) then
       open(newunit=iunit,file=fname,position='append')
-      ! write(iunit,'(*(E16.7e3))') var(1:n)
-      write(iunit,'(*(E30.15e3))') var(1:n)   !!!!!tmp
+      write(iunit,'(*(E16.7e3))') var(1:n)
       close(iunit)
     end if
   end subroutine out0d
@@ -65,9 +65,7 @@ module mod_output
     integer , intent(in), dimension(3) :: ng,lo,hi
     integer , intent(in) :: idir
     real(rp), intent(in), dimension(3) :: l,dl
-    real(rp), intent(in), dimension(0:) :: z_g
-    ! real(rp), intent(in), dimension(0:lo(3)-1) :: dz
-    real(rp), intent(in), dimension(lo(3)-1:) :: dz
+    real(rp), intent(in), dimension(0:) :: z_g,dz
     real(rp), intent(in), dimension(lo(1)-1:,lo(2)-1:,lo(3)-1:) :: p
     real(rp), allocatable, dimension(:) :: p1d
     integer :: i,j,k
@@ -505,4 +503,487 @@ module mod_output
       end if
     end select
   end subroutine out2d_duct
+  subroutine out1d_single_point_chan(fname,ng,lo,hi,idir,l,dl,dzc_g,dzf_g,zc_g,zf_g,u,v,w,p)
+    implicit none
+    character(len=*), intent(in) :: fname
+    integer , intent(in), dimension(3) :: ng,lo,hi
+    integer , intent(in) :: idir
+    real(rp), intent(in), dimension(3) :: l,dl
+    real(rp), intent(in), dimension(0:) :: dzc_g,dzf_g,zc_g,zf_g
+    real(rp), intent(in), dimension(lo(1)-1:,lo(2)-1:,lo(3)-1:) :: u,v,w,p
+    real(rp), allocatable, dimension(:,:) :: buf
+    real(rp) :: tmp_x,tmp_y,tmp_z
+    integer :: i,j,k,q
+    integer :: iunit
+    integer :: nn,nvars
+    character(len=30) cfmt
+    real(rp) :: grid_area_ratio
+    real(rp) :: buf01,buf02,buf03,buf04,buf05,buf06,buf07,buf08,buf09,buf10, &
+                buf11,buf12,buf13,buf14,buf15,buf16,buf17,buf18,buf19,buf20, &
+                buf21,buf22,buf23,buf24,buf25,buf26,buf27,buf28,buf29,buf30, &
+                buf31,buf32,buf33,buf34,buf35,buf36,buf37,buf38
+    real(rp) :: div
+    !
+    nn = ng(idir)
+    nvars = 38
+    select case(idir)
+    case(3)
+      grid_area_ratio = dl(1)*dl(2)/(l(1)*l(2))
+      allocate(buf(nvars,nn))
+      !$acc enter data create(buf)
+      !$acc kernels
+      buf(:,:) = 0._rp
+      !$acc end kernels
+      !$acc parallel loop gang
+      do k=lo(3),hi(3)
+        buf01 = 0._rp
+        buf02 = 0._rp
+        buf03 = 0._rp
+        buf04 = 0._rp
+        buf05 = 0._rp
+        buf06 = 0._rp
+        buf07 = 0._rp
+        buf08 = 0._rp
+        buf09 = 0._rp
+        buf10 = 0._rp
+        buf11 = 0._rp
+        buf12 = 0._rp
+        buf13 = 0._rp
+        buf14 = 0._rp
+        buf15 = 0._rp
+        buf16 = 0._rp
+        buf17 = 0._rp
+        buf18 = 0._rp
+        buf19 = 0._rp
+        buf20 = 0._rp
+        buf21 = 0._rp
+        !$acc loop vector collapse(2)
+        do j=lo(2),hi(2)
+          do i=lo(1),hi(1)
+            !
+            ! velocity
+            !
+            buf01 = buf01  + u(i,j,k)
+            buf02 = buf02  + v(i,j,k)
+            buf03 = buf03  + w(i,j,k)
+            buf04 = buf04  + u(i,j,k)**2
+            buf05 = buf05  + v(i,j,k)**2
+            buf06 = buf06  + w(i,j,k)**2
+            buf07 = buf07  + 0.25_rp*(u(i,j,k+1) + u(i  ,j,k))* &
+                                     (w(i,j,k  ) + w(i+1,j,k))
+            buf08 = buf08 + u(i,j,k)**3
+            buf09 = buf09 + v(i,j,k)**3
+            buf10 = buf10 + w(i,j,k)**3
+            buf11 = buf11 + u(i,j,k)**4
+            buf12 = buf12 + v(i,j,k)**4
+            buf13 = buf13 + w(i,j,k)**4
+            !
+            ! pressure
+            !
+            buf14 = buf14 + p(i,j,k)
+            buf15 = buf15 + p(i,j,k)**2
+            !
+            ! vorticity
+            !
+            ! x component
+            !
+            tmp_x = (w(i,j+1,k)-w(i,j,k))/dl(2) - (v(i,j,k+1)-v(i,j,k))/dzc_g(k)
+            !
+            ! y component
+            !
+            tmp_y = (u(i,j,k+1)-u(i,j,k))/dzc_g(k) - (w(i+1,j,k)-w(i,j,k))/dl(1)
+            !
+            ! z component
+            !
+            tmp_z = (v(i+1,j,k)-v(i,j,k))/dl(1) - (u(i,j+1,k)-u(i,j,k))/dl(2)
+            !
+            buf16 = buf16 + tmp_x
+            buf17 = buf17 + tmp_y
+            buf18 = buf18 + tmp_z
+            buf19 = buf19 + tmp_x**2
+            buf20 = buf20 + tmp_y**2
+            buf21 = buf21 + tmp_z**2
+          end do
+        end do
+        buf( 1,k) = buf01*grid_area_ratio
+        buf( 2,k) = buf02*grid_area_ratio
+        buf( 3,k) = buf03*grid_area_ratio
+        buf( 4,k) = buf04*grid_area_ratio
+        buf( 5,k) = buf05*grid_area_ratio
+        buf( 6,k) = buf06*grid_area_ratio
+        buf( 7,k) = buf07*grid_area_ratio
+        buf( 8,k) = buf08*grid_area_ratio
+        buf( 9,k) = buf09*grid_area_ratio
+        buf(10,k) = buf10*grid_area_ratio
+        buf(11,k) = buf11*grid_area_ratio
+        buf(12,k) = buf12*grid_area_ratio
+        buf(13,k) = buf13*grid_area_ratio
+        buf(14,k) = buf14*grid_area_ratio
+        buf(15,k) = buf15*grid_area_ratio
+        buf(16,k) = buf16*grid_area_ratio
+        buf(17,k) = buf17*grid_area_ratio
+        buf(18,k) = buf18*grid_area_ratio
+        buf(19,k) = buf19*grid_area_ratio
+        buf(20,k) = buf20*grid_area_ratio
+        buf(21,k) = buf21*grid_area_ratio
+      end do
+      !$acc update self(buf)
+      call mpi_allreduce(MPI_IN_PLACE,buf(1,1),size(buf),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
+      if(myid == 0) then
+        nvars = 21
+        write(cfmt,'(A,I3,A)') '(',nvars+2+2,'ES26.18)'
+        open(newunit=iunit,file=fname//'.out')
+        do k=1,nn
+          write(iunit,trim(cfmt)) zc_g(k),zf_g(k),(buf(i,k),i=1,nvars),dzc_g(k),dzf_g(k)
+        end do
+        close(iunit)
+      end if
+      !
+      ! MKE and Reynolds shear stresses budgets
+      !
+      !$acc kernels
+      buf(:,:) = 0._rp
+      !$acc end kernels
+      !$acc parallel loop gang
+      do k=lo(3),hi(3)
+        buf01 = 0._rp
+        buf02 = 0._rp
+        buf03 = 0._rp
+        buf04 = 0._rp
+        buf05 = 0._rp
+        buf06 = 0._rp
+        buf07 = 0._rp
+        buf08 = 0._rp
+        buf09 = 0._rp
+        buf10 = 0._rp
+        buf11 = 0._rp
+        buf12 = 0._rp
+        buf13 = 0._rp
+        buf14 = 0._rp
+        buf15 = 0._rp
+        buf16 = 0._rp
+        buf17 = 0._rp
+        buf18 = 0._rp
+        buf19 = 0._rp
+        buf20 = 0._rp
+        buf21 = 0._rp
+        buf22 = 0._rp
+        buf23 = 0._rp
+        buf24 = 0._rp
+        buf25 = 0._rp
+        buf26 = 0._rp
+        buf27 = 0._rp
+        buf28 = 0._rp
+        buf29 = 0._rp
+        buf30 = 0._rp
+        buf31 = 0._rp
+        buf32 = 0._rp
+        buf33 = 0._rp
+        buf34 = 0._rp
+        buf35 = 0._rp
+        buf36 = 0._rp
+        buf37 = 0._rp
+        buf38 = 0._rp
+        !$acc loop vector collapse(2)
+        do j=lo(2),hi(2)
+          do i=lo(1),hi(1)
+            !
+            ! terms needed for MKE (excl. mean pressure gradient)
+            !
+            buf01 = buf01 + u(i,j,k)                           ! cell center -> for MKE work by pressure gradient
+            buf02 = buf02 + 0.5_rp*(u(i,j,k)+u(i,j,k+1))       ! cell edge   -> for MKE turbulent transport
+            !
+            buf03 = buf03 + (u(i,j,k+1)   -u(i,j,k)   )/dzc_g(k) ! cell edge -> for MKE viscous transport
+            buf04 = buf04 + (u(i,j,k+1)**2-u(i,j,k)**2)/dzc_g(k) ! cell edge -> for MKE viscous transport
+            !
+            buf05 = buf05 + 0.25_rp*(u(i,j,k+1) + u(i  ,j,k))* &
+                                    (w(i,j,k  ) + w(i+1,j,k))  ! cell edge   -> for MKE turbulent transport
+            buf06 = buf06 + 0.25_rp*(u(i-1,j,k) + u(i,j,k  ))* &
+                                    (w(i  ,j,k) + w(i,j,k-1))  ! cell center -> for MKE turbulent dissipation
+            !
+            buf07 = buf07 + 0.25_rp*( &
+                                   ((u(i  ,j,k+1)-u(i  ,j,k  ))/dzc_g(k  )) + &
+                                   ((u(i  ,j,k  )-u(i  ,j,k-1))/dzc_g(k-1)) + &
+                                   ((u(i-1,j,k+1)-u(i-1,j,k  ))/dzc_g(k  )) + &
+                                   ((u(i-1,j,k  )-u(i-1,j,k-1))/dzc_g(k-1)) &
+                                  ) ! cell center for production and viscous dissipation
+            !
+            ! terms needed for uu (excl. those computed above)
+            !
+            ! for transport
+            !
+            buf08 = buf08 + 0.125_rp*(u(i,j,k+1) + u(i  ,j,k))**2* &
+                                   (w(i,j,k  ) + w(i+1,j,k))   ! cell edge
+            !
+            ! for pressure-strain
+            !
+            buf09 = buf09 + p(i,j,k); q = q + 1 ! cell center
+            buf10 = buf10 + (u(i,j,k)-u(i-1,j,k))/dl(1)*p(i,j,k) ! cell center
+            !
+            ! for dissipation
+            !
+            buf11 = buf11 + &
+                                      ((u(i  ,j  ,k  )-u(i-1,j  ,k  ))/dl(1))**2 + &
+                             0.25_rp*( &
+                                      ((u(i  ,j+1,k  )-u(i  ,j  ,k  ))/dl(2))**2 + &
+                                      ((u(i  ,j  ,k  )-u(i  ,j-1,k  ))/dl(2))**2 + &
+                                      ((u(i-1,j+1,k  )-u(i-1,j  ,k  ))/dl(2))**2 + &
+                                      ((u(i-1,j  ,k  )-u(i-1,j-1,k  ))/dl(2))**2 &
+                                     ) + &
+                             0.25_rp*( &
+                                      ((u(i  ,j  ,k+1)-u(i  ,j  ,k  ))/dzc_g(k  ))**2 + &
+                                      ((u(i  ,j  ,k  )-u(i  ,j  ,k-1))/dzc_g(k-1))**2 + &
+                                      ((u(i-1,j  ,k+1)-u(i-1,j  ,k  ))/dzc_g(k  ))**2 + &
+                                      ((u(i-1,j  ,k  )-u(i-1,j  ,k-1))/dzc_g(k-1))**2 &
+                                     ) ! cell center
+            !
+            ! terms needed for vv (excl. those computed above)
+            !
+            ! for transport
+            !
+            buf12 = buf12  + (v(i,j,k+1)**2-v(i,j,k)**2)/dzc_g(k)    ! cell edge
+            buf13 = buf13  + 0.125_rp*(v(i,j,k+1) + v(i,j  ,k))**2* &
+                                      (w(i,j,k  ) + w(i,j+1,k))    ! cell edge
+            !
+            ! for pressure-strain
+            !
+            buf14 = buf14  + (v(i,j,k)-v(i,j-1,k))/dl(2)*p(i,j,k) ! cell center
+            !
+            ! for dissipation
+            !
+            buf15 = buf15  + &
+                              0.25_rp*( &
+                                       ((v(i+1,j  ,k  )-v(i  ,j  ,k  ))/dl(1))**2 + &
+                                       ((v(i  ,j  ,k  )-v(i-1,j  ,k  ))/dl(1))**2 + &
+                                       ((v(i+1,j-1,k  )-v(i  ,j-1,k  ))/dl(1))**2 + &
+                                       ((v(i  ,j-1,k  )-v(i-1,j-1,k  ))/dl(1))**2 &
+                                      ) + &
+                                       ((v(i  ,j  ,k  )-v(i  ,j-1,k  ))/dl(2))**2 + &
+                              0.25_rp*( &
+                                       ((v(i  ,j  ,k+1)-v(i  ,j  ,k  ))/dzc_g(k  ))**2 + &
+                                       ((v(i  ,j  ,k  )-v(i  ,j  ,k-1))/dzc_g(k-1))**2 + &
+                                       ((v(i  ,j-1,k+1)-v(i  ,j-1,k  ))/dzc_g(k  ))**2 + &
+                                       ((v(i  ,j-1,k  )-v(i  ,j-1,k-1))/dzc_g(k-1))**2 &
+                                      ) ! cell center
+            !
+            ! terms needed for ww (excl. those computed above)
+            !
+            ! for transport
+            !
+            buf16 = buf16 + 0.5_rp*( (w(i,j,k+1)**2-w(i,j,k  )**2)/dzf_g(k+1) + &
+                                     (w(i,j,k  )**2-w(i,j,k-1)**2)/dzf_g(k  ) ) ! cell edge
+            buf17 = buf17 + w(i,j,k)**3                                       ! cell edge
+            buf18 = buf18 + w(i,j,k)*0.5_rp*(p(i,j,k+1)+p(i,j,k))             ! cell edge
+            !
+            ! for pressure-strain
+            !
+            buf19 = buf19 + (w(i,j,k)-w(i,j,k-1))/dzf_g(k)*p(i,j,k)
+            !
+            ! for dissipation
+            !
+            buf20 = buf20 + &
+                             0.25_rp*( &
+                                      ((w(i+1,j,k  )-w(i  ,j,k  ))/dl(1))**2 + &
+                                      ((w(i  ,j,k  )-w(i-1,j,k  ))/dl(1))**2 + &
+                                      ((w(i+1,j,k-1)-w(i  ,j,k-1))/dl(1))**2 + &
+                                      ((w(i  ,j,k-1)-w(i-1,j,k-1))/dl(1))**2 &
+                                     ) + &
+                             0.25_rp*( &
+                                      ((w(i,j+1,k  )-w(i,j  ,k  ))/dl(2))**2 + &
+                                      ((w(i,j  ,k  )-w(i,j-1,k  ))/dl(2))**2 + &
+                                      ((w(i,j+1,k-1)-w(i,j  ,k-1))/dl(2))**2 + &
+                                      ((w(i,j  ,k-1)-w(i,j-1,k-1))/dl(2))**2 &
+                                     ) + &
+                                      ((w(i,j,k)-w(i,j,k-1))/dzf_g(k))**2
+            !
+            ! terms needed for uw (excl. those computed above)
+            !
+            ! for production
+            !
+            buf21 = buf21 + 0.5_rp*(w(i,j,k)**2+w(i,j,k-1)**2)
+            !
+            ! for transport
+            !
+            buf22 = buf22 + ( 0.25_rp*( w(i,j,k) + w(i,j,k+1) + w(i+1,j,k+1) + w(i+1,j,k) )*u(i,j,k+1) - &
+                              0.25_rp*( w(i,j,k) + w(i,j,k-1) + w(i+1,j,k-1) + w(i+1,j,k) )*u(i,j,k  ) )/dzc_g(k) ! cell edge
+            buf23 = buf23 + w(i,j,k)**2 ! cell edge
+            buf24 = buf24  + 0.125_rp*(u(i,j,k+1) + u(i  ,j,k))* &
+                                      (w(i,j,k  ) + w(i+1,j,k))**2 ! cell edge
+            buf25 = buf25 + 0.5_rp*(p(i,j,k+1)+p(i,j,k)) ! cell edge
+            buf26 = buf26 + 0.25_rp*( u(i,j,k) + u(i,j,k+1) + u(i-1,j,k+1) + u(i-1,j,k) )* &
+                            0.50_rp*( p(i,j,k+1) + p(i,j,k) ) ! cell edge
+            !
+            ! for pressure-strain
+            !
+            buf27 = buf27  + &
+                              0.25_rp*( &
+                                       (u(i  ,j,k+1)-u(i  ,j,k  ))/dzc_g(k  ) + &
+                                       (u(i  ,j,k  )-u(i  ,j,k-1))/dzc_g(k-1) + &
+                                       (u(i-1,j,k+1)-u(i-1,j,k  ))/dzc_g(k  ) + &
+                                       (u(i-1,j,k  )-u(i-1,j,k-1))/dzc_g(k-1) &
+                                      )*p(i,j,k) + &
+                              0.25_rp*( &
+                                       (w(i+1,j,k  )-w(i  ,j,k  ))/dl(1) + &
+                                       (w(i  ,j,k  )-w(i-1,j,k  ))/dl(1) + &
+                                       (w(i+1,j,k-1)-w(i  ,j,k-1))/dl(1) + &
+                                       (w(i  ,j,k-1)-w(i-1,j,k-1))/dl(1) &
+                                      )*p(i,j,k)
+            !
+            ! for dissipation
+            !
+            buf28 = buf28  + &
+                                       (u(i  ,j,k  )-u(i-1,j,k  ))/dl(1)* &
+                              0.25_rp*( &
+                                       (w(i+1,j,k  )-w(i  ,j,k  ))/dl(1) + &
+                                       (w(i  ,j,k  )-w(i-1,j,k  ))/dl(1) + &
+                                       (w(i+1,j,k-1)-w(i  ,j,k-1))/dl(1) + &
+                                       (w(i  ,j,k-1)-w(i-1,j,k-1))/dl(1) &
+                                      ) + &
+                               0.25_rp*( &
+                                        (u(i  ,j+1,k)-u(i  ,j  ,k))/dl(2) + &
+                                        (u(i  ,j  ,k)-u(i  ,j-1,k))/dl(2) + &
+                                        (u(i-1,j+1,k)-u(i-1,j  ,k))/dl(2) + &
+                                        (u(i-1,j  ,k)-u(i-1,j-1,k))/dl(2) &
+                                       ) * &
+                               0.25_rp*( &
+                                        (w(i,j+1,k  )-w(i,j  ,k  ))/dl(2) + &
+                                        (w(i,j  ,k  )-w(i,j-1,k  ))/dl(2) + &
+                                        (w(i,j+1,k-1)-w(i,j  ,k-1))/dl(2) + &
+                                        (w(i,j  ,k-1)-w(i,j-1,k-1))/dl(2) &
+                                       ) + &
+                                      0.25_rp*( &
+                                        (u(i  ,j,k+1)-u(i  ,j,k  ))/dzc_g(k  ) + &
+                                        (u(i  ,j,k  )-u(i  ,j,k-1))/dzc_g(k-1) + &
+                                        (u(i-1,j,k+1)-u(i-1,j,k  ))/dzc_g(k  ) + &
+                                        (u(i-1,j,k  )-u(i-1,j,k-1))/dzc_g(k-1) &
+                                       )* &
+                                        (w(i  ,j,k  )-w(i  ,j,k-1))/dzf_g(k)
+            !
+            ! split dissipation contributions
+            !
+            ! MKE
+            !
+            buf29 = buf29 + ((u(i  ,j  ,k+1)-u(i  ,j  ,k  ))/dzc_g(k))
+            !
+            ! uu
+            !
+            buf30 = buf30 + ((u(i  ,j  ,k  )-u(i-1,j  ,k  ))/dl(1)   )**2
+            buf31 = buf31 + ((u(i  ,j+1,k  )-u(i  ,j  ,k  ))/dl(2)   )**2
+            buf32 = buf32 + ((u(i  ,j  ,k+1)-u(i  ,j  ,k  ))/dzc_g(k))**2
+            !
+            ! vv
+            !
+            buf33 = buf33 + ((v(i+1,j  ,k  )-v(i  ,j  ,k  ))/dl(1)   )**2
+            buf34 = buf34 + ((v(i  ,j  ,k  )-v(i  ,j-1,k  ))/dl(2)   )**2
+            buf35 = buf35 + ((v(i  ,j  ,k+1)-v(i  ,j  ,k  ))/dzc_g(k))**2
+            !
+            ! ww
+            !
+            buf36 = buf36 + ((w(i+1,j  ,k  )-w(i  ,j  ,k  ))/dl(1)   )**2
+            buf37 = buf37 + ((w(i  ,j+1,k  )-w(i  ,j  ,k  ))/dl(2)   )**2
+            buf38 = buf38 + ((w(i  ,j  ,k  )-w(i  ,j  ,k-1))/dzf_g(k))**2
+          end do
+        end do
+        buf( 1,k) = buf01*grid_area_ratio
+        buf( 2,k) = buf02*grid_area_ratio
+        buf( 3,k) = buf03*grid_area_ratio
+        buf( 4,k) = buf04*grid_area_ratio
+        buf( 5,k) = buf05*grid_area_ratio
+        buf( 6,k) = buf06*grid_area_ratio
+        buf( 7,k) = buf07*grid_area_ratio
+        buf( 8,k) = buf08*grid_area_ratio
+        buf( 9,k) = buf09*grid_area_ratio
+        buf(10,k) = buf10*grid_area_ratio
+        buf(11,k) = buf11*grid_area_ratio
+        buf(12,k) = buf12*grid_area_ratio
+        buf(13,k) = buf13*grid_area_ratio
+        buf(14,k) = buf14*grid_area_ratio
+        buf(15,k) = buf15*grid_area_ratio
+        buf(16,k) = buf16*grid_area_ratio
+        buf(17,k) = buf17*grid_area_ratio
+        buf(18,k) = buf18*grid_area_ratio
+        buf(19,k) = buf19*grid_area_ratio
+        buf(20,k) = buf20*grid_area_ratio
+        buf(21,k) = buf21*grid_area_ratio
+        buf(22,k) = buf22*grid_area_ratio
+        buf(23,k) = buf23*grid_area_ratio
+        buf(24,k) = buf24*grid_area_ratio
+        buf(25,k) = buf25*grid_area_ratio
+        buf(26,k) = buf26*grid_area_ratio
+        buf(27,k) = buf27*grid_area_ratio
+        buf(28,k) = buf28*grid_area_ratio
+        buf(29,k) = buf29*grid_area_ratio
+        buf(30,k) = buf30*grid_area_ratio
+        buf(31,k) = buf31*grid_area_ratio
+        buf(32,k) = buf32*grid_area_ratio
+        buf(33,k) = buf33*grid_area_ratio
+        buf(34,k) = buf34*grid_area_ratio
+        buf(35,k) = buf35*grid_area_ratio
+        buf(36,k) = buf36*grid_area_ratio
+        buf(37,k) = buf37*grid_area_ratio
+        buf(38,k) = buf38*grid_area_ratio
+      end do
+      !$acc update self(buf)
+      call mpi_allreduce(MPI_IN_PLACE,buf(1,1),size(buf),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
+      if(myid == 0) then
+        nvars = 38
+        write(cfmt,'(A,I3,A)') '(',nvars+2+2,'ES26.18)'
+        open(newunit=iunit,file=fname//'_reystr_budget.out')
+        do k=1,nn
+          write(iunit,trim(cfmt)) zc_g(k),zf_g(k),(buf(i,k),i=1,nvars),dzc_g(k),dzf_g(k)
+        end do
+        close(iunit)
+      end if
+      block
+      use mod_param, only:dx,dy
+      !$acc parallel loop gang
+      do k=lo(3),hi(3)
+        buf01 = 0._rp
+        buf02 = 0._rp
+        buf03 = 0._rp
+        buf04 = 0._rp
+        buf05 = 0._rp
+        buf06 = 0._rp
+        !$acc loop vector collapse(2) reduction(+:buf02,buf03,buf05,buf06) reduction(max:buf01,buf04)
+        do j=lo(2),hi(2)
+          do i=lo(1),hi(1)
+            !
+            ! velocity
+            !
+            div = (w(i,j,k)-w(i,j,k-1))/dzf_g(k) + &
+                  (v(i,j,k)-v(i,j-1,k))/dy       + &
+                  (u(i,j,k)-u(i-1,j,k))/dx
+            buf01 = max(abs(div),buf01)
+            buf02 = buf02 + abs(div)
+            buf03 = buf03 + div
+            buf04 = max(abs(div)*dzf_g(k),buf04)
+            buf05 = buf05 + abs(div)*dzf_g(k)
+            buf06 = buf06 + div*dzf_g(k)
+          end do
+        end do
+        buf(1,k) = buf01
+        buf(2,k) = buf02*grid_area_ratio
+        buf(3,k) = buf03*grid_area_ratio
+        buf(4,k) = buf04
+        buf(5,k) = buf05*grid_area_ratio
+        buf(6,k) = buf06*grid_area_ratio
+      end do
+      !$acc update self(buf)
+      call mpi_allreduce(MPI_IN_PLACE,buf(1,1),size(buf),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
+      if(myid == 0) then
+        nvars = 6
+        write(cfmt,'(A,I3,A)') '(',nvars+2+2,'ES26.18)'
+        open(newunit=iunit,file=fname//'_leakage.out')
+        do k=1,nn
+          write(iunit,trim(cfmt)) zc_g(k),zf_g(k),(buf(i,k),i=1,nvars),dzc_g(k),dzf_g(k)
+        end do
+        close(iunit)
+      end if
+      end block
+    case(2)
+    case(1)
+    end select
+    !$acc exit data delete(buf)
+    !$acc wait
+  end subroutine out1d_single_point_chan
 end module mod_output

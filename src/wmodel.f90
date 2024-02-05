@@ -30,12 +30,15 @@ module mod_wmodel    !!!!!rename as wallstress
     real(rp) :: wei,uh,vh,wh,u1,u2,v1,v2,w1,w2,tauw(2)
     integer  :: i,j,k,j1,j2,k1,k2
     !
+    ! call wallmodel(0.01_rp,0._rp,0.1_rp,l,1._rp/19800._rp,tauw)
+    ! stop
+    !
     ! to be simplified
     ! modify bc 1, consistent with bc 0, using h, rather than l-h
     if(is_bound(0,3).and.lwm(0,3)>0) then  !to be improved by modifying input.nml straightly
       !lower wall
       k = 1
-      do while(zc(k) < h)
+      do while(zc(k) <= h)
         k = k + 1
       end do
       if(k > n(3)) print *, 'error with wall model'
@@ -50,7 +53,7 @@ module mod_wmodel    !!!!!rename as wallstress
           v2 = 0.25_rp*(v(i,j,k2) + v(i+1,j,k2) + v(i,j-1,k2) + v(i+1,j-1,k2))
           uh = (1._rp - wei)*u1 + wei*u2
           vh = (1._rp - wei)*v1 + wei*v2
-          call wallmodel(uh,vh,h,visc,tauw)
+          call wallmodel(uh,vh,h,l,visc,tauw)
           bcu%z(i,j,0) = 1._rp/visc*tauw(1) !tauw, x direction
           !
           u1 = 0.25_rp*(u(i-1,j,k1) + u(i,j,k1) + u(i-1,j+1,k1) + u(i,j+1,k1))
@@ -59,7 +62,7 @@ module mod_wmodel    !!!!!rename as wallstress
           v2 = v(i,j,k2)
           uh = (1._rp - wei)*u1 + wei*u2
           vh = (1._rp - wei)*v1 + wei*v2
-          call wallmodel(uh,vh,h,visc,tauw)
+          call wallmodel(uh,vh,h,l,visc,tauw)
           bcv%z(i,j,0) = 1._rp/visc*tauw(2) !tauw, y direction
         end do
       end do
@@ -67,7 +70,7 @@ module mod_wmodel    !!!!!rename as wallstress
     if(is_bound(1,3).and.lwm(1,3)>0) then
       !upper wall
       k = n(3)
-      do while(zc(k) > l(3)-h)
+      do while(zc(k) >= l(3)-h)
         k = k - 1
       end do
       if(k < 1) print *, 'error with wall model'
@@ -82,7 +85,7 @@ module mod_wmodel    !!!!!rename as wallstress
           v2 = 0.25_rp*(v(i,j,k2) + v(i+1,j,k2) + v(i,j-1,k2) + v(i+1,j-1,k2))
           uh = (1._rp - wei)*u1 + wei*u2
           vh = (1._rp - wei)*v1 + wei*v2
-          call wallmodel(uh,vh,h,visc,tauw)
+          call wallmodel(uh,vh,h,l,visc,tauw)
           bcu%z(i,j,1) = -1._rp/visc*tauw(1) !tauw, x direction
           !
           u1 = 0.25_rp*(u(i-1,j,k1) + u(i,j,k1) + u(i-1,j+1,k1) + u(i,j+1,k1))
@@ -91,7 +94,7 @@ module mod_wmodel    !!!!!rename as wallstress
           v2 = v(i,j,k2)
           uh = (1._rp - wei)*u1 + wei*u2
           vh = (1._rp - wei)*v1 + wei*v2
-          call wallmodel(uh,vh,h,visc,tauw)
+          call wallmodel(uh,vh,h,l,visc,tauw)
           bcv%z(i,j,1) = -1._rp/visc*tauw(2) !tauw, y direction
         end do
       end do
@@ -116,7 +119,7 @@ module mod_wmodel    !!!!!rename as wallstress
           w2 = 0.25_rp*(w(i,j2,k) + w(i+1,j2,k) + w(i,j2,k-1) + w(i+1,j2,k))
           uh = (1._rp - wei)*u1 + wei*u2
           wh = (1._rp - wei)*w1 + wei*w2
-          call wallmodel(uh,wh,h,visc,tauw)
+          call wallmodel(uh,wh,h,l,visc,tauw)
           bcu%y(i,k,0) = 1._rp/visc*tauw(1) !tauw, x direction
           !
           u1 = 0.25_rp*(u(i-1,j1,k) + u(i,j1,k) + u(i-1,j1,k+1) + u(i,j1,k+1))
@@ -125,7 +128,7 @@ module mod_wmodel    !!!!!rename as wallstress
           w2 = w(i,j2,k)
           uh = (1._rp - wei)*u1 + wei*u2
           wh = (1._rp - wei)*w1 + wei*w2
-          call wallmodel(uh,wh,h,visc,tauw)
+          call wallmodel(uh,wh,h,l,visc,tauw)
           bcw%y(i,k,0) = 1._rp/visc*tauw(2) !tauw, z direction
         end do
       end do
@@ -148,7 +151,7 @@ module mod_wmodel    !!!!!rename as wallstress
           w2 = 0.25_rp*(w(i,j2,k  ) + w(i+1,j2,k) + w(i,j2,k-1) + w(i+1,j2,k))
           uh = (1._rp - wei)*u1 + wei*u2
           wh = (1._rp - wei)*w1 + wei*w2
-          call wallmodel(uh,wh,h,visc,tauw)
+          call wallmodel(uh,wh,h,l,visc,tauw)
           bcu%y(i,k,1) = -1._rp/visc*tauw(1) !tauw, x direction
           !
           u1 = 0.25_rp*(u(i-1,j1,k  ) + u(i,j1,k  ) + u(i-1,j1,k+1) + u(i,j1,k+1))
@@ -157,7 +160,7 @@ module mod_wmodel    !!!!!rename as wallstress
           w2 = w(i,j2,k)
           uh = (1._rp - wei)*u1 + wei*u2
           wh = (1._rp - wei)*w1 + wei*w2
-          call wallmodel(uh,wh,h,visc,tauw)
+          call wallmodel(uh,wh,h,l,visc,tauw)
           bcw%y(i,k,1) = -1._rp/visc*tauw(2) !tauw, z direction
         end do
       end do
@@ -246,12 +249,14 @@ module mod_wmodel    !!!!!rename as wallstress
   !   end do
   ! end subroutine cmpt_bctau
   !
-  subroutine wallmodel(uh,vh,h,visc,tauw)
+  subroutine wallmodel(uh,vh,h,l,visc,tauw)   !!!!!use h/del
     implicit none
     real(rp), intent(in)  :: uh,vh,h,visc
+    real(rp), intent(in), dimension(3) :: l
     real(rp), intent(out), dimension(2) :: tauw
     real(rp) :: upar,utau,f,fp,conv,tauw_old,tauw_tot
-    real(rp) :: umax
+    real(rp) :: umax,del
+    integer :: i
     !
     if(.true.) then
       !log-law profile
@@ -259,10 +264,12 @@ module mod_wmodel    !!!!!rename as wallstress
       utau = sqrt(upar/h*visc)
       conv = 1._rp
       do while(conv > 1.e-4)
+        !Newton-Raphson method
+        !six iterations needed in general
         tauw_old = utau*utau
         f  = upar/utau - 1._rp/kap_log*log(h*utau/visc) - b_log
         fp = -1._rp/utau*(upar/utau + 1._rp/kap_log)
-        utau = abs(utau - f/fp)  !to be improved
+        utau = abs(utau - f/fp) !abs increases robustness
         tauw_tot = utau*utau
         conv = abs(tauw_tot-tauw_old)/tauw_old
       end do
@@ -270,9 +277,11 @@ module mod_wmodel    !!!!!rename as wallstress
       tauw(2)  = tauw_tot*vh/upar
     else
       !parabolic profile
+      !U_ref and L_ref randomly chosen
       upar = sqrt(uh*uh+vh*vh)
-      umax = upar/(1._rp-((h-0.5_rp)/0.5_rp)**2)
-      tauw_tot = 4._rp*umax*visc
+      del  = 0.5_rp*l(3)
+      umax = upar/(h/del*(2._rp-h/del))
+      tauw_tot = 2._rp/del*umax*visc
       tauw(1)  = tauw_tot*uh/upar
       tauw(2)  = tauw_tot*vh/upar
     end if

@@ -63,6 +63,7 @@ real(rp), protected, dimension(3) :: velf
 !
 real(rp), protected, dimension(3) :: dl,dli
 real(rp), protected :: visc
+real(rp), protected :: dx,dy
 !
 integer, protected, dimension(0:1,3) :: lwm
 real(rp), protected :: hwm
@@ -122,6 +123,8 @@ contains
     dl(:) = l(:)/(1.*ng(:))
     dli(:) = dl(:)**(-1)
     visc = visci**(-1)
+    dx = dl(1)
+    dy = dl(2)
     !
     open(newunit=iunit,file='input.nml',status='old',action='read',iostat=ierr)
       if( ierr == 0 ) then
