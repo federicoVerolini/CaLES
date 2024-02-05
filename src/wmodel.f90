@@ -265,7 +265,7 @@ module mod_wmodel    !!!!!rename as wallstress
       conv = 1._rp
       do while(conv > 1.e-4)
         !Newton-Raphson method
-        !six iterations needed in general
+        !six iterations needed in general 
         tauw_old = utau*utau
         f  = upar/utau - 1._rp/kap_log*log(h*utau/visc) - b_log
         fp = -1._rp/utau*(upar/utau + 1._rp/kap_log)
