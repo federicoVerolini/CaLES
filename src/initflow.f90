@@ -70,6 +70,7 @@ module mod_initflow
       u1d(:) = 0.
     case('uni')
       u1d(:) = uref
+      is_noise = .false. ! for testing purposes
     case('log')
       reb = ubulk*l(3)/visc
       call log_profile(n(3),zc/l(3),reb,u1d)
@@ -248,7 +249,7 @@ module mod_initflow
     n(:) = shape(p)
     allocate(seed(64))
     seed(:) = iseed
-    call random_seed( put = seed )
+    call random_seed( put = seed ) !random numbers reproducible with the same seed
     do k=1,ng(3)
       kk = k-(lo(3)-1)
       do j=1,ng(2)
