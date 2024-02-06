@@ -13,6 +13,13 @@ module mod_output
   private
   public out0d,gen_alias,out1d,out1d_chan,out2d,out3d,write_log_output,write_visu_2d,write_visu_3d
   public out1d_single_point_chan
+  character(len=*), parameter :: fmt_dp = '(*(es24.16e3,1x))', &
+                                 fmt_sp = '(*(es15.8e2,1x))'
+#if !defined(_SINGLE_PRECISION)
+  character(len=*), parameter :: fmt_rp = fmt_dp
+#else
+  character(len=*), parameter :: fmt_rp = fmt_sp
+#endif
   contains
   subroutine out0d(fname,n,var)
     !
@@ -28,9 +35,9 @@ module mod_output
     real(rp), intent(in), dimension(:) :: var
     integer :: iunit
     !
-    if (myid  ==  0) then
+    if (myid == 0) then
       open(newunit=iunit,file=fname,position='append')
-      write(iunit,'(*(E16.7e3))') var(1:n)
+      write(iunit,fmt_rp) var(1:n)
       close(iunit)
     end if
   end subroutine out0d
@@ -55,7 +62,7 @@ module mod_output
     ! ng    -> global domain sizes
     ! lo,hi -> upper and lower extents of the input array
     ! idir  -> direction of the profile
-    ! dl,dl -> uniform grid spacing and length arrays
+    ! dl,l  -> uniform grid spacing and length arrays
     ! z_g   -> global z coordinate array (grid is non-uniform in z)
     ! dz    -> local z grid spacing array (should work also with the global one)
     ! p     -> 3D input scalar field
@@ -98,7 +105,7 @@ module mod_output
       if(myid == 0) then
         open(newunit=iunit,file=fname)
         do k=1,ng(3)
-          write(iunit,'(2E16.7e3)') z_g(k),p1d(k)
+          write(iunit,fmt_rp) z_g(k),p1d(k)
         end do
         close(iunit)
       end if
@@ -120,7 +127,7 @@ module mod_output
       if(myid == 0) then
         open(newunit=iunit,file=fname)
         do j=1,ng(2)
-          write(iunit,'(2E16.7e3)') (j-.5)*dl(2),p1d(j)
+          write(iunit,fmt_rp) (j-.5)*dl(2),p1d(j)
         end do
         close(iunit)
       end if
@@ -142,7 +149,7 @@ module mod_output
       if(myid == 0) then
         open(newunit=iunit,file=fname)
         do i=1,ng(1)
-          write(iunit,'(2E16.7e3)') (i-.5)*dl(1),p1d(i)
+          write(iunit,fmt_rp) (i-.5)*dl(1),p1d(i)
         end do
         close(iunit)
       end if
@@ -359,9 +366,9 @@ module mod_output
       if(myid == 0) then
         open(newunit=iunit,file=fname)
         do k=1,ng(3)
-          write(iunit,'(8E16.7e3)') z_g(k),um(k),vm(k),wm(k), &
-                                           u2(k),v2(k),w2(k), &
-                                           uw(k)   !uw is reynolds stress
+          write(iunit,fmt_rp) z_g(k),um(k),vm(k),wm(k), &
+                                     u2(k),v2(k),w2(k), &
+                                     uw(k)   !uw is reynolds stress
         end do
         close(iunit)
       end if
@@ -425,22 +432,22 @@ module mod_output
       call MPI_ALLREDUCE(MPI_IN_PLACE,w2(1,1),ng(1)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
       call MPI_ALLREDUCE(MPI_IN_PLACE,vw(1,1),ng(1)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
       call MPI_ALLREDUCE(MPI_IN_PLACE,uv(1,1),ng(1)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      um(:,:) =      um(:,:)*grid_area_ratio
-      vm(:,:) =      vm(:,:)*grid_area_ratio
-      wm(:,:) =      wm(:,:)*grid_area_ratio
-      u2(:,:) = sqrt(u2(:,:)*grid_area_ratio - um(:,:)**2)
-      v2(:,:) = sqrt(v2(:,:)*grid_area_ratio - vm(:,:)**2)
-      w2(:,:) = sqrt(w2(:,:)*grid_area_ratio - wm(:,:)**2)
-      vw(:,:) =      vw(:,:)*grid_area_ratio - vm(:,:)*wm(:,:)
-      uv(:,:) =      uv(:,:)*grid_area_ratio - um(:,:)*vm(:,:)
+      um(:,:) = um(:,:)*grid_area_ratio
+      vm(:,:) = vm(:,:)*grid_area_ratio
+      wm(:,:) = wm(:,:)*grid_area_ratio
+      u2(:,:) = u2(:,:)*grid_area_ratio - um(:,:)**2
+      v2(:,:) = v2(:,:)*grid_area_ratio - vm(:,:)**2
+      w2(:,:) = w2(:,:)*grid_area_ratio - wm(:,:)**2
+      vw(:,:) = vw(:,:)*grid_area_ratio - vm(:,:)*wm(:,:)
+      uv(:,:) = uv(:,:)*grid_area_ratio - um(:,:)*vm(:,:)
       if(myid == 0) then
         open(newunit=iunit,file=fname)
         do k=1,ng(3)
           do i=1,ng(1)
             x_g = (i-.5)*dl(1)
-            write(iunit,'(10E16.7e3)') x_g,z_g(k),um(i,k),vm(i,k),wm(i,k), &
-                                                  u2(i,k),v2(i,k),w2(i,k), &
-                                                  vw(i,k),uv(i,k)
+            write(iunit,fmt_rp) x_g,z_g(k),um(i,k),vm(i,k),wm(i,k), &
+                                           u2(i,k),v2(i,k),w2(i,k), &
+                                           vw(i,k),uv(i,k)
           end do
         end do
         close(iunit)
@@ -475,30 +482,30 @@ module mod_output
           end do
         end do
       end do
-      call MPI_ALLREDUCE(MPI_IN_PLACE,um(1,1),ng(1)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,vm(1,1),ng(1)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,wm(1,1),ng(1)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,u2(1,1),ng(1)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,v2(1,1),ng(1)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,w2(1,1),ng(1)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,uv(1,1),ng(1)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,uw(1,1),ng(1)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      um(:,:) =      um(:,:)*grid_area_ratio
-      vm(:,:) =      vm(:,:)*grid_area_ratio
-      wm(:,:) =      wm(:,:)*grid_area_ratio
-      u2(:,:) = sqrt(u2(:,:)*grid_area_ratio - um(:,:)**2)
-      v2(:,:) = sqrt(v2(:,:)*grid_area_ratio - vm(:,:)**2)
-      w2(:,:) = sqrt(w2(:,:)*grid_area_ratio - wm(:,:)**2)
-      uv(:,:) =      uv(:,:)*grid_area_ratio - um(:,:)*vm(:,:)
-      uw(:,:) =      uw(:,:)*grid_area_ratio - um(:,:)*wm(:,:)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,um(1,1),ng(2)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,vm(1,1),ng(2)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,wm(1,1),ng(2)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,u2(1,1),ng(2)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,v2(1,1),ng(2)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,w2(1,1),ng(2)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,uv(1,1),ng(2)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,uw(1,1),ng(2)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
+      um(:,:) = um(:,:)*grid_area_ratio
+      vm(:,:) = vm(:,:)*grid_area_ratio
+      wm(:,:) = wm(:,:)*grid_area_ratio
+      u2(:,:) = u2(:,:)*grid_area_ratio - um(:,:)**2
+      v2(:,:) = v2(:,:)*grid_area_ratio - vm(:,:)**2
+      w2(:,:) = w2(:,:)*grid_area_ratio - wm(:,:)**2
+      uv(:,:) = uv(:,:)*grid_area_ratio - um(:,:)*vm(:,:)
+      uw(:,:) = uw(:,:)*grid_area_ratio - um(:,:)*wm(:,:)
       if(myid == 0) then
         open(newunit=iunit,file=fname)
         do k=1,ng(3)
           do j=1,ng(2)
             y_g = (j-.5)*dl(2)
-            write(iunit,'(10E16.7e3)') y_g,z_g(k),um(j,k),vm(j,k),wm(j,k), &
-                                                  u2(j,k),v2(j,k),w2(j,k), &
-                                                  uv(j,k),uw(j,k)
+            write(iunit,fmt_rp) y_g,z_g(k),um(j,k),vm(j,k),wm(j,k), &
+                                           u2(j,k),v2(j,k),w2(j,k), &
+                                           uv(j,k),uw(j,k)
           end do
         end do
         close(iunit)
