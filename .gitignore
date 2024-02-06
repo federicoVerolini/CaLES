@@ -13,8 +13,4 @@
 *.xmf
 cans*
 tests/
-docs/
 build/
-build.conf
-Makefile
-configs/
