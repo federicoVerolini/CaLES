@@ -13,6 +13,11 @@ contains
   subroutine bulk_mean(n,grid_vol_ratio,p,mean)
     !
     ! compute the mean value of an observable over the entire domain
+    ! small difference in the mean value is expected for different domain decompositions
+    ! i.e., different numbers of MPI tasks. Simply put, a+b+c+d = (a+b)+(c+d) is not
+    ! exactly true in floating point arithmetic. Thus, MPI_ALLREDUCE with operator MPI_SUM
+    ! should be avoided when comparing the results from different numbers of MPI tasks.
+    ! also, -O0 is used to avoid compiler optimization that may change the order of summation
     !
     use mpi
     use mod_precision

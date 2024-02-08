@@ -46,7 +46,8 @@ program cans
   use mod_load           , only: load_all
   use mod_mom            , only: bulk_forcing
   use mod_rk             , only: rk
-  use mod_output         , only: out0d,gen_alias,out1d,out1d_chan,out1d_single_point_chan,out2d,out3d,write_log_output,write_visu_2d,write_visu_3d
+  use mod_output         , only: out0d,gen_alias,out1d,out1d_chan,out1d_single_point_chan,out2d,out3d,write_log_output, &
+                                 write_visu_2d,write_visu_3d
   use mod_param          , only: ng,l,dl,dli, &
                                  gtype,gr, &
                                  cfl,dtmin, &
@@ -341,7 +342,7 @@ program cans
     if(myid == 0) print*, '*** Checkpoint loaded at time = ', time, 'time step = ', istep, '. ***'
   end if
   !
-  open(55,file=trim(datadir)//'debug.dat',status='replace')
+  open(55,file=trim(datadir)//'debug',status='replace')
   !$acc enter data copyin(u,v,w,p) create(pp)
   call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,lo,l,dl,zc,visc,hwm,.false.,dzc,dzf,u,v,w)
   call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
@@ -474,7 +475,7 @@ program cans
       call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,lo,l,dl,zc,visc,hwm,.true.,dzc,dzf,u,v,w)
       call updatep(n,dli,dzci,dzfi,alpha,pp,p)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
-    end do
+    end do ! end of irk loop
     dpdl(:) = -dpdl(:)*dti
     !
     ! check simulation stopping criteria
