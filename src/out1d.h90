@@ -31,5 +31,6 @@
   call out1d(trim(datadir)//'vmean_x_fld_'//fldnum//'.out',ng,lo,hi,1,l,dl,zc_g,dzf,v)
   call out1d(trim(datadir)//'wmean_x_fld_'//fldnum//'.out',ng,lo,hi,1,l,dl,zc_g,dzf,w)
   ! call out1d_chan(trim(datadir)//'velstats_fld_'//fldnum//'.out',ng,lo,hi,3,l,dl,zc_g,u,v,w)
-  call out1d_single_point_chan(trim(datadir)//'velstats_fld_'//fldnum,ng,lo,hi,3,l,dl,dzc_g,dzf_g,zc_g,zf_g,u,v,w,p)
+  call out1d_single_point_chan(trim(datadir)//'velstats_fld_'//fldnum,ng,lo,hi,3, &
+                               l,dl,dzc_g,dzf_g,zc_g,zf_g,u,v,w,p)
   ! call gen_alias(myid,trim(datadir),'umean_z_fld_'//fldnum//'.out','umean_z_now.out')

@@ -48,6 +48,8 @@ program cans
   use mod_rk             , only: rk
   use mod_output         , only: out0d,gen_alias,out1d,out1d_chan,out1d_single_point_chan,out2d,out3d,write_log_output, &
                                  write_visu_2d,write_visu_3d
+  ! use mod_output_pdfs    , only: pdfs_sergio
+  ! use mod_spectra        , only: init_spectra,cmpt_spectra
   use mod_param          , only: ng,l,dl,dli, &
                                  gtype,gr, &
                                  cfl,dtmin, &
@@ -315,6 +317,7 @@ program cans
   !
   ! determine workspace sizes and allocate the memory
   !
+  ! call init_spectra(ng)
   call init_wspace_arrays()
   call set_cufft_wspace(pack(arrplanp,.true.),istream_acc_queue_1)
 #if defined(_IMPDIFF) && !defined(_IMPDIFF_1D)
@@ -351,9 +354,14 @@ program cans
   !
   write(fldnum,'(i7.7)') istep
   !$acc update self(u,v,w,p)
-  include 'out1d.h90'
-  include 'out2d.h90'
-  include 'out3d.h90'
+  ! include 'out1d.h90'
+  ! include 'out2d.h90'
+  ! call cmpt_spectra(trim(datadir)//'spectra_u_fld_'//fldnum,n,ng,zc_g,.false.,u)
+  ! call cmpt_spectra(trim(datadir)//'spectra_v_fld_'//fldnum,n,ng,zc_g,.false.,v)
+  ! call cmpt_spectra(trim(datadir)//'spectra_w_fld_'//fldnum,n,ng,zf_g,.true. ,w)
+  ! call cmpt_spectra(trim(datadir)//'spectra_p_fld_'//fldnum,n,ng,zc_g,.false.,p)
+  ! call pdfs_sergio(trim(datadir)//'pdfs_fld_'//fldnum,lo,hi,ng,zc_g,u,v,w,p)
+  ! include 'out3d.h90'
   !
   call chkdt(n,dl,dzci,dzfi,visc,u,v,w,dtmax)
   dt = min(cfl*dtmax,dtmin)
@@ -550,7 +558,24 @@ program cans
     end if
     if(mod(istep,iout2d) == 0) then
       !$acc update self(u,v,w,p)
+      ! call cmpt_spectra(trim(datadir)//'spectra_u_fld_'//fldnum,n,1,ng,zc_g,.false.,u)
+      ! call cmpt_spectra(trim(datadir)//'spectra_v_fld_'//fldnum,n,1,ng,zc_g,.false.,v)
+      ! call cmpt_spectra(trim(datadir)//'spectra_w_fld_'//fldnum,n,1,ng,zf_g,.true. ,w)
+      ! call cmpt_spectra(trim(datadir)//'spectra_p_fld_'//fldnum,n,1,ng,zc_g,.false.,p)
+      ! call pdfs_sergio(trim(datadir)//'pdfs_fld_'//fldnum,lo,hi,ng,zc_g,u,v,w,p)
       include 'out2d.h90'
+      !block
+      !  use mod_common_cudecomp, only: buf => solver_buf_1
+      !  use mod_post, only: vorticity_one_component
+      !  real(rp), pointer, contiguous, dimension(:,:,:) :: vo
+      !  vo(1:n(1),1:n(2),1:n(3)) => buf(1:product(n(:)))
+      !  call vorticity_one_component(1,n,dli,dzci,u,v,w,vo)
+      !  call cmpt_spectra(trim(datadir)//'spectra_vox_fld_'//fldnum,n,0,ng,zf_g,.true. ,vo)
+      !  call vorticity_one_component(2,n,dli,dzci,u,v,w,vo)
+      !  call cmpt_spectra(trim(datadir)//'spectra_voy_fld_'//fldnum,n,0,ng,zf_g,.true. ,vo)
+      !  call vorticity_one_component(3,n,dli,dzci,u,v,w,vo)
+      !  call cmpt_spectra(trim(datadir)//'spectra_voz_fld_'//fldnum,n,0,ng,zc_g,.false.,vo)
+      !end block
     end if
     if(mod(istep,iout3d) == 0) then
       !$acc update self(u,v,w,p)

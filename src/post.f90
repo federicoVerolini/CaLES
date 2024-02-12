@@ -8,7 +8,7 @@ module mod_post
   use mod_precision
   implicit none
   private
-  public vorticity,rotation_rate,strain_rate,q_criterion
+  public vorticity,vorticity_one_component,rotation_rate,strain_rate,q_criterion
   contains
   subroutine vorticity(n,dli,dzci,ux,uy,uz,vox,voy,voz)
     !
@@ -24,6 +24,7 @@ module mod_post
     integer :: i,j,k
     dxi = dli(1)
     dyi = dli(2)
+    !$acc wait
     !$acc parallel loop collapse(3) default(present)
     !$OMP PARALLEL DO   COLLAPSE(3) DEFAULT(shared)
     do k=1,n(3)
@@ -59,7 +60,68 @@ module mod_post
         end do
       end do
     end do
+    !$acc wait
   end subroutine vorticity
+  !
+  subroutine vorticity_one_component(idir,n,dli,dzci,ux,uy,uz,vo)
+    !
+    ! computes the vorticity field
+    !
+    implicit none
+    integer , intent(in )                      :: idir
+    integer , intent(in ), dimension(3)        :: n
+    real(rp), intent(in ), dimension(3)        :: dli
+    real(rp), intent(in ), dimension(0:)       :: dzci
+    real(rp), intent(in ), dimension(0:,0:,0:) :: ux ,uy ,uz
+    real(rp), intent(out), dimension( :, :, :) :: vo
+    real(rp) :: dxi,dyi
+    integer :: i,j,k
+    dxi = dli(1)
+    dyi = dli(2)
+    !$acc wait
+    select case(idir)
+    case(1)
+      !$acc parallel loop collapse(3) default(present)
+      !$OMP PARALLEL DO   COLLAPSE(3) DEFAULT(shared)
+      do k=1,n(3)
+        do j=1,n(2)
+          do i=1,n(1)
+            !
+            ! x component of the vorticity at cell edge
+            !
+            vo(i,j,k) = (uz(i,j+1,k)-uz(i,j,k))*dyi     - (uy(i,j,k+1)-uy(i,j,k))*dzci(k)
+          end do
+        end do
+      end do
+    case(2)
+      !$acc parallel loop collapse(3) default(present)
+      !$OMP PARALLEL DO   COLLAPSE(3) DEFAULT(shared)
+      do k=1,n(3)
+        do j=1,n(2)
+          do i=1,n(1)
+            !
+            ! y component of the vorticity at cell edge
+            !
+            vo(i,j,k) = (ux(i,j,k+1)-ux(i,j,k))*dzci(k) - (uz(i+1,j,k)-uz(i,j,k))*dxi
+          end do
+        end do
+      end do
+    case(3)
+      !$acc parallel loop collapse(3) default(present)
+      !$OMP PARALLEL DO   COLLAPSE(3) DEFAULT(shared)
+      do k=1,n(3)
+        do j=1,n(2)
+          do i=1,n(1)
+            !
+            ! z component of the vorticity at cell edge
+            !
+            vo(i,j,k) = (uy(i+1,j,k)-uy(i,j,k))*dxi     - (ux(i,j+1,k)-ux(i,j,k))*dyi
+          end do
+        end do
+      end do
+    end select
+    !$acc wait
+  end subroutine vorticity_one_component
   !
   subroutine strain_rate(n,dli,dzci,dzfi,ux,uy,uz,str)
     implicit none

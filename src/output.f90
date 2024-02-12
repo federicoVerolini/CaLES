@@ -13,13 +13,6 @@ module mod_output
   private
   public out0d,gen_alias,out1d,out1d_chan,out2d,out3d,write_log_output,write_visu_2d,write_visu_3d
   public out1d_single_point_chan
-  character(len=*), parameter :: fmt_dp = '(*(es24.16e3,1x))', &
-                                 fmt_sp = '(*(es15.8e2,1x))'
-#if !defined(_SINGLE_PRECISION)
-  character(len=*), parameter :: fmt_rp = fmt_dp
-#else
-  character(len=*), parameter :: fmt_rp = fmt_sp
-#endif
   contains
   subroutine out0d(fname,n,var)
     !
@@ -37,7 +30,7 @@ module mod_output
     !
     if (myid == 0) then
       open(newunit=iunit,file=fname,position='append')
-      write(iunit,fmt_rp) var(1:n)
+      write(iunit,'(*(E16.7e3))') var(1:n)
       close(iunit)
     end if
   end subroutine out0d
@@ -76,10 +69,10 @@ module mod_output
     ! real(rp), intent(in), dimension(0:lo(3)-1) :: dz
     real(rp), intent(in), dimension(lo(3)-1:) :: dz
     real(rp), intent(in), dimension(lo(1)-1:,lo(2)-1:,lo(3)-1:) :: p
-    real(rp), allocatable, dimension(:) :: p1d
+    real(dp), allocatable, dimension(:) :: p1d
     integer :: i,j,k
     integer :: iunit
-    real(rp) :: grid_area_ratio,p1d_s
+    real(dp) :: grid_area_ratio,p1d_s
     !
     allocate(p1d(ng(idir)))
     !$acc enter data create(p1d)
@@ -101,11 +94,11 @@ module mod_output
         p1d(k) = p1d_s
       end do
       !$acc exit data copyout(p1d)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,p1d(1),ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,p1d(1),ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
       if(myid == 0) then
         open(newunit=iunit,file=fname)
         do k=1,ng(3)
-          write(iunit,fmt_rp) z_g(k),p1d(k)
+          write(iunit,'(2E16.7e3)') z_g(k),p1d(k)
         end do
         close(iunit)
       end if
@@ -123,11 +116,11 @@ module mod_output
         p1d(j) = p1d_s
       end do
       !$acc exit data copyout(p1d)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,p1d(1),ng(2),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,p1d(1),ng(2),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
       if(myid == 0) then
         open(newunit=iunit,file=fname)
         do j=1,ng(2)
-          write(iunit,fmt_rp) (j-.5)*dl(2),p1d(j)
+          write(iunit,'(2E16.7e3)') (j-.5)*dl(2),p1d(j)
         end do
         close(iunit)
       end if
@@ -145,11 +138,11 @@ module mod_output
         p1d(i) = p1d_s
       end do
       !$acc exit data copyout(p1d)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,p1d(1),ng(1),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,p1d(1),ng(1),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
       if(myid == 0) then
         open(newunit=iunit,file=fname)
         do i=1,ng(1)
-          write(iunit,fmt_rp) (i-.5)*dl(1),p1d(i)
+          write(iunit,'(2E16.7e3)') (i-.5)*dl(1),p1d(i)
         end do
         close(iunit)
       end if
@@ -317,11 +310,11 @@ module mod_output
     real(rp), intent(in), dimension(3) :: l,dl
     real(rp), intent(in), dimension(0:) :: z_g
     real(rp), intent(in), dimension(lo(1)-1:,lo(2)-1:,lo(3)-1:) :: u,v,w
-    real(rp), allocatable, dimension(:) :: um,vm,wm,u2,v2,w2,uw
+    real(dp), allocatable, dimension(:) :: um,vm,wm,u2,v2,w2,uw
     integer :: i,j,k
     integer :: iunit
     integer :: q
-    real(rp) :: grid_area_ratio
+    real(dp) :: grid_area_ratio
     !
     q = ng(idir)
     select case(idir)
@@ -349,13 +342,13 @@ module mod_output
           end do
         end do
       end do
-      call MPI_ALLREDUCE(MPI_IN_PLACE,um(1),ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,vm(1),ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,wm(1),ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,u2(1),ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,v2(1),ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,w2(1),ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,uw(1),ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,um(1),ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,vm(1),ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,wm(1),ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,u2(1),ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,v2(1),ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,w2(1),ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,uw(1),ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
       um(:) = um(:)*grid_area_ratio
       vm(:) = vm(:)*grid_area_ratio
       wm(:) = wm(:)*grid_area_ratio
@@ -366,9 +359,9 @@ module mod_output
       if(myid == 0) then
         open(newunit=iunit,file=fname)
         do k=1,ng(3)
-          write(iunit,fmt_rp) z_g(k),um(k),vm(k),wm(k), &
-                                     u2(k),v2(k),w2(k), &
-                                     uw(k)   !uw is reynolds stress
+          write(iunit,'(8E16.7e3)') z_g(k),um(k),vm(k),wm(k), &
+                                           u2(k),v2(k),w2(k), &
+                                           uw(k) !uw is reynolds stress
         end do
         close(iunit)
       end if
@@ -386,11 +379,11 @@ module mod_output
     real(rp), intent(in), dimension(3) :: l,dl
     real(rp), intent(in), dimension(0:) :: z_g
     real(rp), intent(in), dimension(lo(1)-1:,lo(2)-1:,lo(3)-1:) :: u,v,w
-    real(rp), allocatable, dimension(:,:) :: um,vm,wm,u2,v2,w2,uv,uw,vw
+    real(dp), allocatable, dimension(:,:) :: um,vm,wm,u2,v2,w2,uv,uw,vw
     integer :: i,j,k
     integer :: iunit
     integer :: p,q
-    real(rp) :: x_g,y_g,grid_area_ratio
+    real(dp) :: x_g,y_g,grid_area_ratio
     !
     select case(idir) ! streamwise direction
     case(3)
@@ -424,30 +417,30 @@ module mod_output
           end do
         end do
       end do
-      call MPI_ALLREDUCE(MPI_IN_PLACE,um(1,1),ng(1)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,vm(1,1),ng(1)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,wm(1,1),ng(1)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,u2(1,1),ng(1)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,v2(1,1),ng(1)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,w2(1,1),ng(1)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,vw(1,1),ng(1)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,uv(1,1),ng(1)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      um(:,:) = um(:,:)*grid_area_ratio
-      vm(:,:) = vm(:,:)*grid_area_ratio
-      wm(:,:) = wm(:,:)*grid_area_ratio
-      u2(:,:) = u2(:,:)*grid_area_ratio - um(:,:)**2
-      v2(:,:) = v2(:,:)*grid_area_ratio - vm(:,:)**2
-      w2(:,:) = w2(:,:)*grid_area_ratio - wm(:,:)**2
-      vw(:,:) = vw(:,:)*grid_area_ratio - vm(:,:)*wm(:,:)
-      uv(:,:) = uv(:,:)*grid_area_ratio - um(:,:)*vm(:,:)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,um(1,1),ng(1)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,vm(1,1),ng(1)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,wm(1,1),ng(1)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,u2(1,1),ng(1)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,v2(1,1),ng(1)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,w2(1,1),ng(1)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,vw(1,1),ng(1)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,uv(1,1),ng(1)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      um(:,:) =      um(:,:)*grid_area_ratio
+      vm(:,:) =      vm(:,:)*grid_area_ratio
+      wm(:,:) =      wm(:,:)*grid_area_ratio
+      u2(:,:) = sqrt(u2(:,:)*grid_area_ratio - um(:,:)**2)
+      v2(:,:) = sqrt(v2(:,:)*grid_area_ratio - vm(:,:)**2)
+      w2(:,:) = sqrt(w2(:,:)*grid_area_ratio - wm(:,:)**2)
+      vw(:,:) =      vw(:,:)*grid_area_ratio - vm(:,:)*wm(:,:)
+      uv(:,:) =      uv(:,:)*grid_area_ratio - um(:,:)*vm(:,:)
       if(myid == 0) then
         open(newunit=iunit,file=fname)
         do k=1,ng(3)
           do i=1,ng(1)
             x_g = (i-.5)*dl(1)
-            write(iunit,fmt_rp) x_g,z_g(k),um(i,k),vm(i,k),wm(i,k), &
-                                           u2(i,k),v2(i,k),w2(i,k), &
-                                           vw(i,k),uv(i,k)
+            write(iunit,'(10E16.7e3)') x_g,z_g(k),um(i,k),vm(i,k),wm(i,k), &
+                                                  u2(i,k),v2(i,k),w2(i,k), &
+                                                  vw(i,k),uv(i,k)
           end do
         end do
         close(iunit)
@@ -482,30 +475,30 @@ module mod_output
           end do
         end do
       end do
-      call MPI_ALLREDUCE(MPI_IN_PLACE,um(1,1),ng(2)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,vm(1,1),ng(2)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,wm(1,1),ng(2)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,u2(1,1),ng(2)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,v2(1,1),ng(2)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,w2(1,1),ng(2)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,uv(1,1),ng(2)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,uw(1,1),ng(2)*ng(3),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      um(:,:) = um(:,:)*grid_area_ratio
-      vm(:,:) = vm(:,:)*grid_area_ratio
-      wm(:,:) = wm(:,:)*grid_area_ratio
-      u2(:,:) = u2(:,:)*grid_area_ratio - um(:,:)**2
-      v2(:,:) = v2(:,:)*grid_area_ratio - vm(:,:)**2
-      w2(:,:) = w2(:,:)*grid_area_ratio - wm(:,:)**2
-      uv(:,:) = uv(:,:)*grid_area_ratio - um(:,:)*vm(:,:)
-      uw(:,:) = uw(:,:)*grid_area_ratio - um(:,:)*wm(:,:)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,um(1,1),ng(1)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,vm(1,1),ng(1)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,wm(1,1),ng(1)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,u2(1,1),ng(1)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,v2(1,1),ng(1)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,w2(1,1),ng(1)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,uv(1,1),ng(1)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,uw(1,1),ng(1)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      um(:,:) =      um(:,:)*grid_area_ratio
+      vm(:,:) =      vm(:,:)*grid_area_ratio
+      wm(:,:) =      wm(:,:)*grid_area_ratio
+      u2(:,:) = sqrt(u2(:,:)*grid_area_ratio - um(:,:)**2)
+      v2(:,:) = sqrt(v2(:,:)*grid_area_ratio - vm(:,:)**2)
+      w2(:,:) = sqrt(w2(:,:)*grid_area_ratio - wm(:,:)**2)
+      uv(:,:) =      uv(:,:)*grid_area_ratio - um(:,:)*vm(:,:)
+      uw(:,:) =      uw(:,:)*grid_area_ratio - um(:,:)*wm(:,:)
       if(myid == 0) then
         open(newunit=iunit,file=fname)
         do k=1,ng(3)
           do j=1,ng(2)
             y_g = (j-.5)*dl(2)
-            write(iunit,fmt_rp) y_g,z_g(k),um(j,k),vm(j,k),wm(j,k), &
-                                           u2(j,k),v2(j,k),w2(j,k), &
-                                           uv(j,k),uw(j,k)
+            write(iunit,'(10E16.7e3)') y_g,z_g(k),um(j,k),vm(j,k),wm(j,k), &
+                                                  u2(j,k),v2(j,k),w2(j,k), &
+                                                  uv(j,k),uw(j,k)
           end do
         end do
         close(iunit)
@@ -520,18 +513,18 @@ module mod_output
     real(rp), intent(in), dimension(3) :: l,dl
     real(rp), intent(in), dimension(0:) :: dzc_g,dzf_g,zc_g,zf_g
     real(rp), intent(in), dimension(lo(1)-1:,lo(2)-1:,lo(3)-1:) :: u,v,w,p
-    real(rp), allocatable, dimension(:,:) :: buf
-    real(rp) :: tmp_x,tmp_y,tmp_z
+    real(dp), allocatable, dimension(:,:) :: buf
+    real(dp) :: tmp_x,tmp_y,tmp_z
     integer :: i,j,k,q
     integer :: iunit
     integer :: nn,nvars
     character(len=30) cfmt
-    real(rp) :: grid_area_ratio
-    real(rp) :: buf01,buf02,buf03,buf04,buf05,buf06,buf07,buf08,buf09,buf10, &
+    real(dp) :: grid_area_ratio
+    real(dp) :: buf01,buf02,buf03,buf04,buf05,buf06,buf07,buf08,buf09,buf10, &
                 buf11,buf12,buf13,buf14,buf15,buf16,buf17,buf18,buf19,buf20, &
                 buf21,buf22,buf23,buf24,buf25,buf26,buf27,buf28,buf29,buf30, &
                 buf31,buf32,buf33,buf34,buf35,buf36,buf37,buf38
-    real(rp) :: div
+    real(dp) :: div
     !
     nn = ng(idir)
     nvars = 38
@@ -579,7 +572,7 @@ module mod_output
             buf05 = buf05  + v(i,j,k)**2
             buf06 = buf06  + w(i,j,k)**2
             buf07 = buf07  + 0.25_rp*(u(i,j,k+1) + u(i  ,j,k))* &
-                                     (w(i,j,k  ) + w(i+1,j,k))
+                                     (w(i,j,k  ) + w(i+1,j,k)) ! cell edge
             buf08 = buf08 + u(i,j,k)**3
             buf09 = buf09 + v(i,j,k)**3
             buf10 = buf10 + w(i,j,k)**3
@@ -637,15 +630,18 @@ module mod_output
         buf(21,k) = buf21*grid_area_ratio
       end do
       !$acc update self(buf)
-      call mpi_allreduce(MPI_IN_PLACE,buf(1,1),size(buf),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call mpi_allreduce(MPI_IN_PLACE,buf(1,1),size(buf),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
       if(myid == 0) then
         nvars = 21
-        write(cfmt,'(A,I3,A)') '(',nvars+2+2,'ES26.18)'
+        write(cfmt,'(A)') '(*(es24.16e3,1x))'
         open(newunit=iunit,file=fname//'.out')
         do k=1,nn
           write(iunit,trim(cfmt)) zc_g(k),zf_g(k),(buf(i,k),i=1,nvars),dzc_g(k),dzf_g(k)
         end do
         close(iunit)
+        open(10,file=trim(fname)//'.bin',access='stream')
+        write(10) buf(1:nvars,1:nn)
+        close(10)
       end if
       !
       ! MKE and Reynolds shear stresses budgets
@@ -933,15 +929,18 @@ module mod_output
         buf(38,k) = buf38*grid_area_ratio
       end do
       !$acc update self(buf)
-      call mpi_allreduce(MPI_IN_PLACE,buf(1,1),size(buf),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call mpi_allreduce(MPI_IN_PLACE,buf(1,1),size(buf),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
       if(myid == 0) then
         nvars = 38
-        write(cfmt,'(A,I3,A)') '(',nvars+2+2,'ES26.18)'
+        write(cfmt,'(A)') '(*(es24.16e3,1x))'
         open(newunit=iunit,file=fname//'_reystr_budget.out')
         do k=1,nn
           write(iunit,trim(cfmt)) zc_g(k),zf_g(k),(buf(i,k),i=1,nvars),dzc_g(k),dzf_g(k)
         end do
         close(iunit)
+        open(10,file=trim(fname)//'_reystr_budget.bin',access='stream')
+        write(10) buf(1:nvars,1:nn)
+        close(10)
       end if
       block
       use mod_param, only:dx,dy
@@ -978,15 +977,18 @@ module mod_output
         buf(6,k) = buf06*grid_area_ratio
       end do
       !$acc update self(buf)
-      call mpi_allreduce(MPI_IN_PLACE,buf(1,1),size(buf),MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call mpi_allreduce(MPI_IN_PLACE,buf(1,1),size(buf),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
       if(myid == 0) then
         nvars = 6
-        write(cfmt,'(A,I3,A)') '(',nvars+2+2,'ES26.18)'
+        write(cfmt,'(A)') '(*(es24.16e3,1x))'
         open(newunit=iunit,file=fname//'_leakage.out')
         do k=1,nn
           write(iunit,trim(cfmt)) zc_g(k),zf_g(k),(buf(i,k),i=1,nvars),dzc_g(k),dzf_g(k)
         end do
         close(iunit)
+        open(10,file=trim(fname)//'_leakage.bin',access='stream')
+        write(10) buf(1:nvars,1:nn)
+        close(10)
       end if
       end block
     case(2)
