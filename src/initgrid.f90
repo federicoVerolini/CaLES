@@ -160,7 +160,7 @@ module mod_initgrid
     real(rp) :: dzc
     if(alpha /= 0.) then
       !set random non-zero alpha (gr), dzc = 0.1 for nzg = 32
-      dzc = 0.1*nzg/32.
+      dzc = 0.1*32./nzg
       z = z0 - (dzc*nzg/2.-1.)/(2.*pi)*sin(2.*pi*z0)
     else
       z = z0
