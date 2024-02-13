@@ -20,7 +20,8 @@ module mod_initgrid
                           CLUSTER_ONE_END              = 2, &
                           CLUSTER_ONE_END_R            = 3, &
                           CLUSTER_MIDDLE               = 4, &
-                          CLUSTER_WALL_MODEL           = 5
+                          CLUSTER_NATURAL              = 5, &
+                          CLUSTER_WALL_MODEL           = 6
     integer , intent(in ) :: gtype,n
     real(rp), intent(in ) :: gr,lz
     real(rp), intent(out), dimension(0:n+1) :: dzc,dzf,zc,zf
@@ -36,6 +37,8 @@ module mod_initgrid
       gridpoint => gridpoint_cluster_one_end_r
     case(CLUSTER_MIDDLE)
       gridpoint => gridpoint_cluster_middle
+    case(CLUSTER_NATURAL)
+      gridpoint => gridpoint_cluster_natural
     case(CLUSTER_WALL_MODEL)
       gridpoint => gridpoint_cluster_wall_model
     case default
@@ -47,11 +50,7 @@ module mod_initgrid
     zf(0) = 0.
     do k=1,n
       z0  = (k-0.)/(1.*n)
-#if !defined(_GRIDPOINT_NATURAL_CHANNEL)
-      call gridpoint(n,gr,z0,zf(k))
-#else
-      call gridpoint_natural(k,n,zf(k))
-#endif
+      call gridpoint(k,n,gr,z0,zf(k))
       zf(k) = zf(k)*lz
     end do
     !
@@ -84,12 +83,12 @@ module mod_initgrid
   ! see e.g., Fluid Flow Phenomena -- A Numerical Toolkit, by P. Orlandi
   !           Pirozzoli et al. JFM 788, 614–639 (commented)
   !
-  subroutine gridpoint_cluster_two_end(nzg,alpha,z0,z)
+  subroutine gridpoint_cluster_two_end(kg,nzg,alpha,z0,z)
     !
     ! clustered at the two sides
     !
     implicit none
-    integer, intent(in) :: nzg
+    integer, intent(in) :: kg,nzg
     real(rp), intent(in) :: alpha,z0
     real(rp), intent(out) :: z
     if(alpha /= 0.) then
@@ -99,12 +98,12 @@ module mod_initgrid
       z = z0
     end if
   end subroutine gridpoint_cluster_two_end
-  subroutine gridpoint_cluster_one_end(nzg,alpha,z0,z)
+  subroutine gridpoint_cluster_one_end(kg,nzg,alpha,z0,z)
     !
     ! clustered at the lower side
     !
     implicit none
-    integer, intent(in) :: nzg
+    integer, intent(in) :: kg,nzg
     real(rp), intent(in) :: alpha,z0
     real(rp), intent(out) :: z
     if(alpha /= 0.) then
@@ -114,12 +113,12 @@ module mod_initgrid
       z = z0
     end if
   end subroutine gridpoint_cluster_one_end
-  subroutine gridpoint_cluster_one_end_r(nzg,alpha,r0,r)
+  subroutine gridpoint_cluster_one_end_r(kg,nzg,alpha,r0,r)
     !
     ! clustered at the upper side
     !
     implicit none
-    integer, intent(in) :: nzg
+    integer, intent(in) :: kg,nzg
     real(rp), intent(in ) :: alpha,r0
     real(rp), intent(out) :: r
     if(alpha /= 0._rp) then
@@ -129,12 +128,12 @@ module mod_initgrid
       r = r0
     end if
   end subroutine gridpoint_cluster_one_end_r
-  subroutine gridpoint_cluster_middle(nzg,alpha,z0,z)
+  subroutine gridpoint_cluster_middle(kg,nzg,alpha,z0,z)
     !
     ! clustered in the middle
     !
     implicit none
-    integer, intent(in) :: nzg
+    integer, intent(in) :: kg,nzg
     real(rp), intent(in) :: alpha,z0
     real(rp), intent(out) :: z
     if(alpha /= 0.) then
@@ -149,12 +148,12 @@ module mod_initgrid
       z = z0
     end if
   end subroutine gridpoint_cluster_middle
-  subroutine gridpoint_cluster_wall_model(nzg,alpha,z0,z)
+  subroutine gridpoint_cluster_wall_model(kg,nzg,alpha,z0,z)
     !
     ! clustered using Larsson's formula
     !
     implicit none
-    integer, intent(in) :: nzg
+    integer, intent(in) :: kg,nzg
     real(rp), intent(in) :: alpha,z0
     real(rp), intent(out) :: z
     real(rp) :: dzc
@@ -166,7 +165,7 @@ module mod_initgrid
       z = z0
     end if
   end subroutine gridpoint_cluster_wall_model
-  subroutine gridpoint_natural(kg,nzg,z,kb_a,alpha_a,c_eta_a,dyp_a)
+  subroutine gridpoint_cluster_natural(kg,nzg,dummy,z0,z)
     !
     ! a physics-based, 'natural' grid stretching function for wall-bounded turbulence
     ! see Pirozzoli & Orlandi, JCP 439 - 110408 (2021)
@@ -179,30 +178,26 @@ module mod_initgrid
                            c_eta_p  = 0.8_rp,    &
                            dyp_p    = 0.05_rp
     integer , intent(in ) :: kg,nzg
+    real(rp), intent(in)  :: dummy,z0
     real(rp), intent(out) :: z
-    real(rp), intent(in ), optional :: kb_a,alpha_a,c_eta_a,dyp_a
-    real(rp)                        :: kb  ,alpha  ,c_eta  ,dyp
+    real(rp) :: kb,alpha,c_eta,dyp
     real(rp) :: retau,n,k
-    !
-    ! handle input parameters
-    !
-    kb    = kb_p   ; if(present(kb_a   )) kb    = kb_a
-    alpha = alpha_p; if(present(alpha_a)) alpha = alpha_a
-    c_eta = c_eta_p; if(present(c_eta_a)) c_eta = c_eta_a
-    dyp   = dyp_p  ; if(present(dyp_a  )) dyp   = dyp_a
-    !
-    ! determine retau
-    !
-    n = nzg/2._rp
-    retau = 1._rp/(1._rp+(n/kb)**2)*(dyp*n+(3._rp/4._rp*alpha*c_eta*n)**(4._rp/3._rp)*(n/kb)**2)
-#if defined(_DEBUG)
-    if(kg==1) print*,'Grid targeting Retau = ',retau
-#endif
-    k = 1._rp*min(kg,(nzg-kg))
-    !
-    ! dermine z/(2h)
-    !
-    z = 1._rp/(1._rp+(k/kb)**2)*(dyp*k+(3._rp/4._rp*alpha*c_eta*k)**(4._rp/3._rp)*(k/kb)**2)/(2._rp*retau)
-    if( kg > nzg-kg ) z = 1._rp-z
-  end subroutine gridpoint_natural
+    if(dummy /= 0.) then
+      ! handle input parameters
+      kb    = kb_p
+      alpha = alpha_p
+      c_eta = c_eta_p
+      dyp   = dyp_p
+      ! determine retau
+      n = nzg/2._rp
+      retau = 1._rp/(1._rp+(n/kb)**2)*(dyp*n+(3._rp/4._rp*alpha*c_eta*n)**(4._rp/3._rp)*(n/kb)**2)
+      if(kg==1) print*,'Grid targeting Retau = ',retau
+      k = 1._rp*min(kg,(nzg-kg))
+      ! dermine z/(2h)
+      z = 1._rp/(1._rp+(k/kb)**2)*(dyp*k+(3._rp/4._rp*alpha*c_eta*k)**(4._rp/3._rp)*(k/kb)**2)/(2._rp*retau)
+      if( kg > nzg-kg ) z = 1._rp-z
+    else
+      z = z0
+    end if
+  end subroutine gridpoint_cluster_natural
 end module mod_initgrid
