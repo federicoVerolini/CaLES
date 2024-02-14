@@ -54,7 +54,7 @@ module mod_initflow
       uref = abs(uref)
     case('poi')
       ! mpi_sum called by set_mean, leading to small differences
-      ! when using different numbers of processors
+      ! for different numbers of processors
       call poiseuille(n(3),zc/l(3),ubulk,u1d)
       is_mean = .true.
     case('tbl')

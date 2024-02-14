@@ -139,7 +139,6 @@ module mod_bound
     !
     !wall model not considered in this initialization
     bcu%x(:,:,0) = bc1(0,1,1)
-    bcu%x(:,:,0) = bc1(0,1,1)
     bcv%x(:,:,0) = bc1(0,1,2)
     bcw%x(:,:,0) = bc1(0,1,3)
     bcu%x(:,:,1) = bc1(1,1,1)
