@@ -11,6 +11,6 @@
 *dSYM
 *.xdmf
 *.xmf
-cans*
+./cans*
 tests/
 build/
