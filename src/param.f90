@@ -19,13 +19,15 @@ real(rp), parameter :: eps = epsilon(1._rp)
 real(rp), parameter :: eps = 0._rp
 #endif
 real(rp), parameter :: small = epsilon(1._rp)*10**(precision(1._rp)/2)
+real(rp), parameter :: big = huge(1.0_rp)
 character(len=100), parameter :: datadir = ''
 real(rp), parameter, dimension(2,3) :: rkcoeff = reshape([32._rp/60._rp,  0._rp        , &
                                                           25._rp/60._rp, -17._rp/60._rp, &
                                                           45._rp/60._rp, -25._rp/60._rp], shape(rkcoeff))
 real(rp), parameter, dimension(3)   :: rkcoeff12 = rkcoeff(1,:)+rkcoeff(2,:)
 real(rp), parameter :: kap_log = 0.41_rp
-real(rp), parameter :: b_log = 5.2_rp
+real(rp), parameter :: b_log   = 5.2_rp
+real(rp), parameter :: c_smag  = 0.1_rp
 !
 ! variables to be determined from the input file
 !
@@ -54,8 +56,8 @@ character(len=1), protected, dimension(0:1,3,3) ::  cbcvel
 real(rp)        , protected, dimension(0:1,3,3) ::   bcvel
 character(len=1), protected, dimension(0:1,3)   ::  cbcpre
 real(rp)        , protected, dimension(0:1,3)   ::   bcpre
-character(len=1), dimension(0:1,3,3) :: cbcvel_wm !to be improved
-character(len=1), dimension(0:1,3)   :: cbcpre_wm
+character(len=1), protected, dimension(0:1,3)   ::  cbcsgs
+real(rp)        , protected, dimension(0:1,3)   ::   bcsgs
 !
 real(rp), protected, dimension(3) :: bforce
 logical , protected, dimension(3) :: is_forced
@@ -65,8 +67,10 @@ real(rp), protected, dimension(3) :: dl,dli
 real(rp), protected :: visc
 real(rp), protected :: dx,dy
 !
+character(len=100), protected :: sgstype
 integer, protected, dimension(0:1,3) :: lwm
 real(rp), protected :: hwm
+integer, dimension(0:1,3) :: ind_wm
 #if defined(_OPENACC)
 !
 ! cuDecomp input parameters
@@ -96,12 +100,13 @@ contains
                   stop_type, &
                   restart,is_overwrite_save,nsaves_max, &
                   icheck,iout0d,iout1d,iout2d,iout3d,isave, &
-                  cbcvel,cbcpre,bcvel,bcpre, &
+                  cbcvel,cbcpre,cbcsgs,bcvel,bcpre,bcsgs, &
                   bforce, &
                   is_forced, &
                   velf, &
                   dims
     namelist /les/ &
+                  sgstype, &
                   lwm, &
                   hwm
 #if defined(_OPENACC)

@@ -634,27 +634,35 @@ module mod_mom
     end if
   end subroutine bulk_forcing
   !
-  subroutine mom_xyz_ad(nx,ny,nz,dxi,dyi,dzci,dzfi,visc,u,v,w,dudt,dvdt,dwdt,dudtd,dvdtd,dwdtd)
+  subroutine mom_xyz_ad(nx,ny,nz,dxi,dyi,dzci,dzfi,visc,u,v,w,visct,dudt,dvdt,dwdt,dudtd,dvdtd,dwdtd)
     !
     ! lump all r.h.s. of momentum terms (excluding pressure) into a single fast kernel
+    ! interpolation of eddy viscosity tested via visct = x+y+z
+    ! extra cross-derivatives tested via u,v,w = x*y*z
     !
     integer , intent(in   ) :: nx,ny,nz
     real(rp), intent(in   ) :: dxi,dyi
     real(rp), intent(in   ), dimension(0:) :: dzci,dzfi
     real(rp), intent(in   ) :: visc
-    real(rp), intent(in   ), dimension(0:,0:,0:) :: u,v,w
+    real(rp), intent(in   ), dimension(0:,0:,0:) :: u,v,w,visct
     real(rp), intent(inout), dimension( :, :, :) :: dudt,dvdt,dwdt
     real(rp), intent(inout), dimension( :, :, :), optional :: dudtd,dvdtd,dwdtd
     integer  :: i,j,k
     real(rp) :: u_ccm,u_pcm,u_cpm,u_cmc,u_pmc,u_mcc,u_ccc,u_pcc,u_mpc,u_cpc,u_cmp,u_mcp,u_ccp, &
                 v_ccm,v_pcm,v_cpm,v_cmc,v_pmc,v_mcc,v_ccc,v_pcc,v_mpc,v_cpc,v_cmp,v_mcp,v_ccp, &
-                w_ccm,w_pcm,w_cpm,w_cmc,w_pmc,w_mcc,w_ccc,w_pcc,w_mpc,w_cpc,w_cmp,w_mcp,w_ccp
-    real(rp) :: uuip,uuim,uvjp,uvjm,uwkp,uwkm, &
-                uvip,uvim,vvjp,vvjm,wvkp,wvkm, &
-                uwip,uwim,vwjp,vwjm,wwkp,wwkm
-    real(rp) :: dudxp,dudxm,dudyp,dudym,dudzp,dudzm, &
-                dvdxp,dvdxm,dvdyp,dvdym,dvdzp,dvdzm, &
-                dwdxp,dwdxm,dwdyp,dwdym,dwdzp,dwdzm
+                w_ccm,w_pcm,w_cpm,w_cmc,w_pmc,w_mcc,w_ccc,w_pcc,w_mpc,w_cpc,w_cmp,w_mcp,w_ccp, &
+                s_ccm,s_pcm,s_cpm,s_cmc,s_pmc,s_mcc,s_ccc,s_pcc,s_mpc,s_cpc,s_cmp,s_mcp,s_ccp, &
+                s_ppc,s_pcp,s_cpp
+    real(rp) :: uu_ip,uu_im,uv_jp,uv_jm,uw_kp,uw_km, &
+                uv_ip,uv_im,vv_jp,vv_jm,wv_kp,wv_km, &
+                uw_ip,uw_im,vw_jp,vw_jm,ww_kp,ww_km
+    real(rp) :: dudx_ip,dudx_im,dudy_jp,dudy_jm,dudz_kp,dudz_km, &
+                dvdx_ip,dvdx_im,dvdy_jp,dvdy_jm,dvdz_kp,dvdz_km, &
+                dwdx_ip,dwdx_im,dwdy_jp,dwdy_jm,dwdz_kp,dwdz_km
+    real(rp) ::                 dvdx_jp,dvdx_jm,dwdx_kp,dwdx_km, &
+                dudy_ip,dudy_im,                dwdy_kp,dwdy_km, &
+                dudz_ip,dudz_im,dvdz_jp,dvdz_jm
+    real(rp) :: visc_ip,visc_im,visc_jp,visc_jm,visc_kp,visc_km
     real(rp) :: dudt_s ,dvdt_s ,dwdt_s , &
                 dudtd_s,dvdtd_s,dwdtd_s, &
                 dudtd_xy_s,dudtd_z_s   , &
@@ -664,12 +672,12 @@ module mod_mom
     !$acc private(u_ccm,u_pcm,u_cpm,u_cmc,u_pmc,u_mcc,u_ccc,u_pcc,u_mpc,u_cpc,u_cmp,u_mcp,u_ccp) &
     !$acc private(v_ccm,v_pcm,v_cpm,v_cmc,v_pmc,v_mcc,v_ccc,v_pcc,v_mpc,v_cpc,v_cmp,v_mcp,v_ccp) &
     !$acc private(w_ccm,w_pcm,w_cpm,w_cmc,w_pmc,w_mcc,w_ccc,w_pcc,w_mpc,w_cpc,w_cmp,w_mcp,w_ccp) &
-    !$acc private(uuip,uuim,uvjp,uvjm,uwkp,uwkm) &
-    !$acc private(uvip,uvim,vvjp,vvjm,wvkp,wvkm) &
-    !$acc private(uwip,uwim,vwjp,vwjm,wwkp,wwkm) &
-    !$acc private(dudxp,dudxm,dudyp,dudym,dudzp,dudzm) &
-    !$acc private(dvdxp,dvdxm,dvdyp,dvdym,dvdzp,dvdzm) &
-    !$acc private(dwdxp,dwdxm,dwdyp,dwdym,dwdzp,dwdzm) &
+    !$acc private(uu_ip,uu_im,uv_jp,uv_jm,uw_kp,uw_km) &
+    !$acc private(uv_ip,uv_im,vv_jp,vv_jm,wv_kp,wv_km) &
+    !$acc private(uw_ip,uw_im,vw_jp,vw_jm,ww_kp,ww_km) &
+    !$acc private(dudx_ip,dudx_im,dudy_jp,dudy_jm,dudz_kp,dudz_km) &
+    !$acc private(dvdx_ip,dvdx_im,dvdy_jp,dvdy_jm,dvdz_kp,dvdz_km) &
+    !$acc private(dwdx_ip,dwdx_im,dwdy_jp,dwdy_jm,dwdz_kp,dwdz_km) &
     !$acc private(dudt_s ,dvdt_s ,dwdt_s ) &
     !$acc private(dudtd_s,dvdtd_s,dwdtd_s) &
     !$acc private(dudtd_xy_s,dudtd_z_s) &
@@ -679,12 +687,12 @@ module mod_mom
     !$OMP PRIVATE(u_ccm,u_pcm,u_cpm,u_cmc,u_pmc,u_mcc,u_ccc,u_pcc,u_mpc,u_cpc,u_cmp,u_mcp,u_ccp) &
     !$OMP PRIVATE(v_ccm,v_pcm,v_cpm,v_cmc,v_pmc,v_mcc,v_ccc,v_pcc,v_mpc,v_cpc,v_cmp,v_mcp,v_ccp) &
     !$OMP PRIVATE(w_ccm,w_pcm,w_cpm,w_cmc,w_pmc,w_mcc,w_ccc,w_pcc,w_mpc,w_cpc,w_cmp,w_mcp,w_ccp) &
-    !$OMP PRIVATE(uuip,uuim,uvjp,uvjm,uwkp,uwkm) &
-    !$OMP PRIVATE(uvip,uvim,vvjp,vvjm,wvkp,wvkm) &
-    !$OMP PRIVATE(uwip,uwim,vwjp,vwjm,wwkp,wwkm) &
-    !$OMP PRIVATE(dudxp,dudxm,dudyp,dudym,dudzp,dudzm) &
-    !$OMP PRIVATE(dvdxp,dvdxm,dvdyp,dvdym,dvdzp,dvdzm) &
-    !$OMP PRIVATE(dwdxp,dwdxm,dwdyp,dwdym,dwdzp,dwdzm) &
+    !$OMP PRIVATE(uu_ip,uu_im,uv_jp,uv_jm,uw_kp,uw_km) &
+    !$OMP PRIVATE(uv_ip,uv_im,vv_jp,vv_jm,wv_kp,wv_km) &
+    !$OMP PRIVATE(uw_ip,uw_im,vw_jp,vw_jm,ww_kp,ww_km) &
+    !$OMP PRIVATE(dudx_ip,dudx_im,dudy_jp,dudy_jm,dudz_kp,dudz_km) &
+    !$OMP PRIVATE(dvdx_ip,dvdx_im,dvdy_jp,dvdy_jm,dvdz_kp,dvdz_km) &
+    !$OMP PRIVATE(dwdx_ip,dwdx_im,dwdy_jp,dwdy_jm,dwdz_kp,dwdz_km) &
     !$OMP PRIVATE(dudt_s ,dvdt_s ,dwdt_s ) &
     !$OMP PRIVATE(dudtd_s,dvdtd_s,dwdtd_s) &
     !$OMP PRIVATE(dudtd_xy_s,dudtd_z_s) &
@@ -738,89 +746,149 @@ module mod_mom
           w_mcp = w(i-1,j  ,k+1)
           w_ccp = w(i  ,j  ,k+1)
           !
+          s_ccm = visct(i  ,j  ,k-1)
+          s_pcm = visct(i+1,j  ,k-1)
+          s_cpm = visct(i  ,j+1,k-1)
+          s_cmc = visct(i  ,j-1,k  )
+          s_pmc = visct(i+1,j-1,k  )
+          s_mcc = visct(i-1,j  ,k  )
+          s_ccc = visct(i  ,j  ,k  )
+          s_pcc = visct(i+1,j  ,k  )
+          s_mpc = visct(i-1,j+1,k  )
+          s_cpc = visct(i  ,j+1,k  )
+          s_cmp = visct(i  ,j-1,k+1)
+          s_mcp = visct(i-1,j  ,k+1)
+          s_ccp = visct(i  ,j  ,k+1)
+          !
+          s_ppc = visct(i+1,j+1,k  )
+          s_pcp = visct(i+1,j  ,k+1)
+          s_cpp = visct(i  ,j+1,k+1)
+          !
           ! x diffusion
           !
-          dudxp = (u_pcc-u_ccc)*dxi
-          dudxm = (u_ccc-u_mcc)*dxi
-          dudyp = (u_cpc-u_ccc)*dyi
-          dudym = (u_ccc-u_cmc)*dyi
-          dudzp = (u_ccp-u_ccc)*dzci(k  ) !(u(i,j,k+1)-u(i,j,k  ))*dzci(k)
-          dudzm = (u_ccc-u_ccm)*dzci(k-1) !(u(i,j,k  )-u(i,j,k-1))*dzci(k-1)
+          visc_ip = visc + s_pcc
+          visc_im = visc + s_ccc
+          visc_jp = visc + 0.25*(s_ccc+s_pcc+s_cpc+s_ppc)
+          visc_jm = visc + 0.25*(s_ccc+s_pcc+s_cmc+s_pmc)
+          visc_kp = visc + 0.25*(s_ccc+s_pcc+s_ccp+s_pcp)
+          visc_km = visc + 0.25*(s_ccc+s_pcc+s_ccm+s_pcm)
+          !
+          dudx_ip = (u_pcc-u_ccc)*dxi
+          dudx_im = (u_ccc-u_mcc)*dxi
+          dudy_jp = (u_cpc-u_ccc)*dyi
+          dudy_jm = (u_ccc-u_cmc)*dyi
+          dudz_kp = (u_ccp-u_ccc)*dzci(k  )
+          dudz_km = (u_ccc-u_ccm)*dzci(k-1)
+          !
+          dudx_ip = dudx_ip
+          dudx_im = dudx_im
+          dvdx_jp = (v_pcc-v_ccc)*dxi
+          dvdx_jm = (v_pmc-v_cmc)*dxi
+          dwdx_kp = (w_pcc-w_ccc)*dxi
+          dwdx_km = (w_pcm-w_ccm)*dxi
           !
           ! x advection
           !
-          uuip  = 0.25*(u_pcc+u_ccc)*(u_pcc+u_ccc)
-          uuim  = 0.25*(u_mcc+u_ccc)*(u_mcc+u_ccc)
-          uvjp  = 0.25*(u_cpc+u_ccc)*(v_pcc+v_ccc) !0.25*(u(i,j+1)+u(i,j))*(v(i+1,j)*v(i,j,k))
-          uvjm  = 0.25*(u_cmc+u_ccc)*(v_pmc+v_cmc) !0.25*(u(i,j-1)+u(i,j))*(v(i+1,j-1)*v(i,j-1))
-          uwkp  = 0.25*(u_ccp+u_ccc)*(w_pcc+w_ccc)
-          uwkm  = 0.25*(u_ccm+u_ccc)*(w_pcm+w_ccm)
+          uu_ip  = 0.25*(u_pcc+u_ccc)*(u_pcc+u_ccc)
+          uu_im  = 0.25*(u_mcc+u_ccc)*(u_mcc+u_ccc)
+          uv_jp  = 0.25*(u_cpc+u_ccc)*(v_pcc+v_ccc)
+          uv_jm  = 0.25*(u_cmc+u_ccc)*(v_pmc+v_cmc)
+          uw_kp  = 0.25*(u_ccp+u_ccc)*(w_pcc+w_ccc)
+          uw_km  = 0.25*(u_ccm+u_ccc)*(w_pcm+w_ccm)
           !
           dudtd_xy_s = &
-                         visc*(dudxp-dudxm)*dxi + &
-                         visc*(dudyp-dudym)*dyi
+                         (visc_ip*(dudx_ip+dudx_ip)-visc_im*(dudx_im+dudx_im))*dxi + & ! d(dudx+dudx)/dx
+                         (visc_jp*(dudy_jp+dvdx_jp)-visc_jm*(dudy_jm+dvdx_jm))*dyi     ! d(dudy+dvdx)/dy
           dudtd_z_s  = &
-                         visc*(dudzp-dudzm)*dzfi(k)
+                         (visc_kp*(dudz_kp+dwdx_kp)-visc_km*(dudz_km+dwdx_km))*dzfi(k) ! d(dudz+dwdx)/dz
           dudt_s     = &
-                             -(uuip -uuim )*dxi - &
-                              (uvjp -uvjm )*dyi - &
-                              (uwkp -uwkm )*dzfi(k)
+                             -(uu_ip-uu_im)*dxi - &
+                              (uv_jp-uv_jm)*dyi - &
+                              (uw_kp-uw_km)*dzfi(k)
           !
           ! y diffusion
           !
-          dvdxp = (v_pcc-v_ccc)*dxi
-          dvdxm = (v_ccc-v_mcc)*dxi
-          dvdyp = (v_cpc-v_ccc)*dyi
-          dvdym = (v_ccc-v_cmc)*dyi
-          dvdzp = (v_ccp-v_ccc)*dzci(k  )
-          dvdzm = (v_ccc-v_ccm)*dzci(k-1)
+          visc_ip = visc + 0.25*(s_ccc+s_cpc+s_pcc+s_ppc)
+          visc_im = visc + 0.25*(s_ccc+s_cpc+s_mcc+s_mpc)
+          visc_jp = visc + s_cpc
+          visc_jm = visc + s_ccc
+          visc_kp = visc + 0.25*(s_ccc+s_cpc+s_ccp+s_cpp)
+          visc_km = visc + 0.25*(s_ccc+s_cpc+s_ccm+s_cpm)
+          !
+          dvdx_ip = (v_pcc-v_ccc)*dxi
+          dvdx_im = (v_ccc-v_mcc)*dxi
+          dvdy_jp = (v_cpc-v_ccc)*dyi
+          dvdy_jm = (v_ccc-v_cmc)*dyi
+          dvdz_kp = (v_ccp-v_ccc)*dzci(k  )
+          dvdz_km = (v_ccc-v_ccm)*dzci(k-1)
+          !
+          dudy_ip = (u_cpc-u_ccc)*dyi
+          dudy_im = (u_mpc-u_mcc)*dyi
+          dvdy_jp = dvdy_jp
+          dvdy_jm = dvdy_jm
+          dwdy_kp = (w_cpc-w_ccc)*dyi
+          dwdy_km = (w_cpm-w_ccm)*dyi
           !
           ! y advection
           !
-          uvip  = 0.25*(v_ccc+v_pcc)*(u_ccc+u_cpc) !0.25*(v(i,j,k)+v(i+1,j,k))*(u(i,j,k)*u(i,j+1,k))
-          uvim  = 0.25*(v_ccc+v_mcc)*(u_mcc+u_mpc)
-          vvjp  = 0.25*(v_ccc+v_cpc)*(v_ccc+v_cpc)
-          vvjm  = 0.25*(v_ccc+v_cmc)*(v_ccc+v_cmc)
-          wvkp  = 0.25*(v_ccc+v_ccp)*(w_ccc+w_cpc)
-          wvkm  = 0.25*(v_ccc+v_ccm)*(w_ccm+w_cpm)
+          uv_ip  = 0.25*(v_ccc+v_pcc)*(u_ccc+u_cpc)
+          uv_im  = 0.25*(v_ccc+v_mcc)*(u_mcc+u_mpc)
+          vv_jp  = 0.25*(v_ccc+v_cpc)*(v_ccc+v_cpc)
+          vv_jm  = 0.25*(v_ccc+v_cmc)*(v_ccc+v_cmc)
+          wv_kp  = 0.25*(v_ccc+v_ccp)*(w_ccc+w_cpc)
+          wv_km  = 0.25*(v_ccc+v_ccm)*(w_ccm+w_cpm)
           !
           dvdtd_xy_s = &
-                         visc*(dvdxp-dvdxm)*dxi + &
-                         visc*(dvdyp-dvdym)*dyi
+                         (visc_ip*(dvdx_ip+dudy_ip)-visc_im*(dvdx_im+dudy_im))*dxi + & ! d(dvdx+dudy)/dx
+                         (visc_jp*(dvdy_jp+dvdy_jp)-visc_jm*(dvdy_jm+dvdy_jm))*dyi     ! d(dvdy+dvdy)/dy
           dvdtd_z_s  = &
-                         visc*(dvdzp-dvdzm)*dzfi(k)
+                         (visc_kp*(dvdz_kp+dwdy_kp)-visc_km*(dvdz_km+dwdy_km))*dzfi(k) ! d(dvdz+dwdy)/dz
           dvdt_s     = &
-                             -(uvip -uvim )*dxi - &
-                              (vvjp -vvjm )*dyi - &
-                              (wvkp -wvkm )*dzfi(k)
+                             -(uv_ip-uv_im)*dxi - &
+                              (vv_jp-vv_jm)*dyi - &
+                              (wv_kp-wv_km)*dzfi(k)
           !
           ! z diffusion
           !
-          dwdxp = (w_pcc-w_ccc)*dxi
-          dwdxm = (w_ccc-w_mcc)*dxi
-          dwdyp = (w_cpc-w_ccc)*dyi
-          dwdym = (w_ccc-w_cmc)*dyi
-          dwdzp = (w_ccp-w_ccc)*dzfi(k+1)
-          dwdzm = (w_ccc-w_ccm)*dzfi(k  )
+          visc_ip = visc + 0.25*(s_ccc+s_ccp+s_pcc+s_pcp)
+          visc_im = visc + 0.25*(s_ccc+s_ccp+s_mcc+s_mcp)
+          visc_jp = visc + 0.25*(s_ccc+s_ccp+s_cpc+s_cpp)
+          visc_jm = visc + 0.25*(s_ccc+s_ccp+s_cmc+s_cmp)
+          visc_kp = visc + s_ccp
+          visc_km = visc + s_ccc
+          !
+          dwdx_ip = (w_pcc-w_ccc)*dxi
+          dwdx_im = (w_ccc-w_mcc)*dxi
+          dwdy_jp = (w_cpc-w_ccc)*dyi
+          dwdy_jm = (w_ccc-w_cmc)*dyi
+          dwdz_kp = (w_ccp-w_ccc)*dzfi(k+1)
+          dwdz_km = (w_ccc-w_ccm)*dzfi(k  )
+          !
+          dudz_ip = (u_ccp-u_ccc)*dzci(k  )
+          dudz_im = (u_mcp-u_mcc)*dzci(k  )
+          dvdz_jp = (v_ccp-v_ccc)*dzci(k  )
+          dvdz_jm = (v_cmp-v_cmc)*dzci(k  )
+          dwdz_kp = dwdz_kp
+          dwdz_km = dwdz_km
           !
           ! z advection
           !
-          uwip  = 0.25*(w_ccc+w_pcc)*(u_ccc+u_ccp)
-          uwim  = 0.25*(w_ccc+w_mcc)*(u_mcc+u_mcp)
-          vwjp  = 0.25*(w_ccc+w_cpc)*(v_ccc+v_ccp)
-          vwjm  = 0.25*(w_ccc+w_cmc)*(v_cmc+v_cmp)
-          wwkp  = 0.25*(w_ccc+w_ccp)*(w_ccc+w_ccp)
-          wwkm  = 0.25*(w_ccc+w_ccm)*(w_ccc+w_ccm)
+          uw_ip  = 0.25*(w_ccc+w_pcc)*(u_ccc+u_ccp)
+          uw_im  = 0.25*(w_ccc+w_mcc)*(u_mcc+u_mcp)
+          vw_jp  = 0.25*(w_ccc+w_cpc)*(v_ccc+v_ccp)
+          vw_jm  = 0.25*(w_ccc+w_cmc)*(v_cmc+v_cmp)
+          ww_kp  = 0.25*(w_ccc+w_ccp)*(w_ccc+w_ccp)
+          ww_km  = 0.25*(w_ccc+w_ccm)*(w_ccc+w_ccm)
           !
           dwdtd_xy_s =  &
-                          visc*(dwdxp-dwdxm)*dxi + &
-                          visc*(dwdyp-dwdym)*dyi
+                          (visc_ip*(dwdx_ip+dudz_ip)-visc_im*(dwdx_im+dudz_im))*dxi + & ! d(dwdx+dudz)/dx
+                          (visc_jp*(dwdy_jp+dvdz_jp)-visc_jm*(dwdy_jm+dvdz_jm))*dyi     ! d(dwdy+dvdz)/dy
           dwdtd_z_s =   &
-                          visc*(dwdzp-dwdzm)*dzci(k)
+                          (visc_kp*(dwdz_kp+dwdz_kp)-visc_km*(dwdz_km+dwdz_km))*dzci(k) ! d(dwdz+dwdz)/dz
           dwdt_s     =  &
-                              -(uwip -uwim )*dxi - &
-                               (vwjp -vwjm )*dyi - &
-                               (wwkp -wwkm )*dzci(k)
+                              -(uw_ip-uw_im)*dxi - &
+                               (vw_jp-vw_jm)*dyi - &
+                               (ww_kp-ww_km)*dzci(k)
 #if defined(_IMPDIFF)
 #if defined(_IMPDIFF_1D)
           dudt_s = dudt_s + dudtd_xy_s

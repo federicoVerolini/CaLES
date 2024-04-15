@@ -44,6 +44,8 @@ program cans
   use mod_initmpi        , only: initmpi
   use mod_initsolver     , only: initsolver,cmpt_rhs_b
   use mod_load           , only: load_all
+  use mod_sgs            , only: cmpt_sgs
+  use mod_geom           , only: wall_dist
   use mod_mom            , only: bulk_forcing
   use mod_rk             , only: rk
   use mod_output         , only: out0d,gen_alias,out1d,out1d_chan,out1d_single_point_chan,out2d,out3d,write_log_output, &
@@ -58,16 +60,15 @@ program cans
                                  nstep,time_max,tw_max,stop_type, &
                                  restart,is_overwrite_save,nsaves_max, &
                                  icheck,iout0d,iout1d,iout2d,iout3d,isave, &
-                                 cbcvel,bcvel,cbcpre,bcpre, &
+                                 cbcvel,bcvel,cbcpre,bcpre,cbcsgs,bcsgs, &
                                  is_forced,bforce,velf, &
                                  dims, &
                                  nb,is_bound, &
                                  rkcoeff,small, &
                                  datadir, &
                                  read_input, &
-                                 lwm,hwm
+                                 sgstype,lwm,hwm,ind_wm
   use mod_sanity         , only: test_sanity_input
-  ! use mod_sanity         , only: test_sanity_input,test_sanity_solver
 #if !defined(_OPENACC)
   use mod_solver         , only: solver
 #if defined(_IMPDIFF_1D)
@@ -90,7 +91,7 @@ program cans
   use omp_lib
   implicit none
   integer , dimension(3) :: lo,hi,n,n_x_fft,n_y_fft,lo_z,hi_z,n_z
-  real(rp), allocatable, dimension(:,:,:) :: u,v,w,p,pp
+  real(rp), allocatable, dimension(:,:,:) :: u,v,w,p,pp,visct,dw
   real(rp), dimension(3) :: tauxo,tauyo,tauzo
   real(rp), dimension(3) :: f
 #if !defined(_OPENACC)
@@ -107,7 +108,7 @@ program cans
     real(rp), allocatable, dimension(:,:,:) :: z
   end type rhs_bound
   type(rhs_bound) :: rhsbp
-  type(cond_bound) :: bcu,bcv,bcw,bcp
+  type(cond_bound) :: bcu,bcv,bcw,bcp,bcs
   real(rp) :: alpha
 #if defined(_IMPDIFF)
 #if !defined(_OPENACC)
@@ -118,7 +119,7 @@ program cans
   real(rp), allocatable, dimension(:,:) :: lambdaxyu,lambdaxyv,lambdaxyw,lambdaxy
   real(rp), allocatable, dimension(:) :: au,av,aw,bu,bv,bw,cu,cv,cw,aa,bb,cc
   real(rp) :: normfftu,normfftv,normfftw
-  type(rhs_bound) :: rhsbu,rhsbv,rhsbw !used by implicit treatment
+  type(rhs_bound) :: rhsbu,rhsbv,rhsbw ! used by implicit treatment
   real(rp), allocatable, dimension(:,:,:) :: rhsbx,rhsby,rhsbz
 #endif
   real(rp) :: dt,dti,dtmax,time,dtrk,dtrki,divtot,divmax
@@ -128,7 +129,6 @@ program cans
                                          grid_vol_ratio_c,grid_vol_ratio_f
   real(rp) :: meanvelu,meanvelv,meanvelw
   real(rp), dimension(3) :: dpdl
-  !real(rp), allocatable, dimension(:) :: var
   real(rp), dimension(42) :: var
 #if defined(_TIMING)
   real(rp) :: dt12,dt12av,dt12min,dt12max
@@ -140,6 +140,8 @@ program cans
   character(len=100) :: filename
   integer :: i,j,k,kk
   logical :: is_done,kill
+  character(len=1) :: ctmp
+  integer :: ncpu
   !
   call MPI_INIT(ierr)
   call MPI_COMM_RANK(MPI_COMM_WORLD,myid,ierr)
@@ -157,11 +159,12 @@ program cans
   !
   ! allocate variables
   !
-  allocate(u( 0:n(1)+1,0:n(2)+1,0:n(3)+1), &
-           v( 0:n(1)+1,0:n(2)+1,0:n(3)+1), &
-           w( 0:n(1)+1,0:n(2)+1,0:n(3)+1), &
-           p( 0:n(1)+1,0:n(2)+1,0:n(3)+1), &
-           pp(0:n(1)+1,0:n(2)+1,0:n(3)+1))
+  allocate(u(    0:n(1)+1,0:n(2)+1,0:n(3)+1), &
+           v(    0:n(1)+1,0:n(2)+1,0:n(3)+1), &
+           w(    0:n(1)+1,0:n(2)+1,0:n(3)+1), &
+           p(    0:n(1)+1,0:n(2)+1,0:n(3)+1), &
+           pp(   0:n(1)+1,0:n(2)+1,0:n(3)+1), &
+           visct(0:n(1)+1,0:n(2)+1,0:n(3)+1))
   allocate(lambdaxyp(n_z(1),n_z(2)))
   allocate(ap(n_z(3)),bp(n_z(3)),cp(n_z(3)))
   allocate(dzc( 0:n(3)+1), &
@@ -181,8 +184,7 @@ program cans
   allocate(rhsbp%x(n(2),n(3),0:1), &
            rhsbp%y(n(1),n(3),0:1), &
            rhsbp%z(n(1),n(2),0:1))
-  !defined as (0:n+1), consistent with halo cells
-  !defined in read_input?
+  ! halo cells included in bcu/v/w
   allocate(bcu%x(0:n(2)+1,0:n(3)+1,0:1), &
            bcv%x(0:n(2)+1,0:n(3)+1,0:1), &
            bcw%x(0:n(2)+1,0:n(3)+1,0:1), &
@@ -194,7 +196,10 @@ program cans
            bcw%z(0:n(1)+1,0:n(2)+1,0:1), &
            bcp%x(0:n(2)+1,0:n(3)+1,0:1), &
            bcp%y(0:n(1)+1,0:n(3)+1,0:1), &
-           bcp%z(0:n(1)+1,0:n(2)+1,0:1))
+           bcp%z(0:n(1)+1,0:n(2)+1,0:1), &
+           bcs%x(0:n(2)+1,0:n(3)+1,0:1), &
+           bcs%y(0:n(1)+1,0:n(3)+1,0:1), &
+           bcs%z(0:n(1)+1,0:n(2)+1,0:1))
 #if defined(_IMPDIFF)
   allocate(lambdaxyu(n_z(1),n_z(2)), &
            lambdaxyv(n_z(1),n_z(2)), &
@@ -257,8 +262,8 @@ program cans
     k = kk-(lo(3)-1)
     zc( k) = zc_g(kk)
     zf( k) = zf_g(kk)
-    dzc(k) = dzc_g(kk)
-    dzf(k) = dzf_g(kk)
+    dzc(k) = dzc_g(kk) ! k = 0,n(3)+1, halo cells included
+    dzf(k) = dzf_g(kk) ! k = 0,n(3)+1, halo cells included
     dzci(k) = dzc(k)**(-1)
     dzfi(k) = dzf(k)**(-1)
   end do
@@ -277,8 +282,18 @@ program cans
   !
   ! test input files before proceeding with the calculation
   !
-  call test_sanity_input(ng,dims,stop_type,cbcvel,cbcpre,bcvel,bcpre,lwm,is_forced)
-  call initbc(bcvel,bcpre,bcu,bcv,bcw,bcp)
+  call test_sanity_input(ng,dims,sgstype,stop_type,cbcvel,cbcpre,cbcsgs,bcvel,bcpre,bcsgs,n,is_bound,lwm,l,zc,dl,hwm,is_forced)
+  !
+  ! compute wall distance
+  !
+  if(sgstype=='smag') then
+    allocate(dw(1:n(1),1:n(2),1:n(3)))
+    call wall_dist(cbcvel,n,is_bound,l,dl,zc,dzc,dw)
+  end if
+  !
+  ! initialize boundary condition variables
+  !
+  call initbc(bcvel,bcpre,bcsgs,bcu,bcv,bcw,bcp,bcs,n,is_bound,lwm,l,zc,dl,dzc,hwm,ind_wm)
   !
   ! initialize Poisson solver
   !
@@ -345,25 +360,28 @@ program cans
     if(myid == 0) print*, '*** Checkpoint loaded at time = ', time, 'time step = ', istep, '. ***'
   end if
   !
-  open(55,file=trim(datadir)//'debug',status='replace')
+  ! write(ctmp,'(i1)') myid
+  ! open(55,file=trim(datadir)//'debug'//trim(ctmp),status='replace')
   !$acc enter data copyin(u,v,w,p) create(pp)
-  call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,lo,l,dl,zc,visc,hwm,.false.,dzc,dzf,u,v,w)
+  call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm,.false.,u,v,w)
   call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
+  call cmpt_sgs(sgstype,cbcvel,n,is_bound,l,dl,zc,dzc,dzf,visc,u,v,w,visct)
+  call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,visct) ! corner ghost cells included
   !
   ! post-process and write initial condition
   !
   write(fldnum,'(i7.7)') istep
   !$acc update self(u,v,w,p)
-  ! include 'out1d.h90'
-  ! include 'out2d.h90'
+  include 'out1d.h90'
+  include 'out2d.h90'
+  include 'out3d.h90'
   ! call cmpt_spectra(trim(datadir)//'spectra_u_fld_'//fldnum,n,ng,zc_g,.false.,u)
   ! call cmpt_spectra(trim(datadir)//'spectra_v_fld_'//fldnum,n,ng,zc_g,.false.,v)
   ! call cmpt_spectra(trim(datadir)//'spectra_w_fld_'//fldnum,n,ng,zf_g,.true. ,w)
   ! call cmpt_spectra(trim(datadir)//'spectra_p_fld_'//fldnum,n,ng,zc_g,.false.,p)
   ! call pdfs_sergio(trim(datadir)//'pdfs_fld_'//fldnum,lo,hi,ng,zc_g,u,v,w,p)
-  ! include 'out3d.h90'
   !
-  call chkdt(n,dl,dzci,dzfi,visc,u,v,w,dtmax)
+  call chkdt(n,dl,dzci,dzfi,visc,visct,u,v,w,dtmax)
   dt = min(cfl*dtmax,dtmin)
   if(myid == 0) print*, 'dtmax = ', dtmax, 'dt = ',dt
   dti = 1./dt
@@ -389,7 +407,7 @@ program cans
       dtrk = sum(rkcoeff(:,irk))*dt
       dtrki = dtrk**(-1)
       call rk(rkcoeff(:,irk),n,dli,dzci,dzfi,grid_vol_ratio_c,grid_vol_ratio_f,visc,dt,p, &
-              is_forced,velf,bforce,u,v,w,f)
+              is_forced,velf,bforce,visct,u,v,w,f)
       call bulk_forcing(n,is_forced,f,u,v,w)
 #if defined(_IMPDIFF)
       alpha = -.5*visc*dtrk
@@ -403,7 +421,7 @@ program cans
       rhsbz(:,:,0:1) = rhsbu%z(:,:,0:1)*alpha
       !$acc end kernels
       !$OMP END PARALLEL WORKSHARE
-      call updt_rhs_b(['f','c','c'],cbcvel(:,:,1),n,is_bound,rhsbx,rhsby,rhsbz,u)   !additional rhs_b to u
+      call updt_rhs_b(['f','c','c'],cbcvel(:,:,1),n,is_bound,rhsbx,rhsby,rhsbz,u)   ! additional rhs_b to u
       !$acc kernels default(present) async(1)
       !$OMP PARALLEL WORKSHARE
       aa(:) = au(:)*alpha
@@ -455,7 +473,7 @@ program cans
       rhsbz(:,:,0:1) = rhsbw%z(:,:,0:1)*alpha
       !$acc end kernels
       !$OMP END PARALLEL WORKSHARE
-      call updt_rhs_b(['c','c','f'],cbcvel(:,:,3),n,is_bound,rhsbx,rhsby,rhsbz,w) !additional rhs_b to w
+      call updt_rhs_b(['c','c','f'],cbcvel(:,:,3),n,is_bound,rhsbx,rhsby,rhsbz,w) ! additional rhs_b to w
       !$acc kernels default(present) async(1)
       !$OMP PARALLEL WORKSHARE
       aa(:) = aw(:)*alpha
@@ -471,20 +489,22 @@ program cans
 #else
       call solver_gaussel_z(n                    ,aa,bb,cc,cbcvel(:,3,3),['c','c','f'],w)
 #endif
-#endif  
-      !#endif defined(_IMPDIFF)
-      dpdl(:) = dpdl(:) + f(:) !f is change of dpdl
-      call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,lo,l,dl,zc,visc,hwm,.false.,dzc,dzf,u,v,w)
+#endif
+      dpdl(:) = dpdl(:) + f(:) ! dt multiplied
+      call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm,.false.,u,v,w)
       call fillps(n,dli,dzfi,dtrki,u,v,w,pp)
       call updt_rhs_b(['c','c','c'],cbcpre,n,is_bound,rhsbp%x,rhsbp%y,rhsbp%z,pp)
       call solver(n,ng,arrplanp,normfftp,lambdaxyp,ap,bp,cp,cbcpre,['c','c','c'],pp)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,pp)
       call correc(n,dli,dzci,dtrk,pp,u,v,w)
-      call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,lo,l,dl,zc,visc,hwm,.true.,dzc,dzf,u,v,w)
+      call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm,.true.,u,v,w)
       call updatep(n,dli,dzci,dzfi,alpha,pp,p)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
-    end do ! end of irk loop
+      call cmpt_sgs(sgstype,cbcvel,n,is_bound,l,dl,zc,dzc,dzf,visc,u,v,w,visct)
+      call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,visct)
+    end do
     dpdl(:) = -dpdl(:)*dti
+    ! dt not multiplied, exactly equal to the wall shear stress
     !
     ! check simulation stopping criteria
     !
@@ -500,7 +520,7 @@ program cans
     end if
     if(mod(istep,icheck) == 0) then
       if(myid == 0) print*, 'Checking stability and divergence...'
-      call chkdt(n,dl,dzci,dzfi,visc,u,v,w,dtmax)
+      call chkdt(n,dl,dzci,dzfi,visc,visct,u,v,w,dtmax)
       dt  = min(cfl*dtmax,dtmin)
       if(myid == 0) print*, 'dtmax = ', dtmax, 'dt = ',dt
       if(dtmax < small) then
@@ -525,7 +545,6 @@ program cans
     ! output routines below
     !
     if(mod(istep,iout0d) == 0) then
-      !allocate(var(4))
       var(1) = 1.*istep
       var(2) = dt
       var(3) = time
@@ -544,7 +563,7 @@ program cans
         if(is_forced(3).or.abs(bforce(3)) > 0.) then
           call bulk_mean(n,grid_vol_ratio_c,w,meanvelw)
         end if
-        if(.not.any(is_forced(:))) dpdl(:) = -bforce(:) ! constant pressure gradient
+        if(.not.any(is_forced(:))) dpdl(:) = -bforce(:)
         var(1)   = time
         var(2:4) = dpdl(1:3)
         var(5:7) = [meanvelu,meanvelv,meanvelw]

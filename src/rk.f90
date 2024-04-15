@@ -24,7 +24,7 @@ module mod_rk
   public rk
   contains
   subroutine rk(rkpar,n,dli,dzci,dzfi,grid_vol_ratio_c,grid_vol_ratio_f,visc,dt,p, &
-                is_forced,velf,bforce,u,v,w,f)
+                is_forced,velf,bforce,visct,u,v,w,f)
     !
     ! low-storage 3rd-order Runge-Kutta scheme
     ! for time integration of the momentum equations.
@@ -39,6 +39,7 @@ module mod_rk
     real(rp), intent(in   ), dimension(0:,0:,0:) :: p
     logical , intent(in   ), dimension(3)        :: is_forced
     real(rp), intent(in   ), dimension(3)        :: velf,bforce
+    real(rp), intent(in   ), dimension(0:,0:,0:) :: visct
     real(rp), intent(inout), dimension(0:,0:,0:) :: u,v,w
     real(rp), intent(out), dimension(3) :: f
     real(rp), target     , allocatable, dimension(:,:,:), save :: dudtrk_t ,dvdtrk_t ,dwdtrk_t , &
@@ -80,7 +81,7 @@ module mod_rk
     end if
     !
 #if defined(_FAST_MOM_KERNELS)
-    call mom_xyz_ad(n(1),n(2),n(3),dli(1),dli(2),dzci,dzfi,visc,u,v,w,dudtrk,dvdtrk,dwdtrk,dudtrkd,dvdtrkd,dwdtrkd)
+    call mom_xyz_ad(n(1),n(2),n(3),dli(1),dli(2),dzci,dzfi,visc,u,v,w,visct,dudtrk,dvdtrk,dwdtrk,dudtrkd,dvdtrkd,dwdtrkd)
 #else
     !$acc kernels default(present) async(1)
     !$OMP PARALLEL WORKSHARE

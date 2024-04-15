@@ -53,8 +53,8 @@ module mod_initflow
       call couette(   n(3),zc/l(3),uref ,u1d)
       uref = abs(uref)
     case('poi')
-      ! mpi_sum called by set_mean, leading to small differences
-      ! for different numbers of processors
+      ! MPI_SUM called by set_mean, so small differences obtained
+      ! from using various cpus
       call poiseuille(n(3),zc/l(3),ubulk,u1d)
       is_mean = .true.
     case('tbl')
@@ -73,7 +73,6 @@ module mod_initflow
       u1d(:) = 0.
     case('uni')
       u1d(:) = uref
-      is_noise = .false. ! for testing purposes
     case('log')
       reb = ubulk*l(3)/visc
       call log_profile(n(3),zc/l(3),reb,u1d)

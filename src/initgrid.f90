@@ -59,8 +59,8 @@ module mod_initgrid
     do k=1,n
       dzf(k) = zf(k)-zf(k-1)
     end do
-    dzf(0  ) = dzf(1) !halo cell height is the same as the first cell
-    dzf(n+1) = dzf(n) !halo cell height is the same as the last cell
+    dzf(0  ) = dzf(1) !halo cell same as the first cell
+    dzf(n+1) = dzf(n) !halo cell same as the last cell
     !
     ! step 3) determine grid spacing between centers dzc
     !

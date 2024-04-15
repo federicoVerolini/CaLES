@@ -32,26 +32,32 @@ module mod_sanity
   public test_sanity_input
   ! public test_sanity_input,test_sanity_solver
   contains
-  subroutine test_sanity_input(ng,dims,stop_type,cbcvel,cbcpre,bcvel,bcpre,lwm,is_forced)
+  subroutine test_sanity_input(ng,dims,sgstype,stop_type,cbcvel,cbcpre,cbcsgs,bcvel,bcpre,bcsgs,n,is_bound,lwm,l,zc,dl,h,is_forced)
     !
     ! performs some a priori checks of the input files before the calculation starts
     !
     implicit none
     integer , intent(in), dimension(3) :: ng
     integer , intent(in), dimension(2) :: dims
+    character(len=*), intent(in) :: sgstype
     logical , intent(in), dimension(3) :: stop_type
     character(len=1), intent(in), dimension(0:1,3,3) :: cbcvel
-    character(len=1), intent(in), dimension(0:1,3)   :: cbcpre
-    real(rp)        , intent(in), dimension(0:1,3,3) :: bcvel
-    real(rp)        , intent(in), dimension(0:1,3)   :: bcpre
-    integer         , intent(in), dimension(0:1,3)   :: lwm
-    logical         , intent(in), dimension(3)       :: is_forced
+    character(len=1), intent(in), dimension(0:1,3)   :: cbcpre,cbcsgs
+    real(rp), intent(in), dimension(0:1,3,3) :: bcvel
+    real(rp), intent(in), dimension(0:1,3) :: bcpre,bcsgs
+    integer, intent(in), dimension(3) :: n
+    logical, intent(in), dimension(0:1,3) :: is_bound
+    integer, intent(in), dimension(0:1,3) :: lwm
+    real(rp), intent(in), dimension(3) :: l,dl
+    real(rp), intent(in), dimension(0:) :: zc
+    real(rp), intent(in) :: h
+    logical, intent(in), dimension(3) :: is_forced
     logical :: passed
     !
-    call chk_dims(ng,dims,passed);                     if(.not.passed) call abortit
-    call chk_stop_type(stop_type,passed);              if(.not.passed) call abortit
-    call chk_bc(cbcvel,cbcpre,bcvel,bcpre,lwm,passed); if(.not.passed) call abortit
-    call chk_forcing(cbcpre,is_forced,passed);         if(.not.passed) call abortit
+    call chk_dims(ng,dims,cbcvel,sgstype,passed); if(.not.passed) call abortit
+    call chk_stop_type(stop_type,passed); if(.not.passed) call abortit
+    call chk_bc(cbcvel,cbcpre,cbcsgs,bcvel,bcpre,bcsgs,n,is_bound,lwm,l,zc,dl,h,passed); if(.not.passed) call abortit
+    call chk_forcing(cbcpre,is_forced,passed); if(.not.passed) call abortit
 #if defined(_IMPDIFF_1D) && !defined(_IMPDIFF)
     if(myid == 0)  print*, 'ERROR: `_IMPDIFF_1D` cpp macro requires building with `_IMPDIFF` too.'; call abortit
 #endif
@@ -72,30 +78,55 @@ module mod_sanity
     end if
   end subroutine chk_stop_type
   !
-  subroutine chk_dims(ng,dims,passed)
+  subroutine chk_dims(ng,dims,cbcvel,sgstype,passed)
     implicit none
     integer, intent(in), dimension(3) :: ng
     integer, intent(in), dimension(2) :: dims
+    character(len=1), intent(in), dimension(0:1,3,3) :: cbcvel
+    character(len=*), intent(in) :: sgstype
     logical, intent(out) :: passed
     integer, dimension(2) :: ii
     logical :: passed_loc
+    character(len=2) :: bc01v
+    integer :: idir,ivel,i
     passed = .true.
     ii = pack([1,2,3],[1,2,3] /= ipencil_axis)
     passed_loc = all(dims(:)<=ng(ii)).and.all(dims(:)>=1)
     if(myid == 0.and.(.not.passed_loc)) &
       print*, 'ERROR: 1 <= dims(:) <= [itot,jtot], or [itot,ktot], or [jtot ktot] depending on the decomposition.'
     passed = passed.and.passed_loc
+    !
+    if(sgstype=='smag') then
+      passed_loc = .true.
+      do i = 1,2
+        idir = ii(i)
+        ivel = ii(i)
+        bc01v = cbcvel(0,idir,ivel)//cbcvel(1,idir,ivel)
+        if(bc01v == 'DD') then
+          passed_loc = passed_loc.and.(dims(i)<=2)
+        end if
+      end do
+      if(myid == 0.and.(.not.passed_loc)) &
+        print*, 'ERROR: more than two subdomains between two opposite walls.'
+      passed = passed.and.passed_loc
+    end if
+    !
   end subroutine chk_dims
   !
-  subroutine chk_bc(cbcvel,cbcpre,bcvel,bcpre,lwm,passed)
+  subroutine chk_bc(cbcvel,cbcpre,cbcsgs,bcvel,bcpre,bcsgs,n,is_bound,lwm,l,zc,dl,h,passed)
     implicit none
     character(len=1), intent(in), dimension(0:1,3,3) :: cbcvel
-    character(len=1), intent(in), dimension(0:1,3  ) :: cbcpre
+    character(len=1), intent(in), dimension(0:1,3) :: cbcpre,cbcsgs
     real(rp)        , intent(in), dimension(0:1,3,3) :: bcvel
-    real(rp)        , intent(in), dimension(0:1,3  ) :: bcpre
-    integer         , intent(in), dimension(0:1,3  ) :: lwm
-    logical         , intent(out) :: passed
-    character(len=2) :: bc01v,bc01p
+    real(rp)        , intent(in), dimension(0:1,3) :: bcpre,bcsgs
+    integer, intent(in), dimension(3) :: n
+    logical, intent(in), dimension(0:1,3) :: is_bound
+    integer, intent(in), dimension(0:1,3) :: lwm
+    real(rp), intent(in), dimension(3) :: l,dl
+    real(rp), intent(in), dimension(0:) :: zc
+    real(rp), intent(in) :: h
+    logical, intent(out) :: passed
+    character(len=2) :: bc01v,bc01p,bc01s
     integer :: i,ivel,idir
     logical :: passed_loc
     passed = .true.
@@ -143,6 +174,32 @@ module mod_sanity
     passed = passed.and.passed_loc
     !
     passed_loc = .true.
+    do idir=1,3
+      bc01s = cbcsgs(0,idir)//cbcsgs(1,idir)
+      passed_loc = passed_loc.and.( (bc01s == 'PP').or. &
+                                    (bc01s == 'ND').or. &
+                                    (bc01s == 'DN').or. &
+                                    (bc01s == 'DD').or. &
+                                    (bc01s == 'NN') )
+    end do
+    if(myid == 0.and.(.not.passed_loc)) print*, 'ERROR: sgs BCs not valid.'
+    passed = passed.and.passed_loc
+    !
+    passed_loc = .true.
+    do idir=1,3
+      ivel = idir
+      bc01v = cbcvel(0,idir,ivel)//cbcvel(1,idir,ivel)
+      bc01s = cbcsgs(0,idir)//cbcsgs(1,idir)
+      passed_loc = passed_loc.and.( (bc01v == 'PP'.and.bc01s == 'PP').or. &
+                                    (bc01v == 'ND'.and.bc01s == 'DD').or. &
+                                    (bc01v == 'DN'.and.bc01s == 'DD').or. &
+                                    (bc01v == 'DD'.and.bc01s == 'DD').or. &
+                                    (bc01v == 'NN'.and.bc01s == 'DD') )
+    end do
+    if(myid == 0.and.(.not.passed_loc)) print*, 'ERROR: velocity and sgs BCs not compatible.'
+    passed = passed.and.passed_loc
+    !
+    passed_loc = .true.
     do idir=1,2
       passed_loc = passed_loc.and.((bcpre(0,idir) == 0.).and.(bcpre(1,idir) == 0.))
     end do
@@ -150,16 +207,34 @@ module mod_sanity
       print*, 'ERROR: pressure BCs in directions x and y must be homogeneous (value = 0.).'
     passed = passed.and.passed_loc
     !
-    print*,lwm 
     passed_loc = .true.
     do idir = 1,3
       do i = 0,1
-        if(lwm(i,idir)>0) passed_loc = passed_loc.and.any(cbcvel(i,idir,1:3)/='P')
+        if(lwm(i,idir)/=0) then
+          do ivel = 1,3
+            if(ivel==idir) then
+              passed_loc = passed_loc.and.cbcvel(i,idir,ivel)=='D'
+            else
+              passed_loc = passed_loc.and.cbcvel(i,idir,ivel)=='N'
+            end if
+          end do
+        end if
       end do
     end do
     if(myid == 0.and.(.not.passed_loc)) &
-    print*, 'ERROR: wall model cannot be imposed on periodic BCs.'
+    print*, 'ERROR: wall model BCs must be Neumann (wall-parallel) and Dirichlet (wall-normal).'
     passed = passed.and.passed_loc
+    !
+    passed_loc = .true.
+    if(is_bound(0,1).and.lwm(0,1)/=0) passed_loc = passed_loc.and.(h>0.5_rp*dl(1) .and.h<(n(1)-0.5_rp)*dl(1))
+    if(is_bound(1,1).and.lwm(1,1)/=0) passed_loc = passed_loc.and.(h>0.5_rp*dl(1) .and.h<(n(1)-0.5_rp)*dl(1))
+    if(is_bound(0,2).and.lwm(0,2)/=0) passed_loc = passed_loc.and.(h>0.5_rp*dl(2) .and.h<(n(2)-0.5_rp)*dl(2))
+    if(is_bound(1,2).and.lwm(1,2)/=0) passed_loc = passed_loc.and.(h>0.5_rp*dl(2) .and.h<(n(2)-0.5_rp)*dl(2))
+    if(is_bound(0,3).and.lwm(0,3)/=0) passed_loc = passed_loc.and.(h>zc(1)        .and.h<zc(n(3))  )
+    if(is_bound(1,3).and.lwm(1,3)/=0) passed_loc = passed_loc.and.(h>l(3)-zc(n(3)).and.h<l(3)-zc(1))
+    if(.not.passed_loc) print*, 'ERROR: invalid wall model height.'
+    passed = passed.and.passed_loc
+    !
 #if defined(_IMPDIFF) && !defined(_IMPDIFF_1D)
     !implicit: bcs in x and y must be 'D0' or 'P',
     !so implicit mode can not be used for WMLES of square ducts

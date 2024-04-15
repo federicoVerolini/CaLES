@@ -331,6 +331,7 @@ module mod_output
       do k=lo(3),hi(3)
         do j=lo(2),hi(2)
           do i=lo(1),hi(1)
+            ! always use zc for plotting
             um(k) = um(k) + u(i,j,k)
             vm(k) = vm(k) + v(i,j,k)
             wm(k) = wm(k) + 0.50*(w(i,j,k-1) + w(i,j,k))
@@ -361,7 +362,7 @@ module mod_output
         do k=1,ng(3)
           write(iunit,'(8E16.7e3)') z_g(k),um(k),vm(k),wm(k), &
                                            u2(k),v2(k),w2(k), &
-                                           uw(k) !uw is reynolds stress
+                                           uw(k)
         end do
         close(iunit)
       end if
@@ -505,6 +506,7 @@ module mod_output
       end if
     end select
   end subroutine out2d_duct
+  !
   subroutine out1d_single_point_chan(fname,ng,lo,hi,idir,l,dl,dzc_g,dzf_g,zc_g,zf_g,u,v,w,p)
     implicit none
     character(len=*), intent(in) :: fname

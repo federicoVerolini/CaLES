@@ -14,7 +14,7 @@ module mod_bound
   private
   public boundp,bounduvw,updt_rhs_b,initbc
   contains
-  subroutine bounduvw(cbc,n,bcu,bcv,bcw,nb,is_bound,lwm,lo,l,dl,zc,visc,h,is_correc,dzc,dzf,u,v,w)
+  subroutine bounduvw(cbc,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind,is_correc,u,v,w)
     !
     ! imposes velocity boundary conditions
     !
@@ -24,29 +24,17 @@ module mod_bound
     type(cond_bound), intent(inout) :: bcu,bcv,bcw
     integer , intent(in), dimension(0:1,3) :: nb
     logical , intent(in), dimension(0:1,3) :: is_bound
-    integer , intent(in), dimension(0:1,3) :: lwm 
-    integer , intent(in), dimension(3) :: lo
+    integer , intent(in), dimension(0:1,3) :: lwm,ind
     real(rp), intent(in), dimension(3) :: l,dl
-    real(rp), intent(in), dimension(0:) :: zc
+    real(rp), intent(in), dimension(0:) :: zc,zf,dzc,dzf
     real(rp), intent(in) :: visc,h
     logical , intent(in) :: is_correc
-    real(rp), intent(in), dimension(0:) :: dzc,dzf
     real(rp), intent(inout), dimension(0:,0:,0:) :: u,v,w
     character(len=1), dimension(0:1,3,3) :: cbc_w
     logical :: impose_norm_bc
-    integer :: i,j,idir,nh
+    integer :: i,j,k,idir,nh
     !
     nh = 1
-    !
-    cbc_w = cbc
-    do idir = 1,3
-      do i = 0,1
-        if(is_bound(i,idir).and.lwm(i,idir)>0) then
-          cbc_w(i,idir,1:3 ) = 'N'
-          cbc_w(i,idir,idir) = cbc(i,idir,idir)
-        end if
-      end do
-    end do
     !
 #if !defined(_OPENACC)
     do idir = 1,3
@@ -55,120 +43,108 @@ module mod_bound
       call updthalo(nh,halo(idir),nb(:,idir),idir,w)
     end do
 #else
-    call updthalo_gpu(nh,cbc_w(0,:,1)//cbc_w(1,:,1)==['PP','PP','PP'],u)
-    call updthalo_gpu(nh,cbc_w(0,:,2)//cbc_w(1,:,2)==['PP','PP','PP'],v)
-    call updthalo_gpu(nh,cbc_w(0,:,3)//cbc_w(1,:,3)==['PP','PP','PP'],w)
+    call updthalo_gpu(nh,cbc(0,:,1)//cbc(1,:,1)==['PP','PP','PP'],u)
+    call updthalo_gpu(nh,cbc(0,:,2)//cbc(1,:,2)==['PP','PP','PP'],v)
+    call updthalo_gpu(nh,cbc(0,:,3)//cbc(1,:,3)==['PP','PP','PP'],w)
 #endif
     !
-    !impose_norm_bc=0, the correction does not change wall-normal velocity on walls
-    !this also holds when a wall model is used due to non-penetrating bc
+    ! impose_norm_bc=0, the correction does not change wall-normal velocity on walls
+    ! this also holds when a wall model is used due to non-penetrating bc
+    impose_norm_bc = (.not.is_correc).or.(cbc(0,1,1)//cbc(1,1,1) == 'PP')
     if(is_bound(0,1)) then
-      if(cbc_w(0,1,1)=='P'.or.(cbc_w(0,1,1)/='P'.and..not.is_correc)) &
-                            call set_bc(cbc_w(0,1,1),0,1,nh,.false.,bcu%x,dl(1),u)
-      if(cbc_w(0,1,2)=='P') call set_bc(cbc_w(0,1,2),0,1,nh,.true. ,bcv%x,dl(1),v)
-      if(cbc_w(0,1,3)=='P') call set_bc(cbc_w(0,1,3),0,1,nh,.true. ,bcw%x,dl(1),w)
+      if(impose_norm_bc)  call set_bc(cbc(0,1,1),0,1,nh,.false.,bcu%x,dl(1),u)
+      if(lwm(0,1)==0) then
+                          call set_bc(cbc(0,1,2),0,1,nh,.true. ,bcv%x,dl(1),v)
+                          call set_bc(cbc(0,1,3),0,1,nh,.true. ,bcw%x,dl(1),w)
+      end if
     end if
     if(is_bound(1,1)) then
-      if(cbc_w(1,1,1)=='P'.or.(cbc_w(1,1,1)/='P'.and..not.is_correc)) &
-                            call set_bc(cbc_w(1,1,1),1,1,nh,.false.,bcu%x,dl(1),u)
-      if(cbc_w(1,1,2)=='P') call set_bc(cbc_w(1,1,2),1,1,nh,.true. ,bcv%x,dl(1),v)
-      if(cbc_w(1,1,3)=='P') call set_bc(cbc_w(1,1,3),1,1,nh,.true. ,bcw%x,dl(1),w)
+      if(impose_norm_bc)  call set_bc(cbc(1,1,1),1,1,nh,.false.,bcu%x,dl(1),u)
+      if(lwm(1,1)==0) then    
+                          call set_bc(cbc(1,1,2),1,1,nh,.true. ,bcv%x,dl(1),v)
+                          call set_bc(cbc(1,1,3),1,1,nh,.true. ,bcw%x,dl(1),w)
+      end if
     end if
+    impose_norm_bc = (.not.is_correc).or.(cbc(0,2,2)//cbc(1,2,2) == 'PP')
     if(is_bound(0,2)) then
-      if(cbc_w(0,2,1)=='P') call set_bc(cbc_w(0,2,1),0,2,nh,.true. ,bcu%y,dl(2),u)
-      if(cbc_w(0,2,2)=='P'.or.(cbc_w(0,2,2)/='P'.and..not.is_correc)) &
-                            call set_bc(cbc_w(0,2,2),0,2,nh,.false.,bcv%y,dl(2),v)
-      if(cbc_w(0,2,3)=='P') call set_bc(cbc_w(0,2,3),0,2,nh,.true. ,bcw%y,dl(2),w)
+      if(impose_norm_bc)  call set_bc(cbc(0,2,2),0,2,nh,.false.,bcv%y,dl(2),v)
+      if(lwm(0,2)==0) then    
+                          call set_bc(cbc(0,2,1),0,2,nh,.true. ,bcu%y,dl(2),u)
+                          call set_bc(cbc(0,2,3),0,2,nh,.true. ,bcw%y,dl(2),w)
+      end if
     end if
     if(is_bound(1,2)) then
-      if(cbc_w(1,2,1)=='P') call set_bc(cbc_w(1,2,1),1,2,nh,.true. ,bcu%y,dl(2),u)
-      if(cbc_w(1,2,2)=='P'.or.(cbc_w(1,2,2)/='P'.and..not.is_correc)) &
-                            call set_bc(cbc_w(1,2,2),1,2,nh,.false.,bcv%y,dl(2),v)
-      if(cbc_w(1,2,3)=='P') call set_bc(cbc_w(1,2,3),1,2,nh,.true. ,bcw%y,dl(2),w)
+      if(impose_norm_bc)  call set_bc(cbc(1,2,2),1,2,nh,.false.,bcv%y,dl(2),v)
+      if(lwm(1,2)==0) then    
+                          call set_bc(cbc(1,2,1),1,2,nh,.true. ,bcu%y,dl(2),u)
+                          call set_bc(cbc(1,2,3),1,2,nh,.true. ,bcw%y,dl(2),w)
+      end if
     end if
+    impose_norm_bc = (.not.is_correc).or.(cbc(0,3,3)//cbc(1,3,3) == 'PP')
     if(is_bound(0,3)) then
-      if(cbc_w(0,3,1)=='P') call set_bc(cbc_w(0,3,1),0,3,nh,.true. ,bcu%z,dzc(0)   ,u)
-      if(cbc_w(0,3,2)=='P') call set_bc(cbc_w(0,3,2),0,3,nh,.true. ,bcv%z,dzc(0)   ,v)
-      if(cbc_w(0,3,3)=='P'.or.(cbc_w(0,3,3)/='P'.and..not.is_correc)) &
-                            call set_bc(cbc_w(0,3,3),0,3,nh,.false.,bcw%z,dzf(0)   ,w)
+      if(impose_norm_bc)  call set_bc(cbc(0,3,3),0,3,nh,.false.,bcw%z,dzf(0)   ,w)
+      if(lwm(0,3)==0) then     
+                          call set_bc(cbc(0,3,1),0,3,nh,.true. ,bcu%z,dzc(0)   ,u)
+                          call set_bc(cbc(0,3,2),0,3,nh,.true. ,bcv%z,dzc(0)   ,v)
+      end if
     end if
     if(is_bound(1,3)) then
-      if(cbc_w(1,3,1)=='P') call set_bc(cbc_w(1,3,1),1,3,nh,.true. ,bcu%z,dzc(n(3)),u)
-      if(cbc_w(1,3,2)=='P') call set_bc(cbc_w(1,3,2),1,3,nh,.true. ,bcv%z,dzc(n(3)),v)
-      if(cbc_w(1,3,3)=='P'.or.(cbc_w(1,3,3)/='P'.and..not.is_correc)) &
-                            call set_bc(cbc_w(1,3,3),1,3,nh,.false.,bcw%z,dzf(n(3)),w)
+      if(impose_norm_bc)  call set_bc(cbc(1,3,3),1,3,nh,.false.,bcw%z,dzf(n(3)),w)
+      if(lwm(1,3)==0) then    
+                          call set_bc(cbc(1,3,1),1,3,nh,.true. ,bcu%z,dzc(n(3)),u)
+                          call set_bc(cbc(1,3,2),1,3,nh,.true. ,bcv%z,dzc(n(3)),v)
+      end if
     end if
     !
-    call cmpt_bcuvw(n,is_bound,lwm,lo,l,dl,zc,visc,h,u,v,w,bcu,bcv,bcw)
+    ! Neumann bc must be zero at some locations to let the ghost points have the same 
+    ! values from the bc implementations of different walls. For example, w(1,5,4) 
+    ! must be set as zero by both the upper wall (non-penetrating) and the front wall 
+    ! (Neumann). Wall models can guarantee this at those locations, since they do 
+    ! produce a zero gradient in the direction where the velocity component is zero.
+    ! 
+    ! bcu/v/w have correct values for all the loop locations in cmpt_bcuvw.
+    ! The only difference is that for square duct/six-wall cases, uh,vh and wh may 
+    ! have incorrect values at the end locations. However, it is only the zero-value 
+    ! component that is essentially useful, which guarantees zero-gradient bc there, 
+    ! leading to correct values at the end ghost points. For two-wall channel,
+    ! uh,vh and wh do have correct values at the end locations.
     !
-    if(is_bound(0,1)) then
-      if(cbc_w(0,1,2)/='P') call set_bc(cbc_w(0,1,2),0,1,nh,.true. ,bcv%x,dl(1),v)
-      if(cbc_w(0,1,3)/='P') call set_bc(cbc_w(0,1,3),0,1,nh,.true. ,bcw%x,dl(1),w)
+    call cmpt_bcuvw(n,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind,u,v,w,bcu,bcv,bcw)
+    !
+    if(is_bound(0,1).and.lwm(0,1)/=0) then
+      call set_bc(cbc(0,1,2),0,1,nh,.true. ,bcv%x,dl(1),v)
+      call set_bc(cbc(0,1,3),0,1,nh,.true. ,bcw%x,dl(1),w)
     end if
-    if(is_bound(1,1)) then
-      if(cbc_w(1,1,2)/='P') call set_bc(cbc_w(1,1,2),1,1,nh,.true. ,bcv%x,dl(1),v)
-      if(cbc_w(1,1,3)/='P') call set_bc(cbc_w(1,1,3),1,1,nh,.true. ,bcw%x,dl(1),w)
+    if(is_bound(1,1).and.lwm(1,1)/=0) then
+      call set_bc(cbc(1,1,2),1,1,nh,.true. ,bcv%x,dl(1),v)
+      call set_bc(cbc(1,1,3),1,1,nh,.true. ,bcw%x,dl(1),w)
     end if
-    if(is_bound(0,2)) then
-      if(cbc_w(0,2,1)/='P') call set_bc(cbc_w(0,2,1),0,2,nh,.true. ,bcu%y,dl(2),u)
-      if(cbc_w(0,2,3)/='P') call set_bc(cbc_w(0,2,3),0,2,nh,.true. ,bcw%y,dl(2),w)
+    if(is_bound(0,2).and.lwm(0,2)/=0) then
+      call set_bc(cbc(0,2,1),0,2,nh,.true. ,bcu%y,dl(2),u)
+      call set_bc(cbc(0,2,3),0,2,nh,.true. ,bcw%y,dl(2),w)
     end if
-    if(is_bound(1,2)) then
-      if(cbc_w(1,2,1)/='P') call set_bc(cbc_w(1,2,1),1,2,nh,.true. ,bcu%y,dl(2),u)
-      if(cbc_w(1,2,3)/='P') call set_bc(cbc_w(1,2,3),1,2,nh,.true. ,bcw%y,dl(2),w)
+    if(is_bound(1,2).and.lwm(1,2)/=0) then
+      call set_bc(cbc(1,2,1),1,2,nh,.true. ,bcu%y,dl(2),u)
+      call set_bc(cbc(1,2,3),1,2,nh,.true. ,bcw%y,dl(2),w)
     end if
-    if(is_bound(0,3)) then
-      if(cbc_w(0,3,1)/='P') call set_bc(cbc_w(0,3,1),0,3,nh,.true. ,bcu%z,dzc(0)   ,u)
-      if(cbc_w(0,3,2)/='P') call set_bc(cbc_w(0,3,2),0,3,nh,.true. ,bcv%z,dzc(0)   ,v)
+    if(is_bound(0,3).and.lwm(0,3)/=0) then
+      call set_bc(cbc(0,3,1),0,3,nh,.true. ,bcu%z,dzc(0)   ,u)
+      call set_bc(cbc(0,3,2),0,3,nh,.true. ,bcv%z,dzc(0)   ,v)
     end if
-    if(is_bound(1,3)) then
-      if(cbc_w(1,3,1)/='P') call set_bc(cbc_w(1,3,1),1,3,nh,.true. ,bcu%z,dzc(n(3)),u)
-      if(cbc_w(1,3,2)/='P') call set_bc(cbc_w(1,3,2),1,3,nh,.true. ,bcv%z,dzc(n(3)),v)
+    if(is_bound(1,3).and.lwm(1,3)/=0) then
+      call set_bc(cbc(1,3,1),1,3,nh,.true. ,bcu%z,dzc(n(3)),u)
+      call set_bc(cbc(1,3,2),1,3,nh,.true. ,bcv%z,dzc(n(3)),v)
     end if
+    !
+    !for square duct/six-wall cases, adding a loop for the end locations if all values of uh,vh and wh
+    !need to be correct at the ending locations. This need should never arise. 
     !
   end subroutine bounduvw
   !
-  subroutine initbc(bc1,bc2,bcu,bcv,bcw,bcp)
-    !
-    ! initialize bcu,bcv,bcw,bcp
-    !
-    implicit none
-    real(rp), intent(in), dimension(0:1,3,3) :: bc1
-    real(rp), intent(in), dimension(0:1,3) :: bc2
-    type(cond_bound), intent(inout) :: bcu,bcv,bcw,bcp
-    !
-    !wall model not considered in this initialization
-    bcu%x(:,:,0) = bc1(0,1,1)
-    bcv%x(:,:,0) = bc1(0,1,2)
-    bcw%x(:,:,0) = bc1(0,1,3)
-    bcu%x(:,:,1) = bc1(1,1,1)
-    bcv%x(:,:,1) = bc1(1,1,2)
-    bcw%x(:,:,1) = bc1(1,1,3)
-    bcu%y(:,:,0) = bc1(0,2,1)
-    bcv%y(:,:,0) = bc1(0,2,2)
-    bcw%y(:,:,0) = bc1(0,2,3)
-    bcu%y(:,:,1) = bc1(1,2,1)
-    bcv%y(:,:,1) = bc1(1,2,2)
-    bcw%y(:,:,1) = bc1(1,2,3)
-    bcu%z(:,:,0) = bc1(0,3,1)
-    bcv%z(:,:,0) = bc1(0,3,2)
-    bcw%z(:,:,0) = bc1(0,3,3)
-    bcu%z(:,:,1) = bc1(1,3,1)
-    bcv%z(:,:,1) = bc1(1,3,2)
-    bcw%z(:,:,1) = bc1(1,3,3)
-    !
-    bcp%x(:,:,0) = bc2(0,1)
-    bcp%x(:,:,1) = bc2(1,1)
-    bcp%y(:,:,0) = bc2(0,2)
-    bcp%y(:,:,1) = bc2(1,2)
-    bcp%z(:,:,0) = bc2(0,3)
-    bcp%z(:,:,1) = bc2(1,3)
-    !
-  end subroutine initbc
-  !
   subroutine boundp(cbc,n,bcp,nb,is_bound,dl,dzc,p)
     !
-    ! imposes pressure boundary conditions
+    ! imposes boundary conditions for p, pp and visct
+    ! ghost cells at corners also updated, e.g. p(0,0,1), p(0,0,0)
     !
     implicit none
     character(len=1), intent(in), dimension(0:1,3) :: cbc
@@ -649,4 +625,120 @@ module mod_bound
     !$acc end host_data
   end subroutine updthalo_gpu
 #endif
+  !
+  subroutine initbc(bcvel,bcpre,bcsgs,bcu,bcv,bcw,bcp,bcs,n,is_bound,lwm,l,zc,dl,dzc,h,ind)
+    !
+    ! initialize bcu,bcv,bcw,bcp,bcs
+    !
+    implicit none
+    real(rp), intent(in), dimension(0:1,3,3) :: bcvel
+    real(rp), intent(in), dimension(0:1,3) :: bcpre,bcsgs
+    type(cond_bound), intent(inout) :: bcu,bcv,bcw,bcp,bcs
+    integer , intent(in), dimension(3) :: n
+    logical , intent(in), dimension(0:1,3) :: is_bound
+    integer , intent(in), dimension(0:1,3) :: lwm
+    real(rp), intent(in), dimension(3) :: l,dl
+    real(rp), intent(in), dimension(0:) :: zc,dzc
+    real(rp), intent(in) :: h
+    integer,  intent(out), dimension(0:1,3) :: ind
+    integer :: i,j,k,i1,i2,j1,j2,k1,k2
+    !
+    ! unnecessary to consider wall model here, because
+    ! bcu,bcv,bcw are overwritten by cmpt_bcuvw before set_bc, and that
+    ! imp3d never used for WMLES. Only imp1d and explicit can be applied.
+    !
+    bcu%x(:,:,0) = bcvel(0,1,1)
+    bcv%x(:,:,0) = bcvel(0,1,2)
+    bcw%x(:,:,0) = bcvel(0,1,3)
+    bcu%x(:,:,1) = bcvel(1,1,1)
+    bcv%x(:,:,1) = bcvel(1,1,2)
+    bcw%x(:,:,1) = bcvel(1,1,3)
+    bcu%y(:,:,0) = bcvel(0,2,1)
+    bcv%y(:,:,0) = bcvel(0,2,2)
+    bcw%y(:,:,0) = bcvel(0,2,3)
+    bcu%y(:,:,1) = bcvel(1,2,1)
+    bcv%y(:,:,1) = bcvel(1,2,2)
+    bcw%y(:,:,1) = bcvel(1,2,3)
+    bcu%z(:,:,0) = bcvel(0,3,1)
+    bcv%z(:,:,0) = bcvel(0,3,2)
+    bcw%z(:,:,0) = bcvel(0,3,3)
+    bcu%z(:,:,1) = bcvel(1,3,1)
+    bcv%z(:,:,1) = bcvel(1,3,2)
+    bcw%z(:,:,1) = bcvel(1,3,3)
+    !
+    bcp%x(:,:,0) = bcpre(0,1)
+    bcp%x(:,:,1) = bcpre(1,1)
+    bcp%y(:,:,0) = bcpre(0,2)
+    bcp%y(:,:,1) = bcpre(1,2)
+    bcp%z(:,:,0) = bcpre(0,3)
+    bcp%z(:,:,1) = bcpre(1,3)
+    !
+    bcs%x(:,:,0) = bcsgs(0,1)
+    bcs%x(:,:,1) = bcsgs(1,1)
+    bcs%y(:,:,0) = bcsgs(0,2)
+    bcs%y(:,:,1) = bcsgs(1,2)
+    bcs%z(:,:,0) = bcsgs(0,3)
+    bcs%z(:,:,1) = bcsgs(1,3)
+    !
+    ! find the index required for interpolation to the wall model height.
+    ! The stored index corresponds to the cells far from a wall, i.e., i2,j2,k2.
+    ! Remmeber to set h strightly higher than the first cell center, and lower 
+    ! than the last cell center (h=h-eps)
+    !
+    if(is_bound(0,1).and.lwm(0,1)/=0) then
+      i = 1
+      do while((i-0.5)*dl(1) < h)
+        i = i + 1
+      end do
+      i2 = i
+      i1 = i - 1
+      ind(0,1) = i2
+    end if
+    if(is_bound(1,1).and.lwm(1,1)/=0) then
+      i = n(1)
+      do while((n(1)-i+0.5)*dl(1) < h)
+        i = i - 1
+      end do
+      i2 = i
+      i1 = i + 1
+      ind(1,1) = i2
+    end if
+    if(is_bound(0,2).and.lwm(0,2)/=0) then
+      j = 1
+      do while((j-0.5)*dl(2) < h)
+        j = j + 1
+      end do
+      j2 = j
+      j1 = j - 1
+      ind(0,2) = j2
+    end if
+    if(is_bound(1,2).and.lwm(1,2)/=0) then
+      j = n(2)
+      do while((n(2)-j+0.5)*dl(2) < h)
+        j = j - 1
+      end do
+      j2 = j
+      j1 = j + 1
+      ind(1,2) = j2
+    end if
+    if(is_bound(0,3).and.lwm(0,3)/=0) then
+      k = 1
+      do while(zc(k) < h)
+        k = k + 1
+      end do
+      k2 = k
+      k1 = k - 1
+      ind(0,3) = k2
+    end if
+    if(is_bound(1,3).and.lwm(1,3)/=0) then
+      k = n(3)
+      do while(l(3)-zc(k) < h)
+        k = k - 1
+      end do
+      k2 = k
+      k1 = k + 1
+      ind(1,3) = k2
+    end if
+    !
+  end subroutine initbc
 end module mod_bound
