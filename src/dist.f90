@@ -4,7 +4,7 @@
 ! SPDX-License-Identifier: MIT
 !
 ! -
-module mod_geom
+module mod_dist
   use mod_precision
   use mod_param, only: big
   implicit none
@@ -91,4 +91,4 @@ module mod_geom
       end do
     end if
   end subroutine wall_dist
-end module mod_geom
+end module mod_dist

@@ -45,7 +45,7 @@ program cans
   use mod_initsolver     , only: initsolver,cmpt_rhs_b
   use mod_load           , only: load_all
   use mod_sgs            , only: cmpt_sgs
-  use mod_geom           , only: wall_dist
+  use mod_dist           , only: wall_dist
   use mod_mom            , only: bulk_forcing
   use mod_rk             , only: rk
   use mod_output         , only: out0d,gen_alias,out1d,out1d_chan,out1d_single_point_chan,out2d,out3d,write_log_output, &
