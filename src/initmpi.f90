@@ -26,16 +26,18 @@ module mod_initmpi
   public initmpi
   !@acc integer, parameter :: CUDECOMP_RANK_NULL = -1
   contains
-  subroutine initmpi(ng,dims,bc,lo,hi,n,n_x_fft,n_y_fft,lo_z,hi_z,n_z,nb,is_bound)
+  subroutine initmpi(ng,dims,sgstype,cbcvel,cbcpre,lo,hi,n,n_x_fft,n_y_fft,lo_z,hi_z,n_z,nb,is_bound)
     implicit none
     integer, intent(in   ), dimension(3) :: ng
     integer, intent(inout), dimension(2) :: dims
-    character(len=1), intent(in), dimension(0:1,3) :: bc
+    character(len=*), intent(in) :: sgstype
+    character(len=1), intent(in), dimension(0:1,3,3) :: cbcvel
+    character(len=1), intent(in), dimension(0:1,3) :: cbcpre
     integer, intent(out), dimension(3    ) :: lo,hi,n,n_x_fft,n_y_fft,lo_z,hi_z,n_z
     integer, intent(out), dimension(0:1,3) :: nb
     logical, intent(out), dimension(0:1,3) :: is_bound
     logical, dimension(3) :: periods
-    integer :: l,ipencil_t(2)
+    integer :: l,ipencil_t(2),nproc
 #if defined(_OPENACC)
     integer(acc_device_kind) ::dev_type
     integer :: local_comm,mydev,ndev
@@ -46,8 +48,27 @@ module mod_initmpi
     integer :: comm_cart
 #endif
     !
+#if !defined(_DECOMP_Y) && !defined(_DECOMP_Z)
+    ipencil=1
+#elif defined(_DECOMP_Y)
+    ipencil=2
+#elif defined(_DECOMP_Z)
+    ipencil=3
+#endif
+    ipencil_t(:) = pack([1,2,3],[1,2,3] /= ipencil)
+    is_bound(:,:) = .false.
+    !
+    call MPI_COMM_SIZE(MPI_COMM_WORLD,nproc,ierr)
+    if(sum(dims(:))==0.and.nproc>=2.and.trim(sgstype)=='smag') then
+      call calc_dims(cbcvel,sgstype,ipencil_t,nproc,dims)
+      if(myid == 0) then
+        print*, 'In auto-tuning mode......'
+        print*, 'p_row x p_col',dims(1),dims(2)
+      end if
+    end if
+    !
     periods(:) = .false.
-    where(bc(0,:)//bc(1,:) == 'PP') periods(:) = .true.
+    where(cbcpre(0,:)//cbcpre(1,:) == 'PP') periods(:) = .true.
     !
 #if defined(_OPENACC)
     call MPI_COMM_SPLIT_TYPE(MPI_COMM_WORLD,MPI_COMM_TYPE_SHARED,0,MPI_INFO_NULL,local_comm,ierr)
@@ -113,15 +134,6 @@ module mod_initmpi
     istat = cudecompGridDescCreate(ch,gd,conf,atune_conf)
 #endif
     call decomp_2d_init(ng(1),ng(2),ng(3),dims(1),dims(2),periods)
-#if !defined(_DECOMP_Y) && !defined(_DECOMP_Z)
-    ipencil=1
-#elif defined(_DECOMP_Y)
-    ipencil=2
-#elif defined(_DECOMP_Z)
-    ipencil=3
-#endif
-    ipencil_t(:) = pack([1,2,3],[1,2,3] /= ipencil)
-    is_bound(:,:) = .false.
 #if defined(_OPENACC)
     !
     ! fetch lo(:), hi(:), n(:) and n_z(:) from cuDecomp (should match the modified 2decomp one)
@@ -209,4 +221,35 @@ module mod_initmpi
     !exchange (n(1)+2)*(n(3)+2) cells in the y direction
     !exchange (n(1)+2)*(n(2)+2) cells in the z direction
   end subroutine makehalo
+  !
+  subroutine calc_dims(cbcvel,sgstype,ipencil_t,nproc,dims)
+    !
+    ! calculate dims(1:2) to ensure <= 2 subdomains between two opposite walls.
+    ! The splitting could be more general, but unnecessary for the current purpose.
+    !
+    implicit none
+    character(len=1), intent(in), dimension(0:1,3,3) :: cbcvel
+    character(len=*), intent(in) :: sgstype
+    integer, intent(in),dimension(2) :: ipencil_t(2)
+    integer, intent(in) :: nproc
+    integer, intent(inout), dimension(2) :: dims
+    character(len=2) :: bc01v
+    integer :: i,idir,ivel
+    !
+    do i = 1,2
+      idir = ipencil_t(i)
+      ivel = ipencil_t(i)
+      bc01v = cbcvel(0,idir,ivel)//cbcvel(1,idir,ivel)
+      if(bc01v == 'DD') then
+        if(mod(nproc,2) == 1) then
+          dims(i)   = 1
+          dims(3-i) = nproc
+        else
+          dims(i)   = 2
+          dims(3-i) = nproc/2
+        end if
+        exit
+      end if
+    end do
+  end subroutine calc_dims
 end module mod_initmpi

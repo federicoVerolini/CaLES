@@ -141,7 +141,6 @@ program cans
   integer :: i,j,k,kk
   logical :: is_done,kill
   character(len=1) :: ctmp
-  integer :: ncpu
   !
   call MPI_INIT(ierr)
   call MPI_COMM_RANK(MPI_COMM_WORLD,myid,ierr)
@@ -153,7 +152,7 @@ program cans
   ! initialize MPI/OpenMP
   !
   !$ call omp_set_num_threads(omp_get_max_threads())
-  call initmpi(ng,dims,cbcpre,lo,hi,n,n_x_fft,n_y_fft,lo_z,hi_z,n_z,nb,is_bound)
+  call initmpi(ng,dims,sgstype,cbcvel,cbcpre,lo,hi,n,n_x_fft,n_y_fft,lo_z,hi_z,n_z,nb,is_bound)
   twi = MPI_WTIME()
   savecounter = 0
   !
@@ -286,7 +285,7 @@ program cans
   !
   ! compute wall distance
   !
-  if(sgstype=='smag') then
+  if(trim(sgstype)=='smag') then
     allocate(dw(1:n(1),1:n(2),1:n(3)))
     call wall_dist(cbcvel,n,is_bound,l,dl,zc,dzc,dw)
   end if

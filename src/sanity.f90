@@ -96,7 +96,7 @@ module mod_sanity
       print*, 'ERROR: 1 <= dims(:) <= [itot,jtot], or [itot,ktot], or [jtot ktot] depending on the decomposition.'
     passed = passed.and.passed_loc
     !
-    if(sgstype=='smag') then
+    if(trim(sgstype)=='smag') then
       passed_loc = .true.
       do i = 1,2
         idir = ii(i)
