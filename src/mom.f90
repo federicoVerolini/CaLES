@@ -892,10 +892,10 @@ module mod_mom
           ww_km  = 0.25*(w_ccc+w_ccm)*(w_ccc+w_ccm)
           !
           dwdtd_xy_s =  &
-                          (visc_ip*(dwdx_ip)-visc_im*(dwdx))*dxi + & ! d(dwdx+dudz)/dx
-                          (visc_jp*(dwdy_jp)-visc_jm*(dwdy))*dyi     ! d(dwdy+dvdz)/dy
+                          (visc_ip*(dwdx_ip)-visc_im*(dwdx_im))*dxi + & ! d(dwdx+dudz)/dx
+                          (visc_jp*(dwdy_jp)-visc_jm*(dwdy_jm))*dyi     ! d(dwdy+dvdz)/dy
           dwdtd_z_s =   &
-                          (visc_kp*(dwdz_kp)-visc_km*(dwdz))*dzci(k) ! d(dwdz+dwdz)/dz
+                          (visc_kp*(dwdz_kp)-visc_km*(dwdz_km))*dzci(k) ! d(dwdz+dwdz)/dz
           ! dwdtd_xy_s =  &
           !                 (visc_ip*(dwdx_ip+dudz_ip)-visc_im*(dwdx_im+dudz_im))*dxi + & ! d(dwdx+dudz)/dx
           !                 (visc_jp*(dwdy_jp+dvdz_jp)-visc_jm*(dwdy_jm+dvdz_jm))*dyi     ! d(dwdy+dvdz)/dy
