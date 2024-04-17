@@ -29,7 +29,7 @@ real(rp), parameter :: kap_log = 0.41_rp
 real(rp), parameter :: b_log   = 5.2_rp
 ! (0.41, 5.2), negligibly better than (0.4187, 5.4494) used 
 ! in ANSYS Fluent Theory Guide
-real(rp), parameter :: c_smag  = 0.05_rp
+real(rp), parameter :: c_smag  = 0.11_rp
 !
 ! variables to be determined from the input file
 !
