@@ -119,7 +119,7 @@ program cans
   real(rp), allocatable, dimension(:,:) :: lambdaxyu,lambdaxyv,lambdaxyw,lambdaxy
   real(rp), allocatable, dimension(:) :: au,av,aw,bu,bv,bw,cu,cv,cw,aa,bb,cc
   real(rp) :: normfftu,normfftv,normfftw
-  type(rhs_bound) :: rhsbu,rhsbv,rhsbw ! used by implicit treatment
+  type(rhs_bound) :: rhsbu,rhsbv,rhsbw ! implicit scheme
   real(rp), allocatable, dimension(:,:,:) :: rhsbx,rhsby,rhsbz
 #endif
   real(rp) :: dt,dti,dtmax,time,dtrk,dtrki,divtot,divmax
@@ -183,7 +183,7 @@ program cans
   allocate(rhsbp%x(n(2),n(3),0:1), &
            rhsbp%y(n(1),n(3),0:1), &
            rhsbp%z(n(1),n(2),0:1))
-  ! halo cells included in bcu/v/w
+  ! halo cells necessary
   allocate(bcu%x(0:n(2)+1,0:n(3)+1,0:1), &
            bcv%x(0:n(2)+1,0:n(3)+1,0:1), &
            bcw%x(0:n(2)+1,0:n(3)+1,0:1), &
@@ -360,7 +360,7 @@ program cans
   end if
   !
   ! write(ctmp,'(i1)') myid
-  ! open(55,file=trim(datadir)//'debug'//trim(ctmp),status='replace')
+  ! open(55,file=trim(datadir)//'debug'//trim(ctmp),status='replace',access='stream')
   !$acc enter data copyin(u,v,w,p) create(pp)
   call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm,.false.,u,v,w)
   call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
@@ -507,20 +507,21 @@ program cans
     !
     ! check simulation stopping criteria
     !
-    if(stop_type(1)) then ! maximum number of time steps reached
+    if(stop_type(1)) then ! number of time steps
       if(istep >= nstep   ) is_done = is_done.or..true.
     end if
-    if(stop_type(2)) then ! maximum simulation time reached
+    if(stop_type(2)) then ! simulation time
       if(time  >= time_max) is_done = is_done.or..true.
     end if
-    if(stop_type(3)) then ! maximum wall-clock time reached
+    if(stop_type(3)) then ! wall-clock time
       tw = (MPI_WTIME()-twi)/3600.
       if(tw    >= tw_max  ) is_done = is_done.or..true.
     end if
-    if(mod(istep,icheck) == 0) then
+    if(mod(istep,icheck) == 0) then 
+      ! set icheck=1 to let restart=.not.restart
       if(myid == 0) print*, 'Checking stability and divergence...'
       call chkdt(n,dl,dzci,dzfi,visc,visct,u,v,w,dtmax)
-      dt  = min(cfl*dtmax,dtmin)
+      dt = min(cfl*dtmax,dtmin)
       if(myid == 0) print*, 'dtmax = ', dtmax, 'dt = ',dt
       if(dtmax < small) then
         if(myid == 0) print*, 'ERROR: time step is too small.'
