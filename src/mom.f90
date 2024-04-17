@@ -637,8 +637,8 @@ module mod_mom
   subroutine mom_xyz_ad(nx,ny,nz,dxi,dyi,dzci,dzfi,visc,u,v,w,visct,dudt,dvdt,dwdt,dudtd,dvdtd,dwdtd)
     !
     ! lump all r.h.s. of momentum terms (excluding pressure) into a single fast kernel
-    ! interpolation of eddy viscosity tested via visct = x+y+z
-    ! extra cross-derivatives tested via u,v,w = x*y*z
+    ! interpolation of eddy viscosity, tested by visct = x+y+z
+    ! extra cross-derivatives, tested by u,v,w = x*y*z
     !
     integer , intent(in   ) :: nx,ny,nz
     real(rp), intent(in   ) :: dxi,dyi
