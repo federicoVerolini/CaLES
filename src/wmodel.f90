@@ -225,17 +225,17 @@ module mod_wmodel
     end if
   end subroutine cmpt_bcuvw
   !
-  subroutine wallmodel(wtype,uh,vh,h,l1d,visc,tauw)
+  subroutine wallmodel(mtype,uh,vh,h,l1d,visc,tauw)
     implicit none
     integer, parameter :: WM_LAM = -1, &
                           WM_LOG =  1
-    integer, intent(in)  :: wtype
+    integer, intent(in)  :: mtype
     real(rp), intent(in) :: uh,vh,h,l1d,visc
     real(rp), intent(out), dimension(2) :: tauw
     real(rp) :: upar,utau,f,fp,conv,tauw_old,tauw_tot
     real(rp) :: umax,del
     !
-    select case(wtype)
+    select case(mtype)
     case(WM_LOG)
       upar = sqrt(uh*uh+vh*vh)
       utau = sqrt(upar/h*visc)
