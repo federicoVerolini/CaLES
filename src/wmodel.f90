@@ -5,15 +5,17 @@
 !
 ! -
 module mod_wmodel
+  use, intrinsic :: ieee_arithmetic, only: is_nan => ieee_is_nan,is_finite => ieee_is_finite
+  use mpi
   use mod_precision
   use mod_typedef, only: cond_bound
   use mod_param, only: kap_log,b_log,eps
   implicit none
   private
-  public cmpt_bcuvw
+  public updt_wallmodelbc
   contains
     !
-  subroutine cmpt_bcuvw(n,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind,u,v,w,bcu,bcv,bcw)
+  subroutine updt_wallmodelbc(n,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind,u,v,w,bcu,bcv,bcw)
     !
     ! bcu,bcv,bcw determined via wall model
     !
@@ -30,7 +32,7 @@ module mod_wmodel
     real(rp), intent(in) :: visc,h
     real(rp), intent(in), dimension(0:,0:,0:) :: u,v,w
     type(cond_bound), intent(inout) :: bcu,bcv,bcw
-    real(rp) :: visci,wei,uh,vh,wh,u1,u2,v1,v2,w1,w2,tauw(2),coef
+    real(rp) :: wei,coef,uh,vh,wh,u1,u2,v1,v2,w1,w2,tauw(2),visci
     integer  :: i,j,k,i1,i2,j1,j2,k1,k2
     !
     visci = 1._rp/visc
@@ -129,6 +131,11 @@ module mod_wmodel
           wh = (1._rp-coef)*w1 + coef*w2
           call wallmodel(lwm(0,2),uh,wh,h,l(2),visc,tauw)
           bcw%y(i,k,0) = visci*tauw(2)
+          ! if(k==0.and.i==1) then
+          !   write(*,*) u(i-1,j1,k), u(i,j1,k), u(i-1,j1,k+1), u(i,j1,k+1)
+          !   call MPI_FINALIZE(ierr)
+          !   stop
+          ! end if
         end do
       end do
     end if
@@ -223,9 +230,23 @@ module mod_wmodel
         end do
       end do
     end if
-  end subroutine cmpt_bcuvw
+  end subroutine updt_wallmodelbc
   !
   subroutine wallmodel(mtype,uh,vh,h,l1d,visc,tauw)
+    !
+    ! Newton-Raphson, 3~7 iters when initialized with an assumed linear profile
+    ! between the wall and the wall model height. It is a bad idea to initialize
+    ! with an assumed linear profile below the first cell center, because its
+    ! slope is quite uncertain. The uncertainty is from the erroneous velocity
+    ! at the first cell center, which could make the computed gradient very
+    ! different from the converged value. In contrast, the velocity at the wall
+    ! model height is more reliable. We do not save tauw_tot from the previous
+    ! step, so those values are not directly available. At zero velocity, utau
+    ! is visc/h*exp(-kap_log*b_log). Using abs is necessary to avoid negative
+    ! values of utau for robustness. Note that arrays (u/v/w) are initialized as
+    ! zero, so the values at ghost points are initialized as zero, which makes
+    ! a reasonable guess.
+    !
     implicit none
     integer, parameter :: WM_LAM = -1, &
                           WM_LOG =  1
@@ -239,25 +260,25 @@ module mod_wmodel
     case(WM_LOG)
       upar = sqrt(uh*uh+vh*vh)
       utau = sqrt(upar/h*visc)
+      utau = max(utau,visc/h*exp(-kap_log*b_log))
       conv = 1._rp
       do while(conv > 1.e-4)
-        ! Newton-Raphson, ~6 iterations
         tauw_old = utau*utau
         f  = upar/utau - 1._rp/kap_log*log(h*utau/visc) - b_log
         fp = -1._rp/utau*(upar/utau + 1._rp/kap_log)
-        utau = abs(utau - f/fp) ! robust
+        utau = abs(utau - f/fp)
         tauw_tot = utau*utau
         conv = abs(tauw_tot-tauw_old)/tauw_old
       end do
-      tauw(1)  = tauw_tot*uh/upar
-      tauw(2)  = tauw_tot*vh/upar
+      tauw(1) = tauw_tot*uh/(upar+eps)
+      tauw(2) = tauw_tot*vh/(upar+eps)
     case(WM_LAM)
       upar = sqrt(uh*uh+vh*vh)
       del  = 0.5_rp*l1d
       umax = upar/(h/del*(2._rp-h/del))
       tauw_tot = 2._rp/del*umax*visc
-      tauw(1)  = tauw_tot*uh/upar
-      tauw(2)  = tauw_tot*vh/upar
+      tauw(1) = tauw_tot*uh/(upar+eps)
+      tauw(2) = tauw_tot*vh/(upar+eps)
     end select
     !
   end subroutine wallmodel

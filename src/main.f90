@@ -131,7 +131,7 @@ program cans
   real(rp), dimension(3) :: dpdl
   real(rp), dimension(42) :: var
 #if defined(_TIMING)
-  real(rp) :: dt12,dt12av,dt12min,dt12max
+  real(rp) :: dt12,dt12av,dt12min,dt12max,dtt(10),dttav,dttmin,dttmax
 #endif
   real(rp) :: twi,tw
   integer  :: savecounter
@@ -139,8 +139,9 @@ program cans
   character(len=4  ) :: chkptnum
   character(len=100) :: filename
   integer :: i,j,k,kk
-  logical :: is_done,kill
+  logical :: is_done,kill,is_updt_wm
   character(len=1) :: ctmp
+  real(rp) :: tmp
   !
   call MPI_INIT(ierr)
   call MPI_COMM_RANK(MPI_COMM_WORLD,myid,ierr)
@@ -362,7 +363,8 @@ program cans
   ! write(ctmp,'(i1)') myid
   ! open(55,file=trim(datadir)//'debug'//trim(ctmp),status='replace',access='stream')
   !$acc enter data copyin(u,v,w,p) create(pp)
-  call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm,.false.,u,v,w)
+  is_updt_wm = .true.
+  call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm,is_updt_wm,.false.,u,v,w)
   call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
   call cmpt_sgs(sgstype,cbcvel,n,is_bound,l,dl,zc,dzc,dzf,visc,u,v,w,visct)
   call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,visct) ! corner ghost cells included
@@ -394,6 +396,7 @@ program cans
 #if defined(_TIMING)
     !$acc wait(1)
     dt12 = MPI_WTIME()
+    dtt = 0.
 #endif
     istep = istep + 1
     time = time + dt
@@ -446,7 +449,7 @@ program cans
       rhsbz(:,:,0:1) = rhsbv%z(:,:,0:1)*alpha
       !$acc end kernels
       !$OMP END PARALLEL WORKSHARE
-      call updt_rhs_b(['c','f','c'],cbcvel(:,:,2),n,is_bound,rhsbx,rhsby,rhsbz,v) !additional rhs_b to v
+      call updt_rhs_b(['c','f','c'],cbcvel(:,:,2),n,is_bound,rhsbx,rhsby,rhsbz,v) ! additional rhs_b to v
       !$acc kernels default(present) async(1)
       !$OMP PARALLEL WORKSHARE
       aa(:) = av(:)*alpha
@@ -490,13 +493,19 @@ program cans
 #endif
 #endif
       dpdl(:) = dpdl(:) + f(:) ! dt multiplied
-      call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm,.false.,u,v,w)
+      tmp = MPI_WTIME()
+      is_updt_wm = .false.
+      call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm,is_updt_wm,.false.,u,v,w)
+      dtt(1) = dtt(1)+(MPI_WTIME()-tmp)
       call fillps(n,dli,dzfi,dtrki,u,v,w,pp)
       call updt_rhs_b(['c','c','c'],cbcpre,n,is_bound,rhsbp%x,rhsbp%y,rhsbp%z,pp)
       call solver(n,ng,arrplanp,normfftp,lambdaxyp,ap,bp,cp,cbcpre,['c','c','c'],pp)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,pp)
       call correc(n,dli,dzci,dtrk,pp,u,v,w)
-      call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm,.true.,u,v,w)
+      tmp = MPI_WTIME()
+      is_updt_wm = (irk==3)
+      call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm,is_updt_wm,.true.,u,v,w)
+      dtt(1) = dtt(1)+(MPI_WTIME()-tmp)
       call updatep(n,dli,dzci,dzfi,alpha,pp,p)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
       call cmpt_sgs(sgstype,cbcvel,n,is_bound,l,dl,zc,dzc,dzf,visc,u,v,w,visct)
@@ -634,6 +643,12 @@ program cans
       call MPI_ALLREDUCE(dt12,dt12max,1,MPI_REAL_RP,MPI_MAX,MPI_COMM_WORLD,ierr)
       if(myid == 0) print*, 'Avrg, min & max elapsed time: '
       if(myid == 0) print*, dt12av/(1.*product(dims)),dt12min,dt12max
+
+      call MPI_ALLREDUCE(dtt(1),dttav ,1,MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(dtt(1),dttmin,1,MPI_REAL_RP,MPI_MIN,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(dtt(1),dttmax,1,MPI_REAL_RP,MPI_MAX,MPI_COMM_WORLD,ierr)
+      if(myid == 0) print*, 'Avrg, min & max bound time: '
+      if(myid == 0) print*, dttav/(1.*product(dims)),dttmin,dttmax
 #endif
   end do
   !

@@ -24,7 +24,7 @@ module mod_sanity
 #else
   use mod_solver_gpu, only: solver => solver_gpu
 #endif
-  use mod_wmodel    , only: cmpt_bcuvw,cmpt_bcp
+  use mod_wmodel    , only: updt_wallmodelbc
   use mod_typedef   , only: cond_bound
   use mod_precision
   implicit none
@@ -364,7 +364,7 @@ module mod_sanity
 !     dl  = dli**(-1)
 !     dt  = acos(-1.) ! value is irrelevant
 !     dti = dt**(-1)
-!     call cmpt_bcuvw(cbcvel,n,bcvel,is_bound,u,v,w,bcu,bcv,bcw) !may call several times in this subroutine 
+!     call updt_wallmodelbc(cbcvel,n,bcvel,is_bound,u,v,w,bcu,bcv,bcw) !may call several times in this subroutine 
 !     call cmpt_bcp  (cbcpre,n,bcpre,is_bound,p    ,bcp) !may call several times in this subroutine
 !     call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,.false.,dl,dzc,dzf,u,v,w)
 !     call fillps(n,dli,dzfi,dti,u,v,w,p)

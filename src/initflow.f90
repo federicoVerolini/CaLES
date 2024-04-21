@@ -135,7 +135,7 @@ module mod_initflow
       lref  = l(3)/2.
       if(trim(inivel) /= 'pdc') lref = 2.*lref
       if(is_wallturb) then ! turbulent flow
-        uref  = (bforce(1)*lref)**(0.5) ! utau = sqrt(-dpdx*h)
+        uref  = (bforce(1)*lref)**(0.5)
         retau = uref*lref/visc
         reb   = (retau/.09)**(1./.88)
         ubulk = reb*visc/(2*lref)

@@ -9,12 +9,12 @@ module mod_bound
   use mod_common_mpi, only: ierr,halo,ipencil_axis
   use mod_precision
   use mod_typedef   , only: cond_bound
-  use mod_wmodel    , only: cmpt_bcuvw
+  use mod_wmodel    , only: updt_wallmodelbc
   implicit none
   private
   public boundp,bounduvw,updt_rhs_b,initbc
   contains
-  subroutine bounduvw(cbc,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind,is_correc,u,v,w)
+  subroutine bounduvw(cbc,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind,is_updt_wm,is_correc,u,v,w)
     !
     ! imposes velocity boundary conditions
     !
@@ -28,7 +28,7 @@ module mod_bound
     real(rp), intent(in), dimension(3) :: l,dl
     real(rp), intent(in), dimension(0:) :: zc,zf,dzc,dzf
     real(rp), intent(in) :: visc,h
-    logical , intent(in) :: is_correc
+    logical , intent(in) :: is_updt_wm,is_correc
     real(rp), intent(inout), dimension(0:,0:,0:) :: u,v,w
     character(len=1), dimension(0:1,3,3) :: cbc_w
     logical :: impose_norm_bc
@@ -96,20 +96,27 @@ module mod_bound
       end if
     end if
     !
-    ! Neumann bc must be zero at some locations to let the ghost points have the same 
+    ! Neumann bc must be zero at some locations to let the ghost points have the same
     ! values from the bc implementations of different walls. For example, w(1,5,4) 
     ! must be set as zero by both the upper wall (non-penetrating) and the front wall 
     ! (Neumann). Wall models can guarantee this at those locations, since they do 
     ! produce a zero gradient in the direction where the velocity component is zero.
     ! 
-    ! bcu/v/w have correct values for all the loop locations in cmpt_bcuvw.
+    ! bcu/v/w have correct values for all the loop locations in updt_wallmodelbc.
     ! The only difference is that for square duct/six-wall cases, uh,vh and wh may 
-    ! have incorrect values at the end locations. However, it is only the zero-value 
-    ! component that is essentially useful, which guarantees zero-gradient bc there, 
-    ! leading to correct values at the end ghost points. For two-wall channel,
+    ! have incorrect values at the end locations. However, it is only the zero-value
+    ! component that is essentially used, which guarantees zero-gradient bc there, 
+    ! leading to correct values at the end ghost points. For two-wall channels,
     ! uh,vh and wh do have correct values at the end locations.
     !
-    call cmpt_bcuvw(n,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind,u,v,w,bcu,bcv,bcw)
+    ! updt_wallmodelbc, ~25% bounduvw time is saved, and ~1% total time is saved,
+    ! since bounduvw time is ~4% of the total time. The computational cost of
+    ! the log-law wall model is negligible.
+    ! 
+    !
+    if(is_updt_wm) then
+      call updt_wallmodelbc(n,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind,u,v,w,bcu,bcv,bcw)
+    end if
     !
     if(is_bound(0,1).and.lwm(0,1)/=0) then
       call set_bc(cbc(0,1,2),0,1,nh,.true. ,bcv%x,dl(1),v)
@@ -136,8 +143,9 @@ module mod_bound
       call set_bc(cbc(1,3,2),1,3,nh,.true. ,bcv%z,dzc(n(3)),v)
     end if
     !
-    !for square duct/six-wall cases, adding a loop for the end locations if all values of uh,vh and wh
-    !need to be correct at the ending locations. This need should never arise. 
+    ! for square duct/six-wall cases, further add a loop for the end locations 
+    ! if all values of uh,vh and wh need to be correct at the end locations. 
+    ! This need should never arise. 
     !
   end subroutine bounduvw
   !
@@ -644,7 +652,7 @@ module mod_bound
     integer :: i,j,k,i1,i2,j1,j2,k1,k2
     !
     ! unnecessary to consider wall model here, because
-    ! bcu,bcv,bcw are overwritten by cmpt_bcuvw before set_bc, and that
+    ! bcu,bcv,bcw are overwritten by updt_wallmodelbc before set_bc, and that
     ! imp3d never used for WMLES. Only imp1d and explicit can be applied.
     !
     bcu%x(:,:,0) = bcvel(0,1,1)
