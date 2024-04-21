@@ -494,7 +494,7 @@ program cans
 #endif
       dpdl(:) = dpdl(:) + f(:) ! dt multiplied
       tmp = MPI_WTIME()
-      is_updt_wm = .false.
+      is_updt_wm = .true.
       call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm,is_updt_wm,.false.,u,v,w)
       dtt(1) = dtt(1)+(MPI_WTIME()-tmp)
       call fillps(n,dli,dzfi,dtrki,u,v,w,pp)
@@ -503,7 +503,8 @@ program cans
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,pp)
       call correc(n,dli,dzci,dtrk,pp,u,v,w)
       tmp = MPI_WTIME()
-      is_updt_wm = (irk==3)
+      ! is_updt_wm = (irk==3)
+      is_updt_wm = .true.
       call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm,is_updt_wm,.true.,u,v,w)
       dtt(1) = dtt(1)+(MPI_WTIME()-tmp)
       call updatep(n,dli,dzci,dzfi,alpha,pp,p)
