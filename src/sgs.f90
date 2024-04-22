@@ -69,8 +69,8 @@ module mod_sgs
       del = (dl(1)*dl(2)*dzf(k))**(1./3.)
       do j=1,n(2)
         do i=1,n(1)
-          fd = 1.-exp(-dw_plus(i,j,k)/25.)
-          visct(i,j,k) = (c_smag*del*fd)**2*sqrt(2.*str(i,j,k))
+          fd = 1._rp-exp(-dw_plus(i,j,k)/25._rp)
+          visct(i,j,k) = (c_smag*del*fd)**2*sqrt(2._rp*str(i,j,k))
         end do
       end do
     end do
