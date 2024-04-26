@@ -348,8 +348,8 @@ program cans
   !                         nb,is_bound,cbcvel,cbcpre,bcvel,bcpre)
 #endif
   !
-  write(ctmp,'(i1)') myid
-  open(55,file=trim(datadir)//'debug'//trim(ctmp),status='replace')
+  ! write(ctmp,'(i1)') myid
+  ! open(55,file=trim(datadir)//'debug'//trim(ctmp),status='replace')
   if(.not.restart) then
     istep = 0
     time = 0.
