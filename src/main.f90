@@ -396,7 +396,6 @@ program cans
 #if defined(_TIMING)
     !$acc wait(1)
     dt12 = MPI_WTIME()
-    dtt = 0.
 #endif
     istep = istep + 1
     time = time + dt
@@ -496,7 +495,6 @@ program cans
       tmp = MPI_WTIME()
       is_updt_wm = .true.
       call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm,is_updt_wm,.false.,u,v,w)
-      dtt(1) = dtt(1)+(MPI_WTIME()-tmp)
       call fillps(n,dli,dzfi,dtrki,u,v,w,pp)
       call updt_rhs_b(['c','c','c'],cbcpre,n,is_bound,rhsbp%x,rhsbp%y,rhsbp%z,pp)
       call solver(n,ng,arrplanp,normfftp,lambdaxyp,ap,bp,cp,cbcpre,['c','c','c'],pp)
@@ -506,7 +504,6 @@ program cans
       ! is_updt_wm = (irk==3)
       is_updt_wm = .true.
       call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm,is_updt_wm,.true.,u,v,w)
-      dtt(1) = dtt(1)+(MPI_WTIME()-tmp)
       call updatep(n,dli,dzci,dzfi,alpha,pp,p)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
       call cmpt_sgs(sgstype,cbcvel,n,is_bound,l,dl,zc,dzc,dzf,visc,u,v,w,visct)
@@ -644,12 +641,6 @@ program cans
       call MPI_ALLREDUCE(dt12,dt12max,1,MPI_REAL_RP,MPI_MAX,MPI_COMM_WORLD,ierr)
       if(myid == 0) print*, 'Avrg, min & max elapsed time: '
       if(myid == 0) print*, dt12av/(1.*product(dims)),dt12min,dt12max
-
-      call MPI_ALLREDUCE(dtt(1),dttav ,1,MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(dtt(1),dttmin,1,MPI_REAL_RP,MPI_MIN,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(dtt(1),dttmax,1,MPI_REAL_RP,MPI_MAX,MPI_COMM_WORLD,ierr)
-      if(myid == 0) print*, 'Avrg, min & max bound time: '
-      if(myid == 0) print*, dttav/(1.*product(dims)),dttmin,dttmax
 #endif
   end do
   !
