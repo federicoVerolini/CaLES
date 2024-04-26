@@ -131,11 +131,6 @@ module mod_wmodel
           wh = (1._rp-coef)*w1 + coef*w2
           call wallmodel(lwm(0,2),uh,wh,h,l(2),visc,tauw)
           bcw%y(i,k,0) = visci*tauw(2)
-          ! if(k==0.and.i==1) then
-          !   write(*,*) u(i-1,j1,k), u(i,j1,k), u(i-1,j1,k+1), u(i,j1,k+1)
-          !   call MPI_FINALIZE(ierr)
-          !   stop
-          ! end if
         end do
       end do
     end if
@@ -239,13 +234,17 @@ module mod_wmodel
     ! with an assumed linear profile below the first cell center, because its
     ! slope is quite uncertain. The uncertainty is from the erroneous velocity
     ! at the first cell center, which could make the computed gradient very
-    ! different from the converged value. In contrast, the velocity at the wall
-    ! model height is more reliable. We do not save tauw_tot from the previous
+    ! different from the converged value. We do not save tauw_tot from previous
     ! step, so those values are not directly available. At zero velocity, utau
-    ! is visc/h*exp(-kap_log*b_log). Using abs is necessary to avoid negative
-    ! values of utau for robustness. Note that arrays (u/v/w) are initialized as
-    ! zero, so the values at ghost points are initialized as zero, which makes
-    ! a reasonable guess.
+    ! is visc/h*exp(-kap_log*b_log). It is necessary to use abs to avoid negative
+    ! values of utau for robustness. Note that arrays (u/v/w) are initialized
+    ! as zero (ghost points), which makes a reasonable guess at end points.
+    ! For a channel, it is good to use the computed utau available at the nearest
+    ! grid point, which helps reduce ~50% of the iterations. However, several "if"
+    ! statements have to be introduced for special points (square duct/cavity),
+    ! which is cubersome, considering that the current purpose is to develop
+    ! machine learning wall models, which do not involve iterations, and that
+    ! the simple log-law wall model accounts less than 1% of the total time.
     !
     implicit none
     integer, parameter :: WM_LAM = -1, &
@@ -255,6 +254,8 @@ module mod_wmodel
     real(rp), intent(out), dimension(2) :: tauw
     real(rp) :: upar,utau,f,fp,conv,tauw_old,tauw_tot
     real(rp) :: umax,del
+    !
+    integer :: i,ierr
     !
     select case(mtype)
     case(WM_LOG)

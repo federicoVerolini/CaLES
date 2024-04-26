@@ -12,8 +12,8 @@ override LIBS += -L$(NVHPC_HOME)/cuda/lib64 -lnvToolsExt
 endif
 
 ifneq ($(strip $(GPU)),1)
-override LIBS += -lfftw3
 
+override LIBS += -lfftw3
 ifeq ($(strip $(OPENMP)),1)
 override LIBS += -lfftw3_threads
 endif

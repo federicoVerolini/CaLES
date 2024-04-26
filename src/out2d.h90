@@ -35,6 +35,9 @@
   call write_visu_2d(datadir,'w_slice_fld_'//fldnum//'.bin','log_visu_2d_slice_1.out','Velocity_Z', &
                      2,ng(2)/2,ng,time,istep, &
                      w(1:n(1),1:n(2),1:n(3)))
-  call write_visu_2d(datadir,'p_slice_fld_'//fldnum//'.bin','log_visu_2d_slice_1.out','Pressure_P', &
+  call write_visu_2d(datadir,'p_slice_fld_'//fldnum//'.bin','log_visu_2d_slice_1.out','Pressure', &
                      2,ng(2)/2,ng,time,istep, &
                      p(1:n(1),1:n(2),1:n(3)))
+  call write_visu_2d(datadir,'visct_slice_fld_'//fldnum//'.bin','log_visu_2d_slice_1.out','Viscosity', &
+                     2,ng(2)/2,ng,time,istep, &
+                     visct(1:n(1),1:n(2),1:n(3)))

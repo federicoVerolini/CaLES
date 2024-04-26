@@ -251,10 +251,10 @@ module mod_output
     character(len=100) :: cfmt
     integer :: iunit
     !
-    write(cfmt, '(A)') '(A,A,A,9i5,E16.7e3,i7)'
+    write(cfmt, '(A)') '(A30,A15,9I5,E16.7E3,I7)'
     if (myid  ==  0) then
       open(newunit=iunit,file=fname,position='append')
-      write(iunit,trim(cfmt)) trim(fname_fld),' ',trim(varname),nmin,nmax,nskip,time,istep
+      write(iunit,trim(cfmt)) trim(fname_fld),trim(varname),nmin,nmax,nskip,time,istep
       close(iunit)
     end if
   end subroutine write_log_output
@@ -507,14 +507,14 @@ module mod_output
     end select
   end subroutine out2d_duct
   !
-  subroutine out1d_single_point_chan(fname,ng,lo,hi,idir,l,dl,dzc_g,dzf_g,zc_g,zf_g,u,v,w,p)
+  subroutine out1d_single_point_chan(fname,ng,lo,hi,idir,l,dl,dzc_g,dzf_g,zc_g,zf_g,u,v,w,p,visct)
     implicit none
     character(len=*), intent(in) :: fname
     integer , intent(in), dimension(3) :: ng,lo,hi
     integer , intent(in) :: idir
     real(rp), intent(in), dimension(3) :: l,dl
     real(rp), intent(in), dimension(0:) :: dzc_g,dzf_g,zc_g,zf_g
-    real(rp), intent(in), dimension(lo(1)-1:,lo(2)-1:,lo(3)-1:) :: u,v,w,p
+    real(rp), intent(in), dimension(lo(1)-1:,lo(2)-1:,lo(3)-1:) :: u,v,w,p,visct
     real(dp), allocatable, dimension(:,:) :: buf
     real(dp) :: tmp_x,tmp_y,tmp_z
     integer :: i,j,k,q
@@ -526,6 +526,8 @@ module mod_output
                 buf11,buf12,buf13,buf14,buf15,buf16,buf17,buf18,buf19,buf20, &
                 buf21,buf22,buf23,buf24,buf25,buf26,buf27,buf28,buf29,buf30, &
                 buf31,buf32,buf33,buf34,buf35,buf36,buf37,buf38
+    real(dp) :: dudx_ip,dudx_im,dvdy_jp,dvdy_jm,dwdz_kp,dwdz_km,dudz,dwdx
+    real(dp) :: s_ccc,s_pcc,s_cpc,s_ccp,s_pcp
     real(dp) :: div
     !
     nn = ng(idir)
@@ -561,6 +563,12 @@ module mod_output
         buf19 = 0._rp
         buf20 = 0._rp
         buf21 = 0._rp
+        buf22 = 0._rp
+        buf23 = 0._rp
+        buf24 = 0._rp
+        buf25 = 0._rp
+        buf26 = 0._rp
+        buf27 = 0._rp
         !$acc loop vector collapse(2)
         do j=lo(2),hi(2)
           do i=lo(1),hi(1)
@@ -607,6 +615,34 @@ module mod_output
             buf19 = buf19 + tmp_x**2
             buf20 = buf20 + tmp_y**2
             buf21 = buf21 + tmp_z**2
+            !
+            ! modelled (subgrid) stress
+            ! stored at the same locations as resolved <uu>, <vv>, <ww>, <uw>
+            !
+            s_ccc = visct(i  ,j  ,k  )
+            s_pcc = visct(i+1,j  ,k  )
+            s_cpc = visct(i  ,j+1,k  )
+            s_ccp = visct(i  ,j  ,k+1)
+            s_pcp = visct(i+1,j  ,k+1)
+            !
+            dudx_ip = (u(i+1,j  ,k  )-u(i  ,j  ,k  ))/dl(1)
+            dudx_im = (u(i  ,j  ,k  )-u(i-1,j  ,k  ))/dl(1)
+            dvdy_jp = (v(i  ,j+1,k  )-v(i  ,j  ,k  ))/dl(2)
+            dvdy_jm = (v(i  ,j  ,k  )-v(i  ,j-1,k  ))/dl(2)
+            dwdz_kp = (w(i  ,j  ,k+1)-w(i  ,j  ,k  ))/dzf_g(k+1)
+            dwdz_km = (w(i  ,j  ,k  )-w(i  ,j  ,k-1))/dzf_g(k  )
+            dudz    = (u(i  ,j  ,k+1)-u(i  ,j  ,k  ))/dzc_g(k  )
+            dwdx    = (w(i+1,j  ,k  )-w(i  ,j  ,k  ))/dl(1)
+            !
+            buf22 = buf22 - 0.5_rp*(s_pcc*(dudx_ip+dudx_ip) + s_ccc*(dudx_im+dudx_im))
+            buf23 = buf23 - 0.5_rp*(s_cpc*(dvdy_jp+dvdy_jp) + s_ccc*(dvdy_jm+dvdy_jm))
+            buf24 = buf24 - 0.5_rp*(s_ccp*(dwdz_kp+dwdz_kp) + s_ccc*(dwdz_km+dwdz_km))
+            buf25 = buf25 - 0.25_rp*(s_ccc+s_pcc+s_ccp+s_pcp)*(dudz+dwdx) ! cell edge
+            buf26 = buf26 + visct(i,j,k)
+            !
+            ! viscous shear stress, uw
+            !
+            buf27 = buf27 + dudz ! cell edge
           end do
         end do
         buf( 1,k) = buf01*grid_area_ratio
@@ -630,11 +666,17 @@ module mod_output
         buf(19,k) = buf19*grid_area_ratio
         buf(20,k) = buf20*grid_area_ratio
         buf(21,k) = buf21*grid_area_ratio
+        buf(22,k) = buf22*grid_area_ratio
+        buf(23,k) = buf23*grid_area_ratio
+        buf(24,k) = buf24*grid_area_ratio
+        buf(25,k) = buf25*grid_area_ratio
+        buf(26,k) = buf26*grid_area_ratio
+        buf(27,k) = buf27*grid_area_ratio
       end do
       !$acc update self(buf)
       call mpi_allreduce(MPI_IN_PLACE,buf(1,1),size(buf),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
       if(myid == 0) then
-        nvars = 21
+        nvars = 27
         write(cfmt,'(A)') '(*(es24.16e3,1x))'
         open(newunit=iunit,file=fname//'.out')
         do k=1,nn

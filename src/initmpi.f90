@@ -59,7 +59,7 @@ module mod_initmpi
     is_bound(:,:) = .false.
     !
     call MPI_COMM_SIZE(MPI_COMM_WORLD,nproc,ierr)
-    if(sum(dims(:))==0.and.nproc>=2.and.trim(sgstype)=='smag') then
+    if(product(dims)==0.and.nproc>=2.and.trim(sgstype)=='smag') then
       call calc_dims(cbcvel,sgstype,ipencil_t,nproc,dims)
       if(myid == 0) then
         print*, 'In auto-tuning mode......'

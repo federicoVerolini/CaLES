@@ -207,7 +207,7 @@ module mod_initsolver
   subroutine bc_rhs(cbc,bc,dlc,dlf,c_or_f,rhs)
     implicit none
     character(len=1), intent(in), dimension(0:1) :: cbc
-    real(rp), intent(in), dimension(0:,0:,0:) :: bc !bc, two faces
+    real(rp), intent(in), dimension(0:,0:,0:) :: bc ! bc, two faces
     real(rp), intent(in), dimension(0:1) :: dlc,dlf
     real(rp), intent(out), dimension(:,:,0:) :: rhs
     character(len=1), intent(in) :: c_or_f ! c -> cell-centered; f -> face-centered

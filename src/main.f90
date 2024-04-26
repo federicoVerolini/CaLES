@@ -348,6 +348,8 @@ program cans
   !                         nb,is_bound,cbcvel,cbcpre,bcvel,bcpre)
 #endif
   !
+  write(ctmp,'(i1)') myid
+  open(55,file=trim(datadir)//'debug'//trim(ctmp),status='replace')
   if(.not.restart) then
     istep = 0
     time = 0.
@@ -360,8 +362,6 @@ program cans
     if(myid == 0) print*, '*** Checkpoint loaded at time = ', time, 'time step = ', istep, '. ***'
   end if
   !
-  ! write(ctmp,'(i1)') myid
-  ! open(55,file=trim(datadir)//'debug'//trim(ctmp),status='replace',access='stream')
   !$acc enter data copyin(u,v,w,p) create(pp)
   is_updt_wm = .true.
   call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm,is_updt_wm,.false.,u,v,w)
