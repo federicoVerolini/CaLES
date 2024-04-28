@@ -69,7 +69,8 @@ module mod_sgs
       del = (dl(1)*dl(2)*dzf(k))**(1./3.)
       do j=1,n(2)
         do i=1,n(1)
-          fd = 1._rp-exp(-dw_plus(i,j,k)/25._rp)
+          ! fd = 1._rp-exp(-dw_plus(i,j,k)/25._rp)
+          fd = 1._rp-(dw_plus(i,j,k)/0.1_rp)**2 ! Moin & Kim (1982)
           visct(i,j,k) = (c_smag*del*fd)**2*sqrt(2._rp*str(i,j,k))
         end do
       end do
@@ -84,7 +85,7 @@ module mod_sgs
     ! opposite walls. dw_plus is calculated based on minimum distance dw,
     ! rather than dw_plus. The current implementation of wall_dist produces 
     ! exactly the same dw_plus under various partitionings that have two blocks
-    ! between two opposite walls.  
+    ! between two opposite walls.
     !
     ! identification of walls is based on the boundary conditions, which might
     ! be problematic for some cases.
@@ -232,7 +233,8 @@ module mod_sgs
             this_dw = zc(k)
             if(this_dw < dw(i,j,k)) then
               dw(i,j,k) = this_dw
-              dw_plus(i,j,k) = this_dw/delv
+              ! dw_plus(i,j,k) = this_dw/delv
+              dw_plus(i,j,k) = this_dw
             end if
           end do
         end do
@@ -258,7 +260,8 @@ module mod_sgs
             this_dw = l(3)-zc(k)
             if(this_dw < dw(i,j,k)) then
               dw(i,j,k) = this_dw
-              dw_plus(i,j,k) = this_dw/delv
+              ! dw_plus(i,j,k) = this_dw/delv
+              dw_plus(i,j,k) = this_dw
             end if
           end do
         end do
