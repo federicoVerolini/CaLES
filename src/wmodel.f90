@@ -237,8 +237,10 @@ module mod_wmodel
     ! different from the converged value. We do not save tauw_tot from previous
     ! step, so those values are not directly available. At zero velocity, utau
     ! is visc/h*exp(-kap_log*b_log). It is necessary to use abs to avoid negative
-    ! values of utau for robustness. Note that arrays (u/v/w) are initialized
-    ! as zero (ghost points), which makes a reasonable guess at end points.
+    ! values of utau. Note that arrays (u/v/w) are initialized as zero (ghost points),
+    ! which makes a reasonable guess at end points.
+    ! The convergence criterion is |tauw/taw_old-1.0| < 1.0e-4, corresponding
+    ! approximately to |utau/utau_old-1.0| < 0.5e-4.
     ! For a channel, it is good to use the computed utau available at the nearest
     ! grid point, which helps reduce ~50% of the iterations. However, several "if"
     ! statements have to be introduced for special points (square duct/cavity),
@@ -252,25 +254,24 @@ module mod_wmodel
     integer, intent(in)  :: mtype
     real(rp), intent(in) :: uh,vh,h,l1d,visc
     real(rp), intent(out), dimension(2) :: tauw
-    real(rp) :: upar,utau,f,fp,conv,tauw_old,tauw_tot
+    real(rp) :: upar,utau,f,fp,conv,utau_old,tauw_tot
     real(rp) :: umax,del
     !
     integer :: i,ierr
     !
     select case(mtype)
     case(WM_LOG)
-      upar = sqrt(uh*uh+vh*vh)
-      utau = sqrt(upar/h*visc)
-      utau = max(utau,visc/h*exp(-kap_log*b_log))
       conv = 1._rp
-      do while(conv > 1.e-4)
-        tauw_old = utau*utau
-        f  = upar/utau - 1._rp/kap_log*log(h*utau/visc) - b_log
-        fp = -1._rp/utau*(upar/utau + 1._rp/kap_log)
-        utau = abs(utau - f/fp)
-        tauw_tot = utau*utau
-        conv = abs(tauw_tot-tauw_old)/tauw_old
+      upar = sqrt(uh*uh+vh*vh)
+      utau = max(sqrt(upar/h*visc),visc/h*exp(-kap_log*b_log))
+      do while(conv>0.5e-4_rp)
+        utau_old = utau
+        f  = upar/utau-1._rp/kap_log*log(h*utau/visc)-b_log
+        fp = -1._rp/utau*(upar/utau+1._rp/kap_log)
+        utau = abs(utau-f/fp)
+        conv = abs(utau/utau_old-1._rp)
       end do
+      tauw_tot = utau*utau
       tauw(1) = tauw_tot*uh/(upar+eps)
       tauw(2) = tauw_tot*vh/(upar+eps)
     case(WM_LAM)

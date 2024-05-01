@@ -25,14 +25,12 @@
 ! CaNS -- Canonical Navier-Stokes Solver
 !-------------------------------------------------------------------------------------
 program cans
-#if defined(_DEBUG)
   use, intrinsic :: iso_fortran_env, only: compiler_version,compiler_options
-#endif
   use, intrinsic :: iso_c_binding  , only: C_PTR
   use, intrinsic :: ieee_arithmetic, only: is_nan => ieee_is_nan
   use mpi
   use decomp_2d
-  use mod_bound          , only: boundp,bounduvw,updt_rhs_b,initbc
+  use mod_bound          , only: boundp,bounduvw,cmpt_rhs_b,updt_rhs_b,initbc
   use mod_chkdiv         , only: chkdiv
   use mod_chkdt          , only: chkdt
   use mod_common_mpi     , only: myid,ierr
@@ -42,7 +40,7 @@ program cans
   use mod_initflow       , only: initflow
   use mod_initgrid       , only: initgrid
   use mod_initmpi        , only: initmpi
-  use mod_initsolver     , only: initsolver,cmpt_rhs_b
+  use mod_initsolver     , only: initsolver
   use mod_load           , only: load_all
   use mod_sgs            , only: cmpt_sgs
   use mod_dist           , only: wall_dist
@@ -222,7 +220,6 @@ program cans
            rhsby(  n(1),n(3),0:1), &
            rhsbz(  n(1),n(2),0:1))
 #endif
-#if defined(_DEBUG)
   if(myid == 0) print*, 'This executable of CaNS was built with compiler: ', compiler_version()
   if(myid == 0) print*, 'Using the options: ', compiler_options()
   block
@@ -232,7 +229,7 @@ program cans
     if(myid == 0) print*, 'MPI Version: ', trim(mpi_version)
   end block
   if(myid == 0) print*, ''
-#endif
+  !
   if(myid == 0) print*, '*******************************'
   if(myid == 0) print*, '*** Beginning of simulation ***'
   if(myid == 0) print*, '*******************************'
@@ -343,13 +340,9 @@ program cans
   if(myid == 0) print*,'*** Device memory footprint (Gb): ', &
                   device_memory_footprint(n,n_z)/(1._sp*1024**3), ' ***'
 #endif
-#if defined(_DEBUG_SOLVER)
-  ! call test_sanity_solver(ng,lo,hi,n,n_x_fft,n_y_fft,lo_z,hi_z,n_z,dli,dzc,dzf,dzci,dzfi,dzci_g,dzfi_g, &
-  !                         nb,is_bound,cbcvel,cbcpre,bcvel,bcpre)
-#endif
   !
-  ! write(ctmp,'(i1)') myid
-  ! open(55,file=trim(datadir)//'debug'//trim(ctmp),status='replace')
+  write(ctmp,'(i1)') myid
+  open(55,file=trim(datadir)//'debug'//trim(ctmp),status='replace')
   if(.not.restart) then
     istep = 0
     time = 0.
@@ -492,7 +485,6 @@ program cans
 #endif
 #endif
       dpdl(:) = dpdl(:) + f(:) ! dt multiplied
-      tmp = MPI_WTIME()
       is_updt_wm = .true.
       call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm,is_updt_wm,.false.,u,v,w)
       call fillps(n,dli,dzfi,dtrki,u,v,w,pp)
@@ -500,7 +492,6 @@ program cans
       call solver(n,ng,arrplanp,normfftp,lambdaxyp,ap,bp,cp,cbcpre,['c','c','c'],pp)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,pp)
       call correc(n,dli,dzci,dtrk,pp,u,v,w)
-      tmp = MPI_WTIME()
       ! is_updt_wm = (irk==3)
       is_updt_wm = .true.
       call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm,is_updt_wm,.true.,u,v,w)

@@ -79,6 +79,7 @@ module mod_debug
     !$acc end data
     call MPI_ALLREDUCE(MPI_IN_PLACE,diffmax,1,MPI_REAL_RP,MPI_MAX,MPI_COMM_WORLD,ierr)
   end subroutine chk_helmholtz
+  !
   subroutine chk_poisson(lo,hi,dli,dzci,dzfi,fp,fpp,diffmax)
     !
     ! this subroutine checks if the Poisson equation is correctly solved;
