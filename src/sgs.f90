@@ -41,7 +41,7 @@ module mod_sgs
     real(rp), allocatable, dimension(:,:,:)   :: dw_plus,s0,cs
     real(rp), dimension(3)        :: dli
     real(rp), dimension(0:n(3)+1) :: dzci,dzfi
-    integer :: m
+    integer :: i,j,k,m
     !
     dli(:)  = dl( :)**(-1)
     dzci(:) = dzc(:)**(-1)
@@ -91,6 +91,15 @@ module mod_sgs
       call filter(uc,uf,is_fil2d_wall=.true.)
       call filter(vc,vf,is_fil2d_wall=.true.)
       call filter(wc,wf,is_fil2d_wall=.true.)
+      ! call filter2d(uc*uc,lij(:,:,:,1))
+      ! call filter2d(vc*vc,lij(:,:,:,2))
+      ! call filter2d(wc*wc,lij(:,:,:,3))
+      ! call filter2d(uc*vc,lij(:,:,:,4))
+      ! call filter2d(uc*wc,lij(:,:,:,5))
+      ! call filter2d(vc*wc,lij(:,:,:,6))
+      ! call filter2d(uc,uf)
+      ! call filter2d(vc,vf)
+      ! call filter2d(wc,wf)
       lij(:,:,:,1) = lij(:,:,:,1) - uf*uf
       lij(:,:,:,2) = lij(:,:,:,2) - vf*vf
       lij(:,:,:,3) = lij(:,:,:,3) - wf*wf
@@ -116,6 +125,15 @@ module mod_sgs
       call filter(u,uf,is_fil2d_wall=.true. )
       call filter(v,vf,is_fil2d_wall=.true. )
       call filter(w,wf,is_fil2d_wall=.false.)
+      ! call filter2d(s0*sij(:,:,:,1),mij(:,:,:,1))
+      ! call filter2d(s0*sij(:,:,:,2),mij(:,:,:,2))
+      ! call filter2d(s0*sij(:,:,:,3),mij(:,:,:,3))
+      ! call filter2d(s0*sij(:,:,:,4),mij(:,:,:,4))
+      ! call filter2d(s0*sij(:,:,:,5),mij(:,:,:,5))
+      ! call filter2d(s0*sij(:,:,:,6),mij(:,:,:,6))
+      ! call filter2d(u,uf)
+      ! call filter2d(v,vf)
+      ! call filter2d(w,wf)
       ! all bs's are used. The wall stress values are updated based on
       ! the filtered velocity and are stored in bcu/v/w. Then, bcu/v/w is 
       ! recomputed based on the unfiltered velocity to restore its values
@@ -129,6 +147,11 @@ module mod_sgs
         mij(:,:,2:n(3)-1,m) = 2._rp*(mij(:,:,2:n(3)-1,m)-4.00_rp*s0(:,:,2:n(3)-1)*sij(:,:,2:n(3)-1,m))
         mij(:,:,n(3)    ,m) = 2._rp*(mij(:,:,n(3)    ,m)-2.52_rp*s0(:,:,n(3)    )*sij(:,:,n(3)    ,m))
       end do
+      ! do m = 1,6
+      !   mij(:,:,1       ,m) = 2._rp*(mij(:,:,1       ,m)-2.52_rp*s0(:,:,1       )*sij(:,:,1       ,m))
+      !   mij(:,:,2:n(3)-1,m) = 2._rp*(mij(:,:,2:n(3)-1,m)-2.52_rp*s0(:,:,2:n(3)-1)*sij(:,:,2:n(3)-1,m))
+      !   mij(:,:,n(3)    ,m) = 2._rp*(mij(:,:,n(3)    ,m)-2.52_rp*s0(:,:,n(3)    )*sij(:,:,n(3)    ,m))
+      ! end do
       !
       ! cs = c_smag^2*del**2
       !
@@ -353,7 +376,7 @@ module mod_sgs
           ! (-1,-1)
           do i = -1,0
             do j = -1,0
-              p_s(7) = p_s(4) + p(ii+i,jj+j,1)
+              p_s(4) = p_s(4) + p(ii+i,jj+j,1)
             end do
           end do
           !
@@ -386,7 +409,7 @@ module mod_sgs
           ! (-1,-1)
           do i = -1,0
             do j = -1,0
-              p_s(7) = p_s(4) + p(ii+i,jj+j,n(3))
+              p_s(4) = p_s(4) + p(ii+i,jj+j,n(3))
             end do
           end do
           !
@@ -396,6 +419,55 @@ module mod_sgs
       end do
     end if
   end subroutine filter
+  !
+  subroutine filter2d(p,pf)
+    !
+    ! top-hat filter, second-order trapezoidal rule
+    !
+    implicit none
+    real(rp), intent(in ), dimension(0:,0:,0:) :: p
+    real(rp), intent(out), dimension(0:,0:,0:) :: pf
+    real(rp) :: p_s(4)
+    integer :: n(3),i,j,k,ii,jj,kk
+    !
+    n  = shape(p)-2
+    pf = 0._rp
+    !
+    do ii = 1,n(1)
+      do jj = 1,n(2)
+        do kk = 1,n(3)
+          p_s = 0._rp
+          ! (1,1)
+          do i = 0,1
+            do j = 0,1
+              p_s(1) = p_s(1) + p(ii+i,jj+j,kk)
+            end do
+          end do
+          ! (-1,1)
+          do i = -1,0
+            do j = 0,1
+              p_s(2) = p_s(2) + p(ii+i,jj+j,kk)
+            end do
+          end do
+          ! (1,-1)
+          do i = 0,1
+            do j = -1,0
+              p_s(3) = p_s(3) + p(ii+i,jj+j,kk)
+            end do
+          end do
+          ! (-1,-1)
+          do i = -1,0
+            do j = -1,0
+              p_s(4) = p_s(4) + p(ii+i,jj+j,kk)
+            end do
+          end do
+          !
+          pf(ii,jj,kk) = sum(p_s)/16._rp
+          !
+        end do
+      end do
+    end do
+  end subroutine filter2d
   !
   subroutine interpolate(n,u,v,w,uc,vc,wc)
     !
