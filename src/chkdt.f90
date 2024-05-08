@@ -18,8 +18,8 @@ module mod_chkdt
     ! computes maximum allowed time step, refer to Pieter Wesseling (P200)
     ! for the stability conditions of the advective and diffusion terms
     !
-    ! the eddy viscosity term is retained in the calculation of dt. It is
-    ! also good to not consider it, since it is smaller than both the
+    ! the eddy viscosity term is considered in the calculation of dt. It is
+    ! also good not to consider it, since it is smaller than both the
     ! viscous term and the advective term. Anyway, the viscous term is
     ! typically implicitly treated in DNS/WRLES, so the eddy viscosity
     ! term does not influence dtmax.
