@@ -21,6 +21,7 @@ module mod_sgs
                       zc,zf,dzc,dzf,visc,h,ind,u,v,w,visct)
     !
     ! compute subgrid viscosity at cell centers
+    ! the dynamcic version is five times slower than the static one
     !
     implicit none
     character(len=*), intent(in) :: sgstype
