@@ -341,8 +341,8 @@ program cans
                   device_memory_footprint(n,n_z)/(1._sp*1024**3), ' ***'
 #endif
   !
-  write(ctmp,'(i1)') myid
-  open(55,file=trim(datadir)//'debug'//trim(ctmp),status='replace')
+  ! write(ctmp,'(i1)') myid
+  ! open(55,file=trim(datadir)//'debug'//trim(ctmp),status='replace')
   if(.not.restart) then
     istep = 0
     time = 0.
