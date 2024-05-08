@@ -41,6 +41,7 @@ module mod_sgs
     real(rp), allocatable, dimension(:,:,:)   :: dw_plus,s0,cs
     real(rp), dimension(3)        :: dli
     real(rp), dimension(0:n(3)+1) :: dzci,dzfi
+    integer :: k,m
     !
     dli(:)  = dl( :)**(-1)
     dzci(:) = dzc(:)**(-1)
@@ -123,12 +124,13 @@ module mod_sgs
       call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind,&
                     .true.,.false.,u,v,w)
       call strain_rate(n,dli,dzci,dzfi,uf,vf,wf,s0,sij)
-      mij(:,:,:,1) = 2._rp*(mij(:,:,:,1)-4._rp*s0*sij(:,:,:,1))
-      mij(:,:,:,2) = 2._rp*(mij(:,:,:,2)-4._rp*s0*sij(:,:,:,2))
-      mij(:,:,:,3) = 2._rp*(mij(:,:,:,3)-4._rp*s0*sij(:,:,:,3))
-      mij(:,:,:,4) = 2._rp*(mij(:,:,:,4)-4._rp*s0*sij(:,:,:,4))
-      mij(:,:,:,5) = 2._rp*(mij(:,:,:,5)-4._rp*s0*sij(:,:,:,5))
-      mij(:,:,:,6) = 2._rp*(mij(:,:,:,6)-4._rp*s0*sij(:,:,:,6))
+      do m = 1,6
+        do k = 2,n(3)-1
+          mij(:,:,k   ,m) = 2._rp*(mij(:,:,k   ,m)-  4._rp*s0(:,:,k)*sij(:,:,k   ,m))
+        end do
+          mij(:,:,1   ,m) = 2._rp*(mij(:,:,1   ,m)-2.52_rp*s0(:,:,k)*sij(:,:,1   ,m))
+          mij(:,:,n(3),m) = 2._rp*(mij(:,:,n(3),m)-2.52_rp*s0(:,:,k)*sij(:,:,n(3),m))
+      end do
       !
       ! cs = c_smag^2*del**2
       !
@@ -138,13 +140,13 @@ module mod_sgs
                  (mij(:,:,:,4)*lij(:,:,:,4) + &
                   mij(:,:,:,5)*lij(:,:,:,5) + &
                   mij(:,:,:,6)*lij(:,:,:,6))*2._rp
-      call ave2d(ng,lo,hi,3,l,dl,dzf,cs)
       s0(:,:,:) = mij(:,:,:,1)*mij(:,:,:,1) + &
                   mij(:,:,:,2)*mij(:,:,:,2) + &
                   mij(:,:,:,3)*mij(:,:,:,3) + &
                  (mij(:,:,:,4)*mij(:,:,:,4) + &
                   mij(:,:,:,5)*mij(:,:,:,5) + &
                   mij(:,:,:,6)*mij(:,:,:,6))*2._rp
+      call ave2d(ng,lo,hi,3,l,dl,dzf,cs)
       call ave2d(ng,lo,hi,3,l,dl,dzf,s0)
       cs = cs/s0
       visct = cs*visct
