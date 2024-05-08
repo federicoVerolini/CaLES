@@ -41,7 +41,7 @@ module mod_sgs
     real(rp), allocatable, dimension(:,:,:)   :: dw_plus,s0,cs
     real(rp), dimension(3)        :: dli
     real(rp), dimension(0:n(3)+1) :: dzci,dzfi
-    integer :: k,m
+    integer :: m
     !
     dli(:)  = dl( :)**(-1)
     dzci(:) = dzc(:)**(-1)
@@ -125,11 +125,9 @@ module mod_sgs
                     .true.,.false.,u,v,w)
       call strain_rate(n,dli,dzci,dzfi,uf,vf,wf,s0,sij)
       do m = 1,6
-        do k = 2,n(3)-1
-          mij(:,:,k   ,m) = 2._rp*(mij(:,:,k   ,m)-  4._rp*s0(:,:,k)*sij(:,:,k   ,m))
-        end do
-          mij(:,:,1   ,m) = 2._rp*(mij(:,:,1   ,m)-2.52_rp*s0(:,:,k)*sij(:,:,1   ,m))
-          mij(:,:,n(3),m) = 2._rp*(mij(:,:,n(3),m)-2.52_rp*s0(:,:,k)*sij(:,:,n(3),m))
+        mij(:,:,1       ,m) = 2._rp*(mij(:,:,1       ,m)-2.52_rp*s0(:,:,1       )*sij(:,:,1       ,m))
+        mij(:,:,2:n(3)-1,m) = 2._rp*(mij(:,:,2:n(3)-1,m)-4.00_rp*s0(:,:,2:n(3)-1)*sij(:,:,2:n(3)-1,m))
+        mij(:,:,n(3)    ,m) = 2._rp*(mij(:,:,n(3)    ,m)-2.52_rp*s0(:,:,n(3)    )*sij(:,:,n(3)    ,m))
       end do
       !
       ! cs = c_smag^2*del**2
