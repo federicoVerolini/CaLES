@@ -497,11 +497,9 @@ program cans
                     .true.,.true.,u,v,w)
       call updatep(n,dli,dzci,dzfi,alpha,pp,p)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
-      if(irk==3) then
-        call cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcpre,bcu,bcv,bcw,bcp,nb,is_bound,lwm,l,dl,&
-                      zc,zf,dzc,dzf,visc,hwm,ind_wm,u,v,w,visct)
-        call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,visct)
-      end if
+      call cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcpre,bcu,bcv,bcw,bcp,nb,is_bound,lwm,l,dl,&
+                    zc,zf,dzc,dzf,visc,hwm,ind_wm,u,v,w,visct)
+      call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,visct)
     end do
     dpdl(:) = -dpdl(:)*dti
     ! dt not multiplied, exactly equal to the wall shear stress
