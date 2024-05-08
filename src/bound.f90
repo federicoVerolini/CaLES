@@ -196,6 +196,7 @@ module mod_bound
   end subroutine boundp
   !
   subroutine set_bc(ctype,ibound,idir,nh,centered,bc,dr,p)
+    !set_bc(cbc(0,3,3),0,3,nh,.false.,bcw%z,dzf(0)   ,w)
     implicit none
     character(len=1), intent(in) :: ctype
     integer , intent(in) :: ibound,idir,nh
@@ -210,8 +211,7 @@ module mod_bound
     n = size(p,idir) - 2*nh
     n1= size(bc,1)-2
     n2= size(bc,2)-2
-    allocate(factor(0:n1+1, &
-                    0:n2+1))
+    allocate(factor(0:n1+1,0:n2+1))
     factor = bc(:,:,ibound)
     if(ctype == 'D'.and.centered) then
       factor = 2.*factor
@@ -235,6 +235,10 @@ module mod_bound
         !       note that the is_bound(:,:) mask above (set under initmpi.f90) is only true along
         !       the (undecomposed) pencil direction;
         !       along decomposed directions, periodicity is naturally set via the halo exchange
+        !
+        ! wall normal velocity at k=n+1 is never used, it can be set to either +(n-1) or -(n-1)
+        ! It is actually problematic if it is used since we do not have a value at k=-1
+        ! the conclusion holds even when there is SGS/wall model/additional viscous term
         !
         select case(idir)
         case(1)
@@ -401,7 +405,7 @@ module mod_bound
               !$acc kernels default(present) async(1)
               !$OMP PARALLEL WORKSHARE
               !p(:,:,n) = 1./3.*(-2.*factor+4.*p(:,:,n-1)-p(:,:,n-2))
-              p(:,:,n+1) = p(:,:,n)! unused
+              p(:,:,n+1) = p(:,:,n) ! unused
               p(:,:,n+dh) = 1.*factor + p(:,:,n-1-dh)
               !$OMP END PARALLEL WORKSHARE
               !$acc end kernels

@@ -356,10 +356,11 @@ program cans
   end if
   !
   !$acc enter data copyin(u,v,w,p) create(pp)
-  is_updt_wm = .true.
-  call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm,is_updt_wm,.false.,u,v,w)
+  call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm,&
+                .true.,.false.,u,v,w)
   call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
-  call cmpt_sgs(sgstype,cbcvel,n,is_bound,l,dl,zc,dzc,dzf,visc,u,v,w,visct)
+  call cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcpre,bcu,bcv,bcw,bcp,nb,is_bound,lwm,l,dl,&
+                zc,zf,dzc,dzf,visc,hwm,ind_wm,u,v,w,visct)
   call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,visct) ! corner ghost cells included
   !
   ! post-process and write initial condition
@@ -485,19 +486,19 @@ program cans
 #endif
 #endif
       dpdl(:) = dpdl(:) + f(:) ! dt multiplied
-      is_updt_wm = .true.
-      call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm,is_updt_wm,.false.,u,v,w)
+      call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm, &
+                    .true.,.false.,u,v,w)
       call fillps(n,dli,dzfi,dtrki,u,v,w,pp)
       call updt_rhs_b(['c','c','c'],cbcpre,n,is_bound,rhsbp%x,rhsbp%y,rhsbp%z,pp)
       call solver(n,ng,arrplanp,normfftp,lambdaxyp,ap,bp,cp,cbcpre,['c','c','c'],pp)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,pp)
       call correc(n,dli,dzci,dtrk,pp,u,v,w)
-      ! is_updt_wm = (irk==3)
-      is_updt_wm = .true.
-      call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm,is_updt_wm,.true.,u,v,w)
+      call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm,&
+                    .true.,.true.,u,v,w)
       call updatep(n,dli,dzci,dzfi,alpha,pp,p)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
-      call cmpt_sgs(sgstype,cbcvel,n,is_bound,l,dl,zc,dzc,dzf,visc,u,v,w,visct)
+      call cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcpre,bcu,bcv,bcw,bcp,nb,is_bound,lwm,l,dl,&
+                    zc,zf,dzc,dzf,visc,hwm,ind_wm,u,v,w,visct)
       call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,visct)
     end do
     dpdl(:) = -dpdl(:)*dti

@@ -123,48 +123,51 @@ module mod_post
     !$acc wait
   end subroutine vorticity_one_component
   !
-  subroutine strain_rate(n,dli,dzci,dzfi,ux,uy,uz,str)
+  subroutine strain_rate(n,dli,dzci,dzfi,ux,uy,uz,s0,sij)
     implicit none
     integer , intent(in ), dimension(3)        :: n
     real(rp), intent(in ), dimension(3)        :: dli
     real(rp), intent(in ), dimension(0:)       :: dzci,dzfi
-    real(rp), intent(in ), dimension(0:,0:,0:) :: ux,uy,uz
-    real(rp), intent(out), dimension(1:,1:,1:) :: str
-    real(rp) :: s11,s22,s33,s12,s13,s23
+    real(rp), intent(in ), dimension(0:,0:,0:) :: ux,uy,uz,s0
+    real(rp), intent(out), dimension(0:,0:,0:,1:), optional :: sij
+    real(rp) :: s11,s12,s13,s22,s23,s33,ss
     real(rp) :: dxi,dyi
     integer :: i,j,k
+    !
     dxi = dli(1)
     dyi = dli(2)
     !
-    ! compute sijsij, where sij = (1/2)(du_i/dx_j + du_j/dx_i)
+    ! compute sqrt(2*sij*sij), sij = (1/2)(du_i/dx_j + du_j/dx_i)
     !
     !$acc parallel loop collapse(3) default(present) private(s11,s12,s13,s22,s23,s33)
     !$OMP PARALLEL DO   COLLAPSE(3) DEFAULT(shared)  PRIVATE(s11,s12,s13,s22,s23,s33)
     do k=1,n(3)
       do j=1,n(2)
         do i=1,n(1)
-          s11 = ((ux(i,j,k)-ux(i-1,j,k))*dxi    )**2
-          s22 = ((uy(i,j,k)-uy(i,j-1,k))*dyi    )**2
-          s33 = ((uz(i,j,k)-uz(i,j,k-1))*dzfi(k))**2
+          s11 = (ux(i,j,k)-ux(i-1,j,k))*dxi
+          s22 = (uy(i,j,k)-uy(i,j-1,k))*dyi
+          s33 = (uz(i,j,k)-uz(i,j,k-1))*dzfi(k)
           s12 = .25_rp*( &
-                        ((ux(i  ,j+1,k)-ux(i  ,j  ,k))*dyi + (uy(i+1,j  ,k)-uy(i  ,j  ,k))*dxi)**2 + &
-                        ((ux(i  ,j  ,k)-ux(i  ,j-1,k))*dyi + (uy(i+1,j-1,k)-uy(i  ,j-1,k))*dxi)**2 + &
-                        ((ux(i-1,j+1,k)-ux(i-1,j  ,k))*dyi + (uy(i  ,j  ,k)-uy(i-1,j  ,k))*dxi)**2 + &
-                        ((ux(i-1,j  ,k)-ux(i-1,j-1,k))*dyi + (uy(i  ,j-1,k)-uy(i-1,j-1,k))*dxi)**2 &
-                       )*.25_rp
+                        (ux(i  ,j+1,k)-ux(i  ,j  ,k))*dyi + (uy(i+1,j  ,k)-uy(i  ,j  ,k))*dxi + &
+                        (ux(i  ,j  ,k)-ux(i  ,j-1,k))*dyi + (uy(i+1,j-1,k)-uy(i  ,j-1,k))*dxi + &
+                        (ux(i-1,j+1,k)-ux(i-1,j  ,k))*dyi + (uy(i  ,j  ,k)-uy(i-1,j  ,k))*dxi + &
+                        (ux(i-1,j  ,k)-ux(i-1,j-1,k))*dyi + (uy(i  ,j-1,k)-uy(i-1,j-1,k))*dxi &
+                       )*.5_rp
           s13 = .25_rp*( &
-                         ((ux(i  ,j,k+1)-ux(i  ,j,k  ))*dzci(k  ) + (uz(i+1,j,k  )-uz(i  ,j,k  ))*dxi)**2 + &
-                         ((ux(i  ,j,k  )-ux(i  ,j,k-1))*dzci(k-1) + (uz(i+1,j,k-1)-uz(i  ,j,k-1))*dxi)**2 + &
-                         ((ux(i-1,j,k+1)-ux(i-1,j,k  ))*dzci(k  ) + (uz(i  ,j,k  )-uz(i-1,j,k  ))*dxi)**2 + &
-                         ((ux(i-1,j,k  )-ux(i-1,j,k-1))*dzci(k-1) + (uz(i  ,j,k-1)-uz(i-1,j,k-1))*dxi)**2 &
-                       )*.25_rp
+                         (ux(i  ,j,k+1)-ux(i  ,j,k  ))*dzci(k  ) + (uz(i+1,j,k  )-uz(i  ,j,k  ))*dxi + &
+                         (ux(i  ,j,k  )-ux(i  ,j,k-1))*dzci(k-1) + (uz(i+1,j,k-1)-uz(i  ,j,k-1))*dxi + &
+                         (ux(i-1,j,k+1)-ux(i-1,j,k  ))*dzci(k  ) + (uz(i  ,j,k  )-uz(i-1,j,k  ))*dxi + &
+                         (ux(i-1,j,k  )-ux(i-1,j,k-1))*dzci(k-1) + (uz(i  ,j,k-1)-uz(i-1,j,k-1))*dxi &
+                       )*.5_rp
           s23 = .25_rp*( &
-                        ((uy(i,j  ,k+1)-uy(i,j  ,k  ))*dzci(k  ) + (uz(i,j+1,k  )-uz(i,j  ,k  ))*dyi)**2 + &
-                        ((uy(i,j  ,k  )-uy(i,j  ,k-1))*dzci(k-1) + (uz(i,j+1,k-1)-uz(i,j  ,k-1))*dyi)**2 + &
-                        ((uy(i,j-1,k+1)-uy(i,j-1,k  ))*dzci(k  ) + (uz(i,j  ,k  )-uz(i,j-1,k  ))*dyi)**2 + &
-                        ((uy(i,j-1,k  )-uy(i,j-1,k-1))*dzci(k-1) + (uz(i,j  ,k-1)-uz(i,j-1,k-1))*dyi)**2 &
-                       )*.25_rp
-          str(i,j,k) = s11+s22+s33 + 2*(s12+s13+s23)
+                        (uy(i,j  ,k+1)-uy(i,j  ,k  ))*dzci(k  ) + (uz(i,j+1,k  )-uz(i,j  ,k  ))*dyi + &
+                        (uy(i,j  ,k  )-uy(i,j  ,k-1))*dzci(k-1) + (uz(i,j+1,k-1)-uz(i,j  ,k-1))*dyi + &
+                        (uy(i,j-1,k+1)-uy(i,j-1,k  ))*dzci(k  ) + (uz(i,j  ,k  )-uz(i,j-1,k  ))*dyi + &
+                        (uy(i,j-1,k  )-uy(i,j-1,k-1))*dzci(k-1) + (uz(i,j  ,k-1)-uz(i,j-1,k-1))*dyi &
+                       )*.5_rp
+          if(present(sij)) sij(i,j,k,1:6) = [s11,s22,s33,s12,s13,s23]
+          ss = s11*s11 + s22*s22 + s33*s33 + (s12*s12 + s13*s13 + s23*s23)*2._rp
+          s0(i,j,k) = sqrt(2._rp*ss)
         end do
       end do
     end do
