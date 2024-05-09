@@ -89,7 +89,8 @@ program cans
   use omp_lib
   implicit none
   integer , dimension(3) :: lo,hi,n,n_x_fft,n_y_fft,lo_z,hi_z,n_z
-  real(rp), allocatable, dimension(:,:,:) :: u,v,w,p,pp,visct,dw
+  real(rp), allocatable, dimension(:,:,:) :: u,v,w,p,pp,visct,dw,dw_plus,s0,uc,vc,wc,uf,vf,wf
+  real(rp), allocatable, dimension(:,:,:,:) :: sij,lij,mij
   real(rp), dimension(3) :: tauxo,tauyo,tauzo
   real(rp), dimension(3) :: f
 #if !defined(_OPENACC)
@@ -106,7 +107,7 @@ program cans
     real(rp), allocatable, dimension(:,:,:) :: z
   end type rhs_bound
   type(rhs_bound) :: rhsbp
-  type(cond_bound) :: bcu,bcv,bcw,bcp,bcs
+  type(cond_bound) :: bcu,bcv,bcw,bcp,bcs,bcuf,bcvf,bcwf
   real(rp) :: alpha
 #if defined(_IMPDIFF)
 #if !defined(_OPENACC)
@@ -182,7 +183,7 @@ program cans
   allocate(rhsbp%x(n(2),n(3),0:1), &
            rhsbp%y(n(1),n(3),0:1), &
            rhsbp%z(n(1),n(2),0:1))
-  ! halo cells necessary
+  ! ghost cells necessary
   allocate(bcu%x(0:n(2)+1,0:n(3)+1,0:1), &
            bcv%x(0:n(2)+1,0:n(3)+1,0:1), &
            bcw%x(0:n(2)+1,0:n(3)+1,0:1), &
@@ -220,6 +221,34 @@ program cans
            rhsby(  n(1),n(3),0:1), &
            rhsbz(  n(1),n(2),0:1))
 #endif
+  !
+  select case(trim(sgstype))
+  case('smag')
+    allocate(s0     (0:n(1)+1,0:n(2)+1,0:n(3)+1), &
+             dw     (0:n(1)+1,0:n(2)+1,0:n(3)+1), &
+             dw_plus(0:n(1)+1,0:n(2)+1,0:n(3)+1))
+  case('dsmag')
+    allocate(s0 (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
+             uc (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
+             vc (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
+             wc (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
+             uf (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
+             vf (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
+             wf (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
+             sij(0:n(1)+1,0:n(2)+1,0:n(3)+1,6), &
+             lij(0:n(1)+1,0:n(2)+1,0:n(3)+1,6), &
+             mij(0:n(1)+1,0:n(2)+1,0:n(3)+1,6))
+    allocate(bcuf%x(0:n(2)+1,0:n(3)+1,0:1), &
+             bcvf%x(0:n(2)+1,0:n(3)+1,0:1), &
+             bcwf%x(0:n(2)+1,0:n(3)+1,0:1), &
+             bcuf%y(0:n(1)+1,0:n(3)+1,0:1), &
+             bcvf%y(0:n(1)+1,0:n(3)+1,0:1), &
+             bcwf%y(0:n(1)+1,0:n(3)+1,0:1), &
+             bcuf%z(0:n(1)+1,0:n(2)+1,0:1), &
+             bcvf%z(0:n(1)+1,0:n(2)+1,0:1), &
+             bcwf%z(0:n(1)+1,0:n(2)+1,0:1))
+  end select
+  !
   if(myid == 0) print*, 'This executable of CaNS was built with compiler: ', compiler_version()
   if(myid == 0) print*, 'Using the options: ', compiler_options()
   block
@@ -284,7 +313,6 @@ program cans
   ! compute wall distance
   !
   if(trim(sgstype)=='smag') then
-    allocate(dw(1:n(1),1:n(2),1:n(3)))
     call wall_dist(cbcvel,n,is_bound,l,dl,zc,dzc,dw)
   end if
   !
@@ -359,8 +387,9 @@ program cans
   call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm,&
                 .true.,.false.,u,v,w)
   call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
-  call cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcpre,bcu,bcv,bcw,bcp,nb,is_bound,lwm,l,dl,&
-                zc,zf,dzc,dzf,visc,hwm,ind_wm,u,v,w,visct)
+  call cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcpre,bcu,bcv,bcw,bcp,nb,is_bound,lwm,l,dl, &
+                zc,zf,dzc,dzf,visc,hwm,ind_wm,u,v,w,dw,dw_plus,s0,uc,vc,wc,uf,vf,wf, &
+                sij,lij,mij,bcuf,bcvf,bcwf,visct)
   call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,visct) ! corner ghost cells included
   !
   ! post-process and write initial condition
@@ -493,12 +522,13 @@ program cans
       call solver(n,ng,arrplanp,normfftp,lambdaxyp,ap,bp,cp,cbcpre,['c','c','c'],pp)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,pp)
       call correc(n,dli,dzci,dtrk,pp,u,v,w)
-      call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm,&
+      call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm, &
                     .true.,.true.,u,v,w)
       call updatep(n,dli,dzci,dzfi,alpha,pp,p)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
-      call cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcpre,bcu,bcv,bcw,bcp,nb,is_bound,lwm,l,dl,&
-                    zc,zf,dzc,dzf,visc,hwm,ind_wm,u,v,w,visct)
+      call cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcpre,bcu,bcv,bcw,bcp,nb,is_bound,lwm,l,dl, &
+                    zc,zf,dzc,dzf,visc,hwm,ind_wm,u,v,w,dw,dw_plus,s0,uc,vc,wc,uf,vf,wf, &
+                    sij,lij,mij,bcuf,bcvf,bcwf,visct)
       call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,visct)
     end do
     dpdl(:) = -dpdl(:)*dti

@@ -17,30 +17,30 @@ module mod_sgs
   public cmpt_sgs
   contains
     !
-  subroutine cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcpre,bcu,bcv,bcw,bcp,nb,is_bound,lwm,l,dl,&
-                      zc,zf,dzc,dzf,visc,h,ind,u,v,w,visct)
+  subroutine cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcpre,bcu,bcv,bcw,bcp,nb,is_bound,lwm,l,dl, &
+                      zc,zf,dzc,dzf,visc,h,ind,u,v,w,dw,dw_plus,s0,uc,vc,wc,uf,vf,wf, &
+                      sij,lij,mij,bcuf,bcvf,bcwf,visct)
     !
     ! compute subgrid viscosity at cell centers
-    ! the dynamcic version's cost is 5 times that of the static one
+    ! the dynamcic version's cost is four times that of the static one
     !
     implicit none
     character(len=*), intent(in) :: sgstype
     integer , intent(in ), dimension(3) :: n,ng,lo,hi
     character(len=1), intent(in), dimension(0:1,3,3) :: cbcvel
     character(len=1), intent(in), dimension(0:1,3)   :: cbcpre
-    type(cond_bound), intent(inout)              :: bcu,bcv,bcw,bcp
+    type(cond_bound), intent(in )                :: bcu,bcv,bcw,bcp
+    type(cond_bound), intent(out)                :: bcuf,bcvf,bcwf
     integer , intent(in ), dimension(0:1,3)      :: nb,lwm,ind
     logical , intent(in ), dimension(0:1,3)      :: is_bound
     real(rp), intent(in ), dimension(3)          :: l,dl
     real(rp), intent(in ), dimension(0:)         :: zc,zf,dzc,dzf
     real(rp), intent(in )                        :: visc,h
-    real(rp), intent(inout), dimension(0:,0:,0:) :: u,v,w
-    real(rp), intent(out),   dimension(0:,0:,0:) :: visct
-    real(rp), allocatable, dimension(:,:,:)   :: uc,vc,wc,uf,vf,wf
-    real(rp), allocatable, dimension(:,:,:,:) :: sij,lij,mij
-    real(rp), allocatable, dimension(:,:,:)   :: dw_plus,s0,cs
+    real(rp), intent(in ), dimension(0:,0:,0:)   :: u,v,w,dw
+    real(rp), intent(out), dimension(0:,0:,0:)   :: dw_plus,s0,uc,vc,wc,uf,vf,wf,visct
+    real(rp), intent(out), dimension(0:,0:,0:,1:) :: sij,lij,mij
     real(rp), dimension(3)        :: dli
-    real(rp), dimension(0:n(3)+1) :: dzci,dzfi
+    real(rp), dimension(0:n(3)+1) :: dzci,dzfi,alph2
     integer :: i,j,k,m
     !
     dli(:)  = dl( :)**(-1)
@@ -51,34 +51,25 @@ module mod_sgs
     case('none')
       visct(:,:,:) = 0._rp
     case('smag')
-      allocate(s0     (0:n(1)+1,0:n(2)+1,0:n(3)+1), &
-               dw_plus(0:n(1)+1,0:n(2)+1,0:n(3)+1))
       call strain_rate(n,dli,dzci,dzfi,u,v,w,s0)
-      call cmpt_dw_plus(cbcvel,n,is_bound,l,dl,zc,dzc,visc,u,v,w,dw_plus)
+      call cmpt_dw_plus(cbcvel,n,is_bound,l,dl,zc,dzc,visc,u,v,w,dw,dw_plus)
       call sgs_smag(n,dl,dzf,dw_plus,s0,visct)
-      deallocate(s0, &
-                 dw_plus)
     case('dsmag')
-      allocate(uc (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
-               vc (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
-               wc (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
-               uf (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
-               vf (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
-               wf (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
-               s0 (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
-               cs (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
-               sij(0:n(1)+1,0:n(2)+1,0:n(3)+1,6), &
-               lij(0:n(1)+1,0:n(2)+1,0:n(3)+1,6), &
-               mij(0:n(1)+1,0:n(2)+1,0:n(3)+1,6))
+      bcuf = bcu
+      bcvf = bcv
+      bcwf = bcw
+      alph2(:   ) = 4._rp
+      alph2(1   ) = 2.52_rp
+      alph2(n(3)) = 2.52_rp
+      !
       call strain_rate(n,dli,dzci,dzfi,u,v,w,s0,sij)
       visct = s0
       !
       ! Lij
       !
       call interpolate(n,u,v,w,uc,vc,wc)
-      ! only periodic/patched bc's are used, since filtering is not
-      ! performed in the wall-normal direction for the first off-wall
-      ! layer of cells
+      ! only periodic/patched bc's are used, since filtering is not performed
+      ! in the wall-normal direction for the first off-wall layer of cells
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,uc)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,vc)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,wc)
@@ -105,6 +96,7 @@ module mod_sgs
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,2))
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,3))
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,4))
+      call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,4))
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,5))
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,6))
       call filter(s0*sij(:,:,:,1),mij(:,:,:,1),is_fil2d_wall=.true.)
@@ -116,38 +108,34 @@ module mod_sgs
       call filter(u,uf,is_fil2d_wall=.true. )
       call filter(v,vf,is_fil2d_wall=.true. )
       call filter(w,wf,is_fil2d_wall=.false.)
-      ! all bs's are used. The wall stress values are updated based on
-      ! the filtered velocity and are stored in bcu/v/w. Then, bcu/v/w is 
-      ! recomputed based on the unfiltered velocity to restore its values
-      call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind,&
+      ! all bs's are used here
+      call bounduvw(cbcvel,n,bcuf,bcvf,bcwf,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind, &
                     .true.,.false.,uf,vf,wf)
-      call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind,&
-                    .true.,.false.,u,v,w)
       call strain_rate(n,dli,dzci,dzfi,uf,vf,wf,s0,sij)
       do m = 1,6
-        mij(:,:,1       ,m) = 2._rp*(mij(:,:,1       ,m)-2.52_rp*s0(:,:,1       )*sij(:,:,1       ,m))
-        mij(:,:,2:n(3)-1,m) = 2._rp*(mij(:,:,2:n(3)-1,m)-4.00_rp*s0(:,:,2:n(3)-1)*sij(:,:,2:n(3)-1,m))
-        mij(:,:,n(3)    ,m) = 2._rp*(mij(:,:,n(3)    ,m)-2.52_rp*s0(:,:,n(3)    )*sij(:,:,n(3)    ,m))
+        do k = 1,n(3)
+          mij(:,:,k,m) = 2._rp*(mij(:,:,k,m)-alph2(k)*s0(:,:,k)*sij(:,:,k,m))
+        end do
       end do
       !
       ! cs = c_smag^2*del**2
       !
-      cs(:,:,:) = mij(:,:,:,1)*lij(:,:,:,1) + &
+      s0(:,:,:) = mij(:,:,:,1)*lij(:,:,:,1) + &
                   mij(:,:,:,2)*lij(:,:,:,2) + &
                   mij(:,:,:,3)*lij(:,:,:,3) + &
                  (mij(:,:,:,4)*lij(:,:,:,4) + &
                   mij(:,:,:,5)*lij(:,:,:,5) + &
                   mij(:,:,:,6)*lij(:,:,:,6))*2._rp
+      call ave2d(ng,lo,hi,3,l,dl,dzf,s0)
+      visct = visct*s0
       s0(:,:,:) = mij(:,:,:,1)*mij(:,:,:,1) + &
                   mij(:,:,:,2)*mij(:,:,:,2) + &
                   mij(:,:,:,3)*mij(:,:,:,3) + &
                  (mij(:,:,:,4)*mij(:,:,:,4) + &
                   mij(:,:,:,5)*mij(:,:,:,5) + &
                   mij(:,:,:,6)*mij(:,:,:,6))*2._rp
-      call ave2d(ng,lo,hi,3,l,dl,dzf,cs)
       call ave2d(ng,lo,hi,3,l,dl,dzf,s0)
-      cs = cs/s0
-      visct = cs*visct
+      visct = visct/s0
     case('amd')
       print*, 'ERROR: AMD model not yet implemented'
     case default
@@ -172,11 +160,10 @@ module mod_sgs
     real(rp), intent(in), dimension(3) :: l,dl
     real(rp), intent(in), dimension(lo(3)-1:) :: dz
     real(rp), intent(inout), dimension(lo(1)-1:,lo(2)-1:,lo(3)-1:) :: p
-    real(dp), allocatable, dimension(:) :: p1d
-    integer :: i,j,k
+    real(dp) :: p1d(ng(idir))
     real(dp) :: grid_area_ratio,p1d_s
+    integer :: i,j,k
     !
-    allocate(p1d(ng(idir)))
     !$acc enter data create(p1d)
     !$acc kernels default(present)
     p1d(:) = 0._rp
@@ -443,7 +430,7 @@ module mod_sgs
     end do
   end subroutine sgs_smag
   !
-  subroutine cmpt_dw_plus(cbc,n,is_bound,l,dl,zc,dzc,visc,u,v,w,dw_plus)
+  subroutine cmpt_dw_plus(cbc,n,is_bound,l,dl,zc,dzc,visc,u,v,w,dw,dw_plus)
     !
     ! inner-scaled distance to the nearest wall. We assume that a wall only
     ! affects its neighboring block, which requires that block to have enough
@@ -453,12 +440,12 @@ module mod_sgs
     ! under different partitionings.
     !
     ! identification of walls is based on boundary conditions, which might
-    ! be problematic in some cases.
+    ! be problematic in some cases
     !
-    ! It is definitely inappropriate to assume zero velocity at the wall.
-    ! For no-slip walls, the velocity at the wall is zero. When a wall model
-    ! is applied, tauw must be computed using the first off-wall and ghost cells.
-    ! It is incorrect to assume non-slip wall, which can lead to large errors.
+    ! It is unacceptable to assume zero velocity at the wall. For no-slip walls,
+    ! the velocity at the wall is zero. When a wall model is applied, tauw must 
+    ! be computed using the first off-wall and ghost cells. It is incorrect to
+    ! assume non-slip wall, which can lead to large errors.
     ! 
     implicit none
     character(len=1), intent(in), dimension(0:1,3,3) :: cbc
@@ -468,19 +455,14 @@ module mod_sgs
     real(rp), intent(in ), dimension(0:)       :: zc,dzc
     real(rp), intent(in )                      :: visc
     real(rp), intent(in ), dimension(0:,0:,0:) :: u,v,w
+    real(rp), intent(in ), dimension(0:,0:,0:) :: dw
     real(rp), intent(out), dimension(0:,0:,0:) :: dw_plus
-    real(rp), dimension(:,:,:), allocatable    :: dw
-    real(rp) :: tauw(2),tauw_tot,this_dw_plus,this_dw,visci
-    real(rp) :: u_cci,u_cco,u_mci,u_mco,v_cci,v_cco,v_cmi,v_cmo, &
-                u_cic,u_coc,u_mic,u_moc,w_cic,w_coc,w_cim,w_com, &
-                v_icc,v_occ,v_imc,v_omc,w_icc,w_occ,w_icm,w_ocm
+    real(rp) :: tauw(2),tauw_tot,this_dw,visci
     integer :: i,j,k
     !
-    visci = 1._rp/visc
+    real(rp), dimension(0:n(1)+1,0:n(2)+1,0:n(3)+1) :: dw1
     !
-    allocate(dw(1:n(1),1:n(2),1:n(3)))
-    dw = big
-    dw_plus = big
+    visci = 1._rp/visc
     !
     if(is_bound(0,1).and.cbc(0,1,1)=='D') then
       do k=1,n(3)
@@ -490,8 +472,8 @@ module mod_sgs
           tauw_tot= sqrt(tauw(1)*tauw(1) + tauw(2)*tauw(2))
           do i = 1,n(1)
             this_dw = dl(1)*(i-0.5)
-            if(this_dw < dw(i,j,k)) then
-              dw(i,j,k) = this_dw
+            if(this_dw == dw(i,j,k)) then
+              dw1(i,j,k) = this_dw
               dw_plus(i,j,k) = this_dw*sqrt(tauw_tot)*visci
             end if
           end do
@@ -506,8 +488,8 @@ module mod_sgs
           tauw_tot= sqrt(tauw(1)*tauw(1) + tauw(2)*tauw(2))
           do i = 1,n(1)
             this_dw = dl(1)*(n(1)-i+0.5)
-            if(this_dw < dw(i,j,k)) then
-              dw(i,j,k) = this_dw
+            if(this_dw == dw(i,j,k)) then
+              dw1(i,j,k) = this_dw
               dw_plus(i,j,k) = this_dw*sqrt(tauw_tot)*visci
             end if
           end do
@@ -523,8 +505,8 @@ module mod_sgs
           tauw_tot= sqrt(tauw(1)*tauw(1) + tauw(2)*tauw(2))
           do j = 1,n(2)
             this_dw = dl(2)*(j-0.5)
-            if(this_dw < dw(i,j,k)) then
-              dw(i,j,k) = this_dw
+            if(this_dw == dw(i,j,k)) then
+              dw1(i,j,k) = this_dw
               dw_plus(i,j,k) = this_dw*sqrt(tauw_tot)*visci
             end if
           end do
@@ -540,8 +522,8 @@ module mod_sgs
           tauw_tot= sqrt(tauw(1)*tauw(1) + tauw(2)*tauw(2))
           do j = 1,n(2)
             this_dw = dl(2)*(n(2)-j+0.5)
-            if(this_dw < dw(i,j,k)) then
-              dw(i,j,k) = this_dw
+            if(this_dw == dw(i,j,k)) then
+              dw1(i,j,k) = this_dw
               dw_plus(i,j,k) = this_dw*sqrt(tauw_tot)*visci
             end if
           end do
@@ -557,8 +539,8 @@ module mod_sgs
           tauw_tot= sqrt(tauw(1)*tauw(1) + tauw(2)*tauw(2))
           do k = 1,n(3)
             this_dw = zc(k)
-            if(this_dw < dw(i,j,k)) then
-              dw(i,j,k) = this_dw
+            if(this_dw == dw(i,j,k)) then
+              dw1(i,j,k) = this_dw
               dw_plus(i,j,k) = this_dw*sqrt(tauw_tot)*visci
             end if
           end do
@@ -574,13 +556,19 @@ module mod_sgs
           tauw_tot= sqrt(tauw(1)*tauw(1) + tauw(2)*tauw(2))
           do k = 1,n(3)
             this_dw = l(3)-zc(k)
-            if(this_dw < dw(i,j,k)) then
-              dw(i,j,k) = this_dw
+            if(this_dw == dw(i,j,k)) then
+              dw1(i,j,k) = this_dw
               dw_plus(i,j,k) = this_dw*sqrt(tauw_tot)*visci
             end if
           end do
         end do
       end do
+    end if
+    ! check if dw and dw1 are the same. Remove this in the future
+    if (.not.all(dw(1:n(1),1:n(2),1:n(3)) == dw1(1:n(1),1:n(2),1:n(3)))) then
+      print*, "dw and dw1 are different"
+      call MPI_FINALIZE(ierr)
+      error stop
     end if
   end subroutine cmpt_dw_plus
 end module mod_sgs

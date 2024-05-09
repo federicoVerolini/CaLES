@@ -230,15 +230,15 @@ module mod_bound
       select case(ctype)
       case('P')
         !
-        ! n.b.: this periodic BC imposition assumes that the subroutine is only called for
-        !       for non-decomposed directions, for which n is the domain length in index space;
+        ! n.b.: this periodic BC imposition assumes that the subroutine is only called for the
+        !       non-decomposed directions, for which n is the domain length in index space;
         !       note that the is_bound(:,:) mask above (set under initmpi.f90) is only true along
         !       the (undecomposed) pencil direction;
         !       along decomposed directions, periodicity is naturally set via the halo exchange
         !
-        ! wall normal velocity at k=n+1 is never used, it can be set to either +(n-1) or -(n-1)
-        ! It is actually problematic if it is used since we do not have a value at k=-1
-        ! the conclusion holds even when there is SGS/wall model/additional viscous term
+        ! wall normal velocity at k=n+1 is never used, it can be set to any values. It must be 
+        ! problematic if it is used, since we do not have a corresponding value at k=-1. This 
+        ! keeps true even when there is SGS/wall model/additional viscous term.
         !
         select case(idir)
         case(1)

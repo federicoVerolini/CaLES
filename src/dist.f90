@@ -22,7 +22,7 @@ module mod_dist
     logical , intent(in ), dimension(0:1,3)    :: is_bound
     real(rp), intent(in ), dimension(3)        :: l,dl
     real(rp), intent(in ), dimension(0:)       :: zc,dzc
-    real(rp), intent(out), dimension(1:,1:,1:) :: dw
+    real(rp), intent(out), dimension(0:,0:,0:) :: dw
     real(rp) :: this_dw
     integer  :: i,j,k
     !
