@@ -15,7 +15,7 @@ module mod_chkdt
   contains
   subroutine chkdt(n,dl,dzci,dzfi,visc,visct,u,v,w,dtmax)
     !
-    ! computes maximum allowed time step, refer to Pieter Wesseling (P200)
+    ! compute maximum allowed time step, refer to Pieter Wesseling (P200)
     ! for the stability conditions of the advective and diffusion terms
     !
     ! the eddy viscosity term is considered in the calculation of dt. It is
@@ -90,7 +90,8 @@ module mod_chkdt
     end do
     if(dti  == 0._rp) dti  = 1._rp
     if(dtid == 0._rp) dtid = eps
-    dtmax = min(0.4125_rp/dtid,1.732_rp/dti) ! vis CFL could be 1.5
+    dtmax = min(0.4125_rp/dtid,1.732_rp/dti) ! viscous CFL could be 1.5
+    print*, 0.4125_rp/dtid, 1.732_rp/dti
     !$acc end data
     !$acc wait(1)
     call MPI_ALLREDUCE(MPI_IN_PLACE,dtmax,1,MPI_REAL_RP,MPI_MIN,MPI_COMM_WORLD,ierr)
