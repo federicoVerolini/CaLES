@@ -91,7 +91,6 @@ module mod_chkdt
     if(dti  == 0._rp) dti  = 1._rp
     if(dtid == 0._rp) dtid = eps
     dtmax = min(0.4125_rp/dtid,1.732_rp/dti) ! viscous CFL could be 1.5
-    print*, 0.4125_rp/dtid, 1.732_rp/dti
     !$acc end data
     !$acc wait(1)
     call MPI_ALLREDUCE(MPI_IN_PLACE,dtmax,1,MPI_REAL_RP,MPI_MIN,MPI_COMM_WORLD,ierr)
