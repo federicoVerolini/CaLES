@@ -12,7 +12,7 @@
 *.xdmf
 *.xmf
 /cans*
-tests/
+test/
 build/
 src/.vscode/
 ~*
