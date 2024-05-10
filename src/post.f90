@@ -124,15 +124,23 @@ module mod_post
   end subroutine vorticity_one_component
   !
   subroutine strain_rate(n,dli,dzci,dzfi,ux,uy,uz,s0,sij)
+    !
+    ! Sij should be first computed at (or averaged to) cell center, then s0=sqrt(2SijSij)
+    ! at cell center. This is also done used by Bae and Orlandi. Pedro averages
+    ! SijSij to cell center first, then computes s0, which always leads to larger s0,
+    ! especially when Sij have opposite signs at the cell edges. The current implementation
+    ! avoids repetitive computation of derivatives, so it is much more efficient.
+    !
     implicit none
     integer , intent(in ), dimension(3)        :: n
     real(rp), intent(in ), dimension(3)        :: dli
     real(rp), intent(in ), dimension(0:)       :: dzci,dzfi
-    real(rp), intent(in ), dimension(0:,0:,0:) :: ux,uy,uz,s0
-    real(rp), intent(out), dimension(0:,0:,0:,1:), optional :: sij
+    real(rp), intent(in ), dimension(0:,0:,0:) :: ux,uy,uz
+    real(rp), intent(out), dimension(0:,0:,0:) :: s0
+    real(rp), intent(out), dimension(0:,0:,0:,1:) :: sij
     real(rp) :: s11,s12,s13,s22,s23,s33,ss
-    real(rp) :: dxi,dyi
-    integer :: i,j,k
+    real(rp) :: dxi,dyi,dzci_k,dzfi_k
+    integer :: i,j,k,m
     !
     dxi = dli(1)
     dyi = dli(2)
@@ -141,60 +149,37 @@ module mod_post
     !
     !$acc parallel loop collapse(3) default(present) private(s11,s12,s13,s22,s23,s33)
     !$OMP PARALLEL DO   COLLAPSE(3) DEFAULT(shared)  PRIVATE(s11,s12,s13,s22,s23,s33)
-    do k=1,n(3)
-      do j=1,n(2)
-        do i=1,n(1)
-          ! s11 = (ux(i,j,k)-ux(i-1,j,k))*dxi
-          ! s22 = (uy(i,j,k)-uy(i,j-1,k))*dyi
-          ! s33 = (uz(i,j,k)-uz(i,j,k-1))*dzfi(k)
-          ! s12 = .25_rp*( &
-          !               (ux(i  ,j+1,k)-ux(i  ,j  ,k))*dyi + (uy(i+1,j  ,k)-uy(i  ,j  ,k))*dxi + &
-          !               (ux(i  ,j  ,k)-ux(i  ,j-1,k))*dyi + (uy(i+1,j-1,k)-uy(i  ,j-1,k))*dxi + &
-          !               (ux(i-1,j+1,k)-ux(i-1,j  ,k))*dyi + (uy(i  ,j  ,k)-uy(i-1,j  ,k))*dxi + &
-          !               (ux(i-1,j  ,k)-ux(i-1,j-1,k))*dyi + (uy(i  ,j-1,k)-uy(i-1,j-1,k))*dxi &
-          !              )*.5_rp
-          ! s13 = .25_rp*( &
-          !                (ux(i  ,j,k+1)-ux(i  ,j,k  ))*dzci(k  ) + (uz(i+1,j,k  )-uz(i  ,j,k  ))*dxi + &
-          !                (ux(i  ,j,k  )-ux(i  ,j,k-1))*dzci(k-1) + (uz(i+1,j,k-1)-uz(i  ,j,k-1))*dxi + &
-          !                (ux(i-1,j,k+1)-ux(i-1,j,k  ))*dzci(k  ) + (uz(i  ,j,k  )-uz(i-1,j,k  ))*dxi + &
-          !                (ux(i-1,j,k  )-ux(i-1,j,k-1))*dzci(k-1) + (uz(i  ,j,k-1)-uz(i-1,j,k-1))*dxi &
-          !              )*.5_rp
-          ! s23 = .25_rp*( &
-          !               (uy(i,j  ,k+1)-uy(i,j  ,k  ))*dzci(k  ) + (uz(i,j+1,k  )-uz(i,j  ,k  ))*dyi + &
-          !               (uy(i,j  ,k  )-uy(i,j  ,k-1))*dzci(k-1) + (uz(i,j+1,k-1)-uz(i,j  ,k-1))*dyi + &
-          !               (uy(i,j-1,k+1)-uy(i,j-1,k  ))*dzci(k  ) + (uz(i,j  ,k  )-uz(i,j-1,k  ))*dyi + &
-          !               (uy(i,j-1,k  )-uy(i,j-1,k-1))*dzci(k-1) + (uz(i,j  ,k-1)-uz(i,j-1,k-1))*dyi &
-          !              )*.5_rp
-          ! if(present(sij)) sij(i,j,k,1:6) = [s11,s22,s33,s12,s13,s23]
-          ! ss = s11*s11 + s22*s22 + s33*s33 + (s12*s12 + s13*s13 + s23*s23)*2._rp
-          ! s0(i,j,k) = sqrt(2._rp*ss)
-          !
-          s11 = ((ux(i,j,k)-ux(i-1,j,k))*dxi    )**2
-          s22 = ((uy(i,j,k)-uy(i,j-1,k))*dyi    )**2
-          s33 = ((uz(i,j,k)-uz(i,j,k-1))*dzfi(k))**2
-          s12 = .25_rp*( &
-                        ((ux(i  ,j+1,k)-ux(i  ,j  ,k))*dyi + (uy(i+1,j  ,k)-uy(i  ,j  ,k))*dxi)**2 + &
-                        ((ux(i  ,j  ,k)-ux(i  ,j-1,k))*dyi + (uy(i+1,j-1,k)-uy(i  ,j-1,k))*dxi)**2 + &
-                        ((ux(i-1,j+1,k)-ux(i-1,j  ,k))*dyi + (uy(i  ,j  ,k)-uy(i-1,j  ,k))*dxi)**2 + &
-                        ((ux(i-1,j  ,k)-ux(i-1,j-1,k))*dyi + (uy(i  ,j-1,k)-uy(i-1,j-1,k))*dxi)**2 &
-                       )*.25_rp
-          s13 = .25_rp*( &
-                         ((ux(i  ,j,k+1)-ux(i  ,j,k  ))*dzci(k  ) + (uz(i+1,j,k  )-uz(i  ,j,k  ))*dxi)**2 + &
-                         ((ux(i  ,j,k  )-ux(i  ,j,k-1))*dzci(k-1) + (uz(i+1,j,k-1)-uz(i  ,j,k-1))*dxi)**2 + &
-                         ((ux(i-1,j,k+1)-ux(i-1,j,k  ))*dzci(k  ) + (uz(i  ,j,k  )-uz(i-1,j,k  ))*dxi)**2 + &
-                         ((ux(i-1,j,k  )-ux(i-1,j,k-1))*dzci(k-1) + (uz(i  ,j,k-1)-uz(i-1,j,k-1))*dxi)**2 &
-                       )*.25_rp
-          s23 = .25_rp*( &
-                        ((uy(i,j  ,k+1)-uy(i,j  ,k  ))*dzci(k  ) + (uz(i,j+1,k  )-uz(i,j  ,k  ))*dyi)**2 + &
-                        ((uy(i,j  ,k  )-uy(i,j  ,k-1))*dzci(k-1) + (uz(i,j+1,k-1)-uz(i,j  ,k-1))*dyi)**2 + &
-                        ((uy(i,j-1,k+1)-uy(i,j-1,k  ))*dzci(k  ) + (uz(i,j  ,k  )-uz(i,j-1,k  ))*dyi)**2 + &
-                        ((uy(i,j-1,k  )-uy(i,j-1,k-1))*dzci(k-1) + (uz(i,j  ,k-1)-uz(i,j-1,k-1))*dyi)**2 &
-                       )*.25_rp
-          ss = s11+s22+s33 + 2*(s12+s13+s23)
-          s0(i,j,k) = sqrt(2._rp*ss)
+    ! compute at cell edge
+    do k = 0,n(3)
+      dzci_k = dzci(k)
+      do j = 0,n(2)
+        do i = 0,n(1)
+          sij(i,j,k,1) = (ux(i,j+1,k)-ux(i,j,k))*dyi    + (uy(i+1,j,k)-uy(i,j,k))*dxi
+          sij(i,j,k,2) = (ux(i,j,k+1)-ux(i,j,k))*dzci_k + (uz(i+1,j,k)-uz(i,j,k))*dxi
+          sij(i,j,k,3) = (uy(i,j,k+1)-uy(i,j,k))*dzci_k + (uz(i,j+1,k)-uz(i,j,k))*dyi
         end do
       end do
     end do
+    
+    do k = 1,n(3)
+      dzfi_k=dzfi(k)
+      do j = 1,n(2)
+        do i = 1,n(1)
+          ! move to cell center
+          sij(i,j,k,4) = 0.125_rp*(sij(i,j,k,1)+sij(i-1,j,k,1)+sij(i,j-1,k,1)+sij(i-1,j-1,k,1))
+          sij(i,j,k,5) = 0.125_rp*(sij(i,j,k,2)+sij(i-1,j,k,2)+sij(i,j,k-1,2)+sij(i-1,j,k-1,2))
+          sij(i,j,k,6) = 0.125_rp*(sij(i,j,k,3)+sij(i,j-1,k,3)+sij(i,j,k-1,3)+sij(i,j-1,k-1,3))
+          ! compute at cell center
+          sij(i,j,k,1) = (ux(i,j,k)-ux(i-1,j,k))*dxi
+          sij(i,j,k,2) = (uy(i,j,k)-uy(i,j-1,k))*dyi
+          sij(i,j,k,3) = (uz(i,j,k)-uz(i,j,k-1))*dzfi_k
+        end do
+      end do
+    end do
+    !
+    s0 = sij(:,:,:,1)**2 + sij(:,:,:,2)**2 + sij(:,:,:,3)**2 + &
+        (sij(:,:,:,4)**2 + sij(:,:,:,5)**2 + sij(:,:,:,6)**2)*2._rp
+    s0 = sqrt(2._rp*s0)
   end subroutine strain_rate
   !
   subroutine rotation_rate(n,dli,dzci,ux,uy,uz,ens)

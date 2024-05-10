@@ -22,7 +22,10 @@ module mod_sgs
                       sij,lij,mij,bcuf,bcvf,bcwf,visct)
     !
     ! compute subgrid viscosity at cell centers
-    ! the dynamcic version's cost is four times that of the static one
+    ! the current implementation of the dynamcic version is two times the 
+    ! cost of the static one. Further acceleration can be achieved by handling
+    ! the data exchange due to periodic bc's (boundp)
+    ! 
     !
     implicit none
     character(len=*), intent(in) :: sgstype
@@ -30,7 +33,7 @@ module mod_sgs
     character(len=1), intent(in), dimension(0:1,3,3) :: cbcvel
     character(len=1), intent(in), dimension(0:1,3)   :: cbcpre
     type(cond_bound), intent(in )                :: bcu,bcv,bcw,bcp
-    type(cond_bound), intent(out)                :: bcuf,bcvf,bcwf
+    type(cond_bound), intent(inout)              :: bcuf,bcvf,bcwf
     integer , intent(in ), dimension(0:1,3)      :: nb,lwm,ind
     logical , intent(in ), dimension(0:1,3)      :: is_bound
     real(rp), intent(in ), dimension(3)          :: l,dl
@@ -51,24 +54,22 @@ module mod_sgs
     case('none')
       visct(:,:,:) = 0._rp
     case('smag')
-      call strain_rate(n,dli,dzci,dzfi,u,v,w,s0)
+      call strain_rate(n,dli,dzci,dzfi,u,v,w,s0,sij)
       call cmpt_dw_plus(cbcvel,n,is_bound,l,dl,zc,dzc,visc,u,v,w,dw,dw_plus)
       call sgs_smag(n,dl,dzf,dw_plus,s0,visct)
     case('dsmag')
-      bcuf = bcu
-      bcvf = bcv
-      bcwf = bcw
-      alph2(:   ) = 4._rp
-      alph2(1   ) = 2.52_rp
+      alph2(:) = 4.00_rp
+      alph2(1) = 2.52_rp
       alph2(n(3)) = 2.52_rp
       !
       call strain_rate(n,dli,dzci,dzfi,u,v,w,s0,sij)
+      !
       visct = s0
       !
       ! Lij
       !
       call interpolate(n,u,v,w,uc,vc,wc)
-      ! only periodic/patched bc's are used, since filtering is not performed
+      ! only periodic/patched bc's are used, because filtering is not performed
       ! in the wall-normal direction for the first off-wall layer of cells
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,uc)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,vc)
@@ -108,7 +109,7 @@ module mod_sgs
       call filter(u,uf,is_fil2d_wall=.true. )
       call filter(v,vf,is_fil2d_wall=.true. )
       call filter(w,wf,is_fil2d_wall=.false.)
-      ! all bs's are used here
+      ! all bc's are used here
       call bounduvw(cbcvel,n,bcuf,bcvf,bcwf,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind, &
                     .true.,.false.,uf,vf,wf)
       call strain_rate(n,dli,dzci,dzfi,uf,vf,wf,s0,sij)
@@ -229,6 +230,10 @@ module mod_sgs
   subroutine filter(p,pf,is_fil2d_wall)
     !
     ! top-hat filter, second-order trapezoidal rule
+    ! we do not define temporary variables to store array elements, since
+    ! each element is used only once, which is different from mom_xyz_ad.
+    ! The current implementation's cost is ~50% of that of computing eight
+    ! cubes as done in Bae's code and Davidson's book.
     !
     implicit none
     real(rp), intent(in ), dimension(0:,0:,0:) :: p
@@ -237,78 +242,132 @@ module mod_sgs
     real(rp) :: p_s(8)
     integer :: n(3),i,j,k,ii,jj,kk
     !
-    n  = shape(p)-2
+    n = shape(p)-2
     pf = 0._rp
     !
-    do ii = 1,n(1)
+    do k = 1,n(3)
+      do j = 1,n(2)
+        do i = 1,n(1)
+          pf(i,j,k) = 8._rp*(p(i,j,k)) + &
+                      4._rp*(p(i-1,j,k) + p(i,j-1,k) + p(i,j,k-1) + &
+                             p(i+1,j,k) + p(i,j+1,k) + p(i,j,k+1)) + &
+                      2._rp*(p(i,j+1,k+1) + p(i+1,j,k+1) + p(i+1,j+1,k) + &
+                             p(i,j-1,k-1) + p(i-1,j,k-1) + p(i-1,j-1,k) + &
+                             p(i,j-1,k+1) + p(i-1,j,k+1) + p(i-1,j+1,k) + &
+                             p(i,j+1,k-1) + p(i+1,j,k-1) + p(i+1,j-1,k)) + &
+                      1._rp*(p(i-1,j-1,k-1) + p(i+1,j-1,k-1) + p(i-1,j+1,k-1) + p(i+1,j+1,k-1) + &
+                             p(i-1,j-1,k+1) + p(i+1,j-1,k+1) + p(i-1,j+1,k+1) + p(i+1,j+1,k+1))
+          pf(i,j,k) = pf(i,j,k)/64._rp
+        end do
+      end do
+    end do
+    ! first off-wall layer, zc(1) and zc(n(3)) 
+    if(is_fil2d_wall) then
+      ! bottom wall
+      do j = 1,n(2)
+        do i = 1,n(1)
+          pf(i,j,1) = 4._rp*(p(i,j,1)) + &
+                      2._rp*(p(i-1,j,1) + p(i,j-1,1) + p(i+1,j,1) + p(i,j+1,1)) + &
+                      1._rp*(p(i-1,j-1,1) + p(i+1,j-1,1) + p(i-1,j+1,1) + p(i+1,j+1,1))
+          pf(i,j,1) = pf(i,j,1)/16._rp  
+        end do
+      end do
+      ! top wall
+      do j = 1,n(2)
+        do i = 1,n(1)
+          pf(i,j,n(3)) = 4._rp*(p(i,j,n(3))) + &
+                         2._rp*(p(i-1,j,n(3)) + p(i,j-1,n(3)) + p(i+1,j,n(3)) + p(i,j+1,n(3))) + &
+                         1._rp*(p(i-1,j-1,n(3)) + p(i+1,j-1,n(3)) + p(i-1,j+1,n(3)) + p(i+1,j+1,n(3)))
+          pf(i,j,n(3)) = pf(i,j,n(3))/16._rp
+        end do
+      end do
+    end if
+  end subroutine filter
+  !
+  subroutine filter_old(p,pf,is_fil2d_wall)
+    !
+    ! top-hat filter, second-order trapezoidal rule
+    !
+    implicit none
+    real(rp), intent(in ), dimension(0:,0:,0:) :: p
+    real(rp), intent(out), dimension(0:,0:,0:) :: pf
+    logical , intent(in ) :: is_fil2d_wall
+    real(rp) :: p_s(8)
+    integer :: n(3),i,j,k,ii,jj,kk
+    !
+    n = shape(p)-2
+    pf = 0._rp
+    !
+    do kk = 1,n(3)
       do jj = 1,n(2)
-        do kk = 1,n(3)
+        do ii = 1,n(1)
           p_s = 0._rp
           ! (1,1,1)
-          do i = 0,1
+          do k = 0,1
             do j = 0,1
-              do k = 0,1
+              do i = 0,1
                 p_s(1) = p_s(1) + p(ii+i,jj+j,kk+k)
               end do
             end do
           end do
           ! (-1,1,1)
-          do i = -1,0
+          do k = 0,1
             do j = 0,1
-              do k = 0,1
+              do i = -1,0
                 p_s(2) = p_s(2) + p(ii+i,jj+j,kk+k)
               end do
             end do
           end do
           ! (1,-1,1)
-          do i = 0,1
+          do k = 0,1
             do j = -1,0
-              do k = 0,1
+              do i = 0,1
                 p_s(3) = p_s(3) + p(ii+i,jj+j,kk+k)
               end do
             end do
           end do
           ! (1,1,-1)
-          do i = 0,1
+          do k = -1,0
             do j = 0,1
-              do k = -1,0
+              do i = 0,1
                 p_s(4) = p_s(4) + p(ii+i,jj+j,kk+k)
               end do
             end do
           end do
           ! (1,-1,-1)
-          do i = 0,1
+          do k = -1,0
             do j = -1,0
-              do k = -1,0
+              do i = 0,1
                 p_s(5) = p_s(5) + p(ii+i,jj+j,kk+k)
               end do
             end do
           end do
           ! (-1,1,-1)
-          do i = -1,0
+          do k = -1,0
             do j = 0,1
-              do k = -1,0
+              do i = -1,0
                 p_s(6) = p_s(6) + p(ii+i,jj+j,kk+k)
               end do
             end do
           end do
           ! (-1,-1,1)
-          do i = -1,0
+          do k = 0,1
             do j = -1,0
-              do k = 0,1
+              do i = -1,0
                 p_s(7) = p_s(7) + p(ii+i,jj+j,kk+k)
               end do
             end do
           end do
           ! (-1,-1,-1)
-          do i = -1,0
+          do k = -1,0
             do j = -1,0
-              do k = -1,0
+              do i = -1,0
                 p_s(8) = p_s(8) + p(ii+i,jj+j,kk+k)
               end do
             end do
           end do
-          pf(ii,jj,kk) = sum(p_s)/64._rp
+          !
+          pf(ii,jj,kk) = sum(p_s(1:8))/64._rp
           !
         end do
       end do
@@ -316,73 +375,73 @@ module mod_sgs
     ! quantities stored at zc(1) and zc(n(3))
     if(is_fil2d_wall) then
       ! bottom wall
-      do ii = 1,n(1)
-        do jj = 1,n(2)
+      do jj = 1,n(2)
+        do ii = 1,n(1)
           p_s = 0._rp
           ! (1,1)
-          do i = 0,1
-            do j = 0,1
+          do j = 0,1
+            do i = 0,1
               p_s(1) = p_s(1) + p(ii+i,jj+j,1)
             end do
           end do
           ! (-1,1)
-          do i = -1,0
-            do j = 0,1
+          do j = 0,1
+            do i = -1,0
               p_s(2) = p_s(2) + p(ii+i,jj+j,1)
             end do
           end do
           ! (1,-1)
-          do i = 0,1
-            do j = -1,0
+          do j = -1,0
+            do i = 0,1
               p_s(3) = p_s(3) + p(ii+i,jj+j,1)
             end do
           end do
           ! (-1,-1)
-          do i = -1,0
-            do j = -1,0
+          do j = -1,0
+            do i = -1,0
               p_s(4) = p_s(4) + p(ii+i,jj+j,1)
             end do
           end do
           !
-          pf(ii,jj,kk) = sum(p_s)/16._rp
+          pf(ii,jj,1) = sum(p_s(1:4))/16._rp
           !
         end do
       end do
       ! top wall
-      do ii = 1,n(1)
-        do jj = 1,n(2)
+      do jj = 1,n(2)
+        do ii = 1,n(1)
           p_s = 0._rp
           ! (1,1)
-          do i = 0,1
-            do j = 0,1
+          do j = 0,1
+            do i = 0,1
               p_s(1) = p_s(1) + p(ii+i,jj+j,n(3))
             end do
           end do
           ! (-1,1)
-          do i = -1,0
-            do j = 0,1
+          do j = 0,1
+            do i = -1,0
               p_s(2) = p_s(2) + p(ii+i,jj+j,n(3))
             end do
           end do
           ! (1,-1)
-          do i = 0,1
-            do j = -1,0
+          do j = -1,0
+            do i = 0,1
               p_s(3) = p_s(3) + p(ii+i,jj+j,n(3))
             end do
           end do
           ! (-1,-1)
-          do i = -1,0
-            do j = -1,0
+          do j = -1,0
+            do i = -1,0
               p_s(4) = p_s(4) + p(ii+i,jj+j,n(3))
             end do
           end do
           !
-          pf(ii,jj,kk) = sum(p_s)/16._rp
+          pf(ii,jj,n(3)) = sum(p_s(1:4))/16._rp
           !
         end do
       end do
     end if
-  end subroutine filter
+  end subroutine filter_old
   !
   subroutine interpolate(n,u,v,w,uc,vc,wc)
     !

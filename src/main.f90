@@ -130,7 +130,7 @@ program cans
   real(rp), dimension(3) :: dpdl
   real(rp), dimension(42) :: var
 #if defined(_TIMING)
-  real(rp) :: dt12,dt12av,dt12min,dt12max,dtt(10),dttav,dttmin,dttmax
+  real(rp) :: dt12,dt12av,dt12min,dt12max,dtt(20),dttav(20),dttmin(20),dttmax(20)
 #endif
   real(rp) :: twi,tw
   integer  :: savecounter
@@ -226,7 +226,8 @@ program cans
   case('smag')
     allocate(s0     (0:n(1)+1,0:n(2)+1,0:n(3)+1), &
              dw     (0:n(1)+1,0:n(2)+1,0:n(3)+1), &
-             dw_plus(0:n(1)+1,0:n(2)+1,0:n(3)+1))
+             dw_plus(0:n(1)+1,0:n(2)+1,0:n(3)+1), &
+             sij    (0:n(1)+1,0:n(2)+1,0:n(3)+1,6))
   case('dsmag')
     allocate(s0 (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
              uc (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
@@ -318,7 +319,8 @@ program cans
   !
   ! initialize boundary condition variables
   !
-  call initbc(bcvel,bcpre,bcsgs,bcu,bcv,bcw,bcp,bcs,n,is_bound,lwm,l,zc,dl,dzc,hwm,ind_wm)
+  call initbc(sgstype,bcvel,bcpre,bcsgs,bcu,bcv,bcw,bcp,bcs,bcuf,bcvf,bcwf, &
+              n,is_bound,lwm,l,zc,dl,dzc,hwm,ind_wm)
   !
   ! initialize Poisson solver
   !

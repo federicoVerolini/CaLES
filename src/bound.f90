@@ -196,12 +196,11 @@ module mod_bound
   end subroutine boundp
   !
   subroutine set_bc(ctype,ibound,idir,nh,centered,bc,dr,p)
-    !set_bc(cbc(0,3,3),0,3,nh,.false.,bcw%z,dzf(0)   ,w)
     implicit none
     character(len=1), intent(in) :: ctype
     integer , intent(in) :: ibound,idir,nh
     logical , intent(in) :: centered
-    real(rp), intent(in), dimension(1-nh:,1-nh:,0:) :: bc !bc, two faces
+    real(rp), intent(in), dimension(1-nh:,1-nh:,0:) :: bc ! bc, two faces
     real(rp), intent(in) :: dr
     real(rp), intent(inout), dimension(1-nh:,1-nh:,1-nh:) :: p
     real(rp), allocatable, dimension(:,:) :: factor
@@ -722,14 +721,15 @@ module mod_bound
   end subroutine updthalo_gpu
 #endif
   !
-  subroutine initbc(bcvel,bcpre,bcsgs,bcu,bcv,bcw,bcp,bcs,n,is_bound,lwm,l,zc,dl,dzc,h,ind)
+  subroutine initbc(sgstype,bcvel,bcpre,bcsgs,bcu,bcv,bcw,bcp,bcs,bcuf,bcvf,bcwf,n,is_bound,lwm,l,zc,dl,dzc,h,ind)
     !
     ! initialize bcu,bcv,bcw,bcp,bcs
     !
     implicit none
+    character(len=*), intent(in) :: sgstype
     real(rp), intent(in), dimension(0:1,3,3) :: bcvel
     real(rp), intent(in), dimension(0:1,3) :: bcpre,bcsgs
-    type(cond_bound), intent(inout) :: bcu,bcv,bcw,bcp,bcs
+    type(cond_bound), intent(inout) :: bcu,bcv,bcw,bcp,bcs,bcuf,bcvf,bcwf
     integer , intent(in), dimension(3) :: n
     logical , intent(in), dimension(0:1,3) :: is_bound
     integer , intent(in), dimension(0:1,3) :: lwm
@@ -775,6 +775,10 @@ module mod_bound
     bcs%y(:,:,1) = bcsgs(1,2)
     bcs%z(:,:,0) = bcsgs(0,3)
     bcs%z(:,:,1) = bcsgs(1,3)
+    !
+    bcuf = bcu
+    bcvf = bcv
+    bcwf = bcw
     !
     ! find the index required for interpolation to the wall model height.
     ! The stored index corresponds to the cells far from a wall, i.e., i2,j2,k2.
