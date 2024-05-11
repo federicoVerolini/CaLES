@@ -129,7 +129,8 @@ module mod_post
     ! at cell center. This is also done used by Bae and Orlandi. Pedro averages
     ! SijSij to cell center first, then computes s0, which always leads to larger s0,
     ! especially when Sij have opposite signs at the cell edges. The current implementation
-    ! avoids repetitive computation of derivatives, so it is much more efficient.
+    ! avoids repetitive computation of derivatives, so it is much more efficient. Note that
+    ! three seperate loops are required. The second and third loops cannot be combined.
     !
     implicit none
     integer , intent(in ), dimension(3)        :: n
@@ -158,15 +159,20 @@ module mod_post
         end do
       end do
     end do
-    !
+    ! move to cell center
     do k = 1,n(3)
       do j = 1,n(2)
         do i = 1,n(1)
-          ! move to cell center
           sij(i,j,k,4) = 0.125_rp*(sij(i,j,k,1)+sij(i-1,j,k,1)+sij(i,j-1,k,1)+sij(i-1,j-1,k,1))
           sij(i,j,k,5) = 0.125_rp*(sij(i,j,k,2)+sij(i-1,j,k,2)+sij(i,j,k-1,2)+sij(i-1,j,k-1,2))
           sij(i,j,k,6) = 0.125_rp*(sij(i,j,k,3)+sij(i,j-1,k,3)+sij(i,j,k-1,3)+sij(i,j-1,k-1,3))
-          ! compute at cell center
+        end do
+      end do
+    end do
+    ! compute at cell center
+    do k = 1,n(3)
+      do j = 1,n(2)
+        do i = 1,n(1)
           sij(i,j,k,1) = (ux(i,j,k)-ux(i-1,j,k))*dxi
           sij(i,j,k,2) = (uy(i,j,k)-uy(i,j-1,k))*dyi
           sij(i,j,k,3) = (uz(i,j,k)-uz(i,j,k-1))*dzfi(k)

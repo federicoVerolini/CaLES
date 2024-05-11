@@ -265,19 +265,19 @@ module mod_sgs
       ! bottom wall
       do j = 1,n(2)
         do i = 1,n(1)
-          pf(i,j,k) = 4._rp*(p(i,j,1)) + &
+          pf(i,j,1) = 4._rp*(p(i,j,1)) + &
                       2._rp*(p(i-1,j,1) + p(i,j-1,1) + p(i+1,j,1) + p(i,j+1,1)) + &
                       1._rp*(p(i-1,j-1,1) + p(i+1,j-1,1) + p(i-1,j+1,1) + p(i+1,j+1,1))
-          pf(i,j,k) = pf(i,j,k)/16._rp
+          pf(i,j,1) = pf(i,j,1)/16._rp
         end do
       end do
       ! top wall
       do j = 1,n(2)
         do i = 1,n(1)
-          pf(i,j,k) = 4._rp*(p(i,j,n(3))) + &
+          pf(i,j,n(3)) = 4._rp*(p(i,j,n(3))) + &
                          2._rp*(p(i-1,j,n(3)) + p(i,j-1,n(3)) + p(i+1,j,n(3)) + p(i,j+1,n(3))) + &
                          1._rp*(p(i-1,j-1,n(3)) + p(i+1,j-1,n(3)) + p(i-1,j+1,n(3)) + p(i+1,j+1,n(3)))
-          pf(i,j,k) = pf(i,j,k)/16._rp
+          pf(i,j,n(3)) = pf(i,j,n(3))/16._rp
         end do
       end do
     end if
