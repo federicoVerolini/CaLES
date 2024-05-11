@@ -97,7 +97,6 @@ module mod_sgs
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,2))
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,3))
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,4))
-      call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,4))
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,5))
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,6))
       call filter(s0*sij(:,:,:,1),mij(:,:,:,1),is_fil2d_wall=.true.)
@@ -261,24 +260,24 @@ module mod_sgs
         end do
       end do
     end do
-    ! first off-wall layer, zc(1) and zc(n(3)) 
+    ! first off-wall layer, zc(1) and zc(n(3))
     if(is_fil2d_wall) then
       ! bottom wall
       do j = 1,n(2)
         do i = 1,n(1)
-          pf(i,j,1) = 4._rp*(p(i,j,1)) + &
+          pf(i,j,k) = 4._rp*(p(i,j,1)) + &
                       2._rp*(p(i-1,j,1) + p(i,j-1,1) + p(i+1,j,1) + p(i,j+1,1)) + &
                       1._rp*(p(i-1,j-1,1) + p(i+1,j-1,1) + p(i-1,j+1,1) + p(i+1,j+1,1))
-          pf(i,j,1) = pf(i,j,1)/16._rp  
+          pf(i,j,k) = pf(i,j,k)/16._rp
         end do
       end do
       ! top wall
       do j = 1,n(2)
         do i = 1,n(1)
-          pf(i,j,n(3)) = 4._rp*(p(i,j,n(3))) + &
+          pf(i,j,k) = 4._rp*(p(i,j,n(3))) + &
                          2._rp*(p(i-1,j,n(3)) + p(i,j-1,n(3)) + p(i+1,j,n(3)) + p(i,j+1,n(3))) + &
                          1._rp*(p(i-1,j-1,n(3)) + p(i+1,j-1,n(3)) + p(i-1,j+1,n(3)) + p(i+1,j+1,n(3)))
-          pf(i,j,n(3)) = pf(i,j,n(3))/16._rp
+          pf(i,j,k) = pf(i,j,k)/16._rp
         end do
       end do
     end if
@@ -501,7 +500,7 @@ module mod_sgs
     ! identification of walls is based on boundary conditions, which might
     ! be problematic in some cases
     !
-    ! It is unacceptable to assume zero velocity at the wall. For no-slip walls,
+    ! it is unacceptable to assume zero velocity at the wall. For no-slip walls,
     ! the velocity at the wall is zero. When a wall model is applied, tauw must 
     ! be computed using the first off-wall and ghost cells. It is incorrect to
     ! assume non-slip wall, which can lead to large errors.

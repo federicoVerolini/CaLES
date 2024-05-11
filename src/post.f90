@@ -138,31 +138,28 @@ module mod_post
     real(rp), intent(in ), dimension(0:,0:,0:) :: ux,uy,uz
     real(rp), intent(out), dimension(0:,0:,0:) :: s0
     real(rp), intent(out), dimension(0:,0:,0:,1:) :: sij
-    real(rp) :: s11,s12,s13,s22,s23,s33,ss
     real(rp) :: dxi,dyi,dzci_k,dzfi_k
-    integer :: i,j,k,m
+    integer :: i,j,k
     !
     dxi = dli(1)
     dyi = dli(2)
     !
-    ! compute s0 = sqrt(2*sij*sij) and sij = (1/2)(du_i/dx_j + du_j/dx_i)
+    ! compute s0 = sqrt(2*sij*sij), where sij = (1/2)(du_i/dx_j + du_j/dx_i)
     !
     !$acc parallel loop collapse(3) default(present) private(s11,s12,s13,s22,s23,s33)
     !$OMP PARALLEL DO   COLLAPSE(3) DEFAULT(shared)  PRIVATE(s11,s12,s13,s22,s23,s33)
     ! compute at cell edge
     do k = 0,n(3)
-      dzci_k = dzci(k)
       do j = 0,n(2)
         do i = 0,n(1)
-          sij(i,j,k,1) = (ux(i,j+1,k)-ux(i,j,k))*dyi    + (uy(i+1,j,k)-uy(i,j,k))*dxi
-          sij(i,j,k,2) = (ux(i,j,k+1)-ux(i,j,k))*dzci_k + (uz(i+1,j,k)-uz(i,j,k))*dxi
-          sij(i,j,k,3) = (uy(i,j,k+1)-uy(i,j,k))*dzci_k + (uz(i,j+1,k)-uz(i,j,k))*dyi
+          sij(i,j,k,1) = (ux(i,j+1,k)-ux(i,j,k))*dyi     + (uy(i+1,j,k)-uy(i,j,k))*dxi
+          sij(i,j,k,2) = (ux(i,j,k+1)-ux(i,j,k))*dzci(k) + (uz(i+1,j,k)-uz(i,j,k))*dxi
+          sij(i,j,k,3) = (uy(i,j,k+1)-uy(i,j,k))*dzci(k) + (uz(i,j+1,k)-uz(i,j,k))*dyi
         end do
       end do
     end do
-    
+    !
     do k = 1,n(3)
-      dzfi_k=dzfi(k)
       do j = 1,n(2)
         do i = 1,n(1)
           ! move to cell center
@@ -172,7 +169,7 @@ module mod_post
           ! compute at cell center
           sij(i,j,k,1) = (ux(i,j,k)-ux(i-1,j,k))*dxi
           sij(i,j,k,2) = (uy(i,j,k)-uy(i,j-1,k))*dyi
-          sij(i,j,k,3) = (uz(i,j,k)-uz(i,j,k-1))*dzfi_k
+          sij(i,j,k,3) = (uz(i,j,k)-uz(i,j,k-1))*dzfi(k)
         end do
       end do
     end do
