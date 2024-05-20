@@ -23,9 +23,9 @@ module mod_sgs
     !
     ! compute subgrid viscosity at cell centers
     ! the current implementation of the dynamcic version is two times the 
-    ! cost of the static one. Further acceleration can be achieved by handling
-    ! the data exchange due to periodic bc's (boundp)
-    ! 
+    ! cost of the static one. Acceleration can be further achieved by
+    ! call only one boundp to do the data exchange of multiple variables.
+    ! Note that it does not save time by simply masking wall bc's in boundp
     !
     implicit none
     character(len=*), intent(in) :: sgstype
@@ -57,8 +57,8 @@ module mod_sgs
       call strain_rate(n,dli,dzci,dzfi,u,v,w,s0,sij)
       call cmpt_dw_plus(cbcvel,n,is_bound,l,dl,zc,dzc,visc,u,v,w,dw,dw_plus)
       call sgs_smag(n,dl,dzf,dw_plus,s0,visct)
-    case('dsmag')
-      alph2(:) = 4.00_rp
+    case('dsmag') ! decide the better filter for channel
+      alph2(:) = 2.52_rp
       alph2(1) = 2.52_rp
       alph2(n(3)) = 2.52_rp
       !
@@ -74,15 +74,24 @@ module mod_sgs
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,uc)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,vc)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,wc)
-      call filter(uc*uc,lij(:,:,:,1),is_fil2d_wall=.true.)
-      call filter(vc*vc,lij(:,:,:,2),is_fil2d_wall=.true.)
-      call filter(wc*wc,lij(:,:,:,3),is_fil2d_wall=.true.)
-      call filter(uc*vc,lij(:,:,:,4),is_fil2d_wall=.true.)
-      call filter(uc*wc,lij(:,:,:,5),is_fil2d_wall=.true.)
-      call filter(vc*wc,lij(:,:,:,6),is_fil2d_wall=.true.)
-      call filter(uc,uf,is_fil2d_wall=.true.)
-      call filter(vc,vf,is_fil2d_wall=.true.)
-      call filter(wc,wf,is_fil2d_wall=.true.)
+      ! call filter(uc*uc,lij(:,:,:,1),is_fil2d_wall=.true.)
+      ! call filter(vc*vc,lij(:,:,:,2),is_fil2d_wall=.true.)
+      ! call filter(wc*wc,lij(:,:,:,3),is_fil2d_wall=.true.)
+      ! call filter(uc*vc,lij(:,:,:,4),is_fil2d_wall=.true.)
+      ! call filter(uc*wc,lij(:,:,:,5),is_fil2d_wall=.true.)
+      ! call filter(vc*wc,lij(:,:,:,6),is_fil2d_wall=.true.)
+      ! call filter(uc,uf,is_fil2d_wall=.true.)
+      ! call filter(vc,vf,is_fil2d_wall=.true.)
+      ! call filter(wc,wf,is_fil2d_wall=.true.)
+      call filter2d(uc*uc,lij(:,:,:,1))
+      call filter2d(vc*vc,lij(:,:,:,2))
+      call filter2d(wc*wc,lij(:,:,:,3))
+      call filter2d(uc*vc,lij(:,:,:,4))
+      call filter2d(uc*wc,lij(:,:,:,5))
+      call filter2d(vc*wc,lij(:,:,:,6))
+      call filter2d(uc,uf)
+      call filter2d(vc,vf)
+      call filter2d(wc,wf)
       lij(:,:,:,1) = lij(:,:,:,1) - uf*uf
       lij(:,:,:,2) = lij(:,:,:,2) - vf*vf
       lij(:,:,:,3) = lij(:,:,:,3) - wf*wf
@@ -99,15 +108,24 @@ module mod_sgs
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,4))
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,5))
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,6))
-      call filter(s0*sij(:,:,:,1),mij(:,:,:,1),is_fil2d_wall=.true.)
-      call filter(s0*sij(:,:,:,2),mij(:,:,:,2),is_fil2d_wall=.true.)
-      call filter(s0*sij(:,:,:,3),mij(:,:,:,3),is_fil2d_wall=.true.)
-      call filter(s0*sij(:,:,:,4),mij(:,:,:,4),is_fil2d_wall=.true.)
-      call filter(s0*sij(:,:,:,5),mij(:,:,:,5),is_fil2d_wall=.true.)
-      call filter(s0*sij(:,:,:,6),mij(:,:,:,6),is_fil2d_wall=.true.)
-      call filter(u,uf,is_fil2d_wall=.true. )
-      call filter(v,vf,is_fil2d_wall=.true. )
-      call filter(w,wf,is_fil2d_wall=.false.)
+      ! call filter(s0*sij(:,:,:,1),mij(:,:,:,1),is_fil2d_wall=.true.)
+      ! call filter(s0*sij(:,:,:,2),mij(:,:,:,2),is_fil2d_wall=.true.)
+      ! call filter(s0*sij(:,:,:,3),mij(:,:,:,3),is_fil2d_wall=.true.)
+      ! call filter(s0*sij(:,:,:,4),mij(:,:,:,4),is_fil2d_wall=.true.)
+      ! call filter(s0*sij(:,:,:,5),mij(:,:,:,5),is_fil2d_wall=.true.)
+      ! call filter(s0*sij(:,:,:,6),mij(:,:,:,6),is_fil2d_wall=.true.)
+      ! call filter(u,uf,is_fil2d_wall=.true. )
+      ! call filter(v,vf,is_fil2d_wall=.true. )
+      ! call filter(w,wf,is_fil2d_wall=.false.)
+      call filter2d(s0*sij(:,:,:,1),mij(:,:,:,1))
+      call filter2d(s0*sij(:,:,:,2),mij(:,:,:,2))
+      call filter2d(s0*sij(:,:,:,3),mij(:,:,:,3))
+      call filter2d(s0*sij(:,:,:,4),mij(:,:,:,4))
+      call filter2d(s0*sij(:,:,:,5),mij(:,:,:,5))
+      call filter2d(s0*sij(:,:,:,6),mij(:,:,:,6))
+      call filter2d(u,uf)
+      call filter2d(v,vf)
+      call filter2d(w,wf)
       ! all bc's are used here
       call bounduvw(cbcvel,n,bcuf,bcvf,bcwf,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind, &
                     .true.,.false.,uf,vf,wf)
@@ -228,7 +246,7 @@ module mod_sgs
   !
   subroutine filter(p,pf,is_fil2d_wall)
     !
-    ! top-hat filter, second-order trapezoidal rule
+    ! top-hat filter 3D, second-order trapezoidal rule
     ! we do not define temporary variables to store array elements, since
     ! each element is used only once, which is different from mom_xyz_ad.
     ! The current implementation's cost is ~50% of that of computing eight
@@ -238,8 +256,7 @@ module mod_sgs
     real(rp), intent(in ), dimension(0:,0:,0:) :: p
     real(rp), intent(out), dimension(0:,0:,0:) :: pf
     logical , intent(in ) :: is_fil2d_wall
-    real(rp) :: p_s(8)
-    integer :: n(3),i,j,k,ii,jj,kk
+    integer :: n(3),i,j,k
     !
     n = shape(p)-2
     pf = 0._rp
@@ -282,6 +299,33 @@ module mod_sgs
       end do
     end if
   end subroutine filter
+  !
+  subroutine filter2d(p,pf)
+    !
+    ! top-hat filter 2D, second-order trapezoidal rule
+    ! filtering along only the homogeneous directions might be more suitable,
+    ! so cs and del can be taken out of the second filtering operation,
+    ! as indicated by R. Agrawal (2022)
+    !
+    implicit none
+    real(rp), intent(in ), dimension(0:,0:,0:) :: p
+    real(rp), intent(out), dimension(0:,0:,0:) :: pf
+    integer :: n(3),i,j,k
+    !
+    n = shape(p)-2
+    pf = 0._rp
+    !
+    do k = 1,n(3)
+      do j = 1,n(2)
+        do i = 1,n(1)
+          pf(i,j,k) = 4._rp*(p(i,j,k)) + &
+                      2._rp*(p(i-1,j,k) + p(i,j-1,k) + p(i+1,j,k) + p(i,j+1,k)) + &
+                      1._rp*(p(i-1,j-1,k) + p(i+1,j-1,k) + p(i-1,j+1,k) + p(i+1,j+1,k))
+          pf(i,j,k) = pf(i,j,k)/16._rp
+        end do
+      end do
+    end do
+  end subroutine filter2d
   !
   subroutine filter_old(p,pf,is_fil2d_wall)
     !

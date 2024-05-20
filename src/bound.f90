@@ -151,7 +151,7 @@ module mod_bound
   !
   subroutine boundp(cbc,n,bcp,nb,is_bound,dl,dzc,p)
     !
-    ! imposes boundary conditions for p, pp and visct
+    ! imposes boundary conditions for cell-centered variables (p, pp,visct)
     ! ghost cells at corners also updated, e.g. p(0,0,1), p(0,0,0)
     !
     implicit none
