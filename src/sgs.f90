@@ -4,6 +4,7 @@
 ! SPDX-License-Identifier: MIT
 !
 ! -
+#define _FILTER_2D
 module mod_sgs
   use mpi
   use mod_common_mpi, only: ierr
@@ -57,10 +58,14 @@ module mod_sgs
       call strain_rate(n,dli,dzci,dzfi,u,v,w,s0,sij)
       call cmpt_dw_plus(cbcvel,n,is_bound,l,dl,zc,dzc,visc,u,v,w,dw,dw_plus)
       call sgs_smag(n,dl,dzf,dw_plus,s0,visct)
-    case('dsmag') ! decide the better filter for channel
-      alph2(:) = 2.52_rp
+    case('dsmag')
+#if defined(_FILTER_2D)
+      alph2 = 2.52_rp
+#else
+      alph2(:) = 4.00_rp
       alph2(1) = 2.52_rp
       alph2(n(3)) = 2.52_rp
+#endif
       !
       call strain_rate(n,dli,dzci,dzfi,u,v,w,s0,sij)
       !
@@ -74,15 +79,7 @@ module mod_sgs
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,uc)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,vc)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,wc)
-      ! call filter(uc*uc,lij(:,:,:,1),is_fil2d_wall=.true.)
-      ! call filter(vc*vc,lij(:,:,:,2),is_fil2d_wall=.true.)
-      ! call filter(wc*wc,lij(:,:,:,3),is_fil2d_wall=.true.)
-      ! call filter(uc*vc,lij(:,:,:,4),is_fil2d_wall=.true.)
-      ! call filter(uc*wc,lij(:,:,:,5),is_fil2d_wall=.true.)
-      ! call filter(vc*wc,lij(:,:,:,6),is_fil2d_wall=.true.)
-      ! call filter(uc,uf,is_fil2d_wall=.true.)
-      ! call filter(vc,vf,is_fil2d_wall=.true.)
-      ! call filter(wc,wf,is_fil2d_wall=.true.)
+#if defined(_FILTER_2D)
       call filter2d(uc*uc,lij(:,:,:,1))
       call filter2d(vc*vc,lij(:,:,:,2))
       call filter2d(wc*wc,lij(:,:,:,3))
@@ -92,6 +89,17 @@ module mod_sgs
       call filter2d(uc,uf)
       call filter2d(vc,vf)
       call filter2d(wc,wf)
+#else
+      call filter(uc*uc,lij(:,:,:,1),is_fil2d_wall=.true.)
+      call filter(vc*vc,lij(:,:,:,2),is_fil2d_wall=.true.)
+      call filter(wc*wc,lij(:,:,:,3),is_fil2d_wall=.true.)
+      call filter(uc*vc,lij(:,:,:,4),is_fil2d_wall=.true.)
+      call filter(uc*wc,lij(:,:,:,5),is_fil2d_wall=.true.)
+      call filter(vc*wc,lij(:,:,:,6),is_fil2d_wall=.true.)
+      call filter(uc,uf,is_fil2d_wall=.true.)
+      call filter(vc,vf,is_fil2d_wall=.true.)
+      call filter(wc,wf,is_fil2d_wall=.true.)
+#endif
       lij(:,:,:,1) = lij(:,:,:,1) - uf*uf
       lij(:,:,:,2) = lij(:,:,:,2) - vf*vf
       lij(:,:,:,3) = lij(:,:,:,3) - wf*wf
@@ -108,15 +116,7 @@ module mod_sgs
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,4))
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,5))
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,6))
-      ! call filter(s0*sij(:,:,:,1),mij(:,:,:,1),is_fil2d_wall=.true.)
-      ! call filter(s0*sij(:,:,:,2),mij(:,:,:,2),is_fil2d_wall=.true.)
-      ! call filter(s0*sij(:,:,:,3),mij(:,:,:,3),is_fil2d_wall=.true.)
-      ! call filter(s0*sij(:,:,:,4),mij(:,:,:,4),is_fil2d_wall=.true.)
-      ! call filter(s0*sij(:,:,:,5),mij(:,:,:,5),is_fil2d_wall=.true.)
-      ! call filter(s0*sij(:,:,:,6),mij(:,:,:,6),is_fil2d_wall=.true.)
-      ! call filter(u,uf,is_fil2d_wall=.true. )
-      ! call filter(v,vf,is_fil2d_wall=.true. )
-      ! call filter(w,wf,is_fil2d_wall=.false.)
+#if defined(_FILTER_2D)
       call filter2d(s0*sij(:,:,:,1),mij(:,:,:,1))
       call filter2d(s0*sij(:,:,:,2),mij(:,:,:,2))
       call filter2d(s0*sij(:,:,:,3),mij(:,:,:,3))
@@ -126,6 +126,17 @@ module mod_sgs
       call filter2d(u,uf)
       call filter2d(v,vf)
       call filter2d(w,wf)
+#else
+      call filter(s0*sij(:,:,:,1),mij(:,:,:,1),is_fil2d_wall=.true.)
+      call filter(s0*sij(:,:,:,2),mij(:,:,:,2),is_fil2d_wall=.true.)
+      call filter(s0*sij(:,:,:,3),mij(:,:,:,3),is_fil2d_wall=.true.)
+      call filter(s0*sij(:,:,:,4),mij(:,:,:,4),is_fil2d_wall=.true.)
+      call filter(s0*sij(:,:,:,5),mij(:,:,:,5),is_fil2d_wall=.true.)
+      call filter(s0*sij(:,:,:,6),mij(:,:,:,6),is_fil2d_wall=.true.)
+      call filter(u,uf,is_fil2d_wall=.true. )
+      call filter(v,vf,is_fil2d_wall=.true. )
+      call filter(w,wf,is_fil2d_wall=.false.)
+#endif
       ! all bc's are used here
       call bounduvw(cbcvel,n,bcuf,bcvf,bcwf,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind, &
                     .true.,.false.,uf,vf,wf)
