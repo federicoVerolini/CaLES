@@ -555,8 +555,9 @@ module mod_sgs
     ! instead of dw_plus, so the implementation ensures the same dw_plus
     ! under different partitionings.
     !
-    ! identification of walls is based on boundary conditions, which might
-    ! be problematic in some cases
+    ! distance to the nearest wall. Identification of walls is based on
+    ! non-penetration boundary conditions, which applied to both the no-slip
+    ! and free-slip (wall model) cases.
     !
     ! it is unacceptable to assume zero velocity at the wall. For no-slip walls,
     ! the velocity at the wall is zero. When a wall model is applied, tauw must 
