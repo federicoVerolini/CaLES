@@ -4,7 +4,6 @@
 ! SPDX-License-Identifier: MIT
 !
 ! -
-#define _FILTER_2D
 module mod_sgs
   use mpi
   use mod_common_mpi, only: ierr
@@ -27,6 +26,10 @@ module mod_sgs
     ! cost of the static one. Acceleration can be further achieved by
     ! call only one boundp to do the data exchange of multiple variables.
     ! Note that it does not save time by simply masking wall bc's in boundp
+    ! 
+    ! The dynamic version yields quite good results for Re_tau=395,550,1000,
+    ! with <=5% error in the friction coeffficient.
+    ! 
     !
     implicit none
     character(len=*), intent(in) :: sgstype
@@ -55,41 +58,31 @@ module mod_sgs
     case('none')
       visct(:,:,:) = 0._rp
     case('smag')
-      call strain_rate(n,dli,dzci,dzfi,u,v,w,s0,sij)
+      call strain_rate(n,dli,dzci,dzfi,is_bound,lwm,u,v,w,s0,sij)
       call cmpt_dw_plus(cbcvel,n,is_bound,l,dl,zc,dzc,visc,u,v,w,dw,dw_plus)
       call sgs_smag(n,dl,dzf,dw_plus,s0,visct)
     case('dsmag')
-#if defined(_FILTER_2D)
-      alph2 = 2.52_rp
-#else
+#if !defined(_FILTER_2D)
       alph2(:) = 4.00_rp
       alph2(1) = 2.52_rp
       alph2(n(3)) = 2.52_rp
+#else
+      alph2(:) = 2.52_rp
 #endif
       !
-      call strain_rate(n,dli,dzci,dzfi,u,v,w,s0,sij)
+      call strain_rate(n,dli,dzci,dzfi,is_bound,lwm,u,v,w,s0,sij)
       !
       visct = s0
       !
       ! Lij
       !
       call interpolate(n,u,v,w,uc,vc,wc)
-      ! only periodic/patched bc's are used, because filtering is not performed
+      ! only periodic/patched bc's are used, since filtering is not performed
       ! in the wall-normal direction for the first off-wall layer of cells
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,uc)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,vc)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,wc)
-#if defined(_FILTER_2D)
-      call filter2d(uc*uc,lij(:,:,:,1))
-      call filter2d(vc*vc,lij(:,:,:,2))
-      call filter2d(wc*wc,lij(:,:,:,3))
-      call filter2d(uc*vc,lij(:,:,:,4))
-      call filter2d(uc*wc,lij(:,:,:,5))
-      call filter2d(vc*wc,lij(:,:,:,6))
-      call filter2d(uc,uf)
-      call filter2d(vc,vf)
-      call filter2d(wc,wf)
-#else
+#if !defined(_FILTER_2D)
       call filter(uc*uc,lij(:,:,:,1),is_fil2d_wall=.true.)
       call filter(vc*vc,lij(:,:,:,2),is_fil2d_wall=.true.)
       call filter(wc*wc,lij(:,:,:,3),is_fil2d_wall=.true.)
@@ -99,6 +92,16 @@ module mod_sgs
       call filter(uc,uf,is_fil2d_wall=.true.)
       call filter(vc,vf,is_fil2d_wall=.true.)
       call filter(wc,wf,is_fil2d_wall=.true.)
+#else
+      call filter2d(uc*uc,lij(:,:,:,1))
+      call filter2d(vc*vc,lij(:,:,:,2))
+      call filter2d(wc*wc,lij(:,:,:,3))
+      call filter2d(uc*vc,lij(:,:,:,4))
+      call filter2d(uc*wc,lij(:,:,:,5))
+      call filter2d(vc*wc,lij(:,:,:,6))
+      call filter2d(uc,uf)
+      call filter2d(vc,vf)
+      call filter2d(wc,wf)
 #endif
       lij(:,:,:,1) = lij(:,:,:,1) - uf*uf
       lij(:,:,:,2) = lij(:,:,:,2) - vf*vf
@@ -116,17 +119,7 @@ module mod_sgs
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,4))
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,5))
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,6))
-#if defined(_FILTER_2D)
-      call filter2d(s0*sij(:,:,:,1),mij(:,:,:,1))
-      call filter2d(s0*sij(:,:,:,2),mij(:,:,:,2))
-      call filter2d(s0*sij(:,:,:,3),mij(:,:,:,3))
-      call filter2d(s0*sij(:,:,:,4),mij(:,:,:,4))
-      call filter2d(s0*sij(:,:,:,5),mij(:,:,:,5))
-      call filter2d(s0*sij(:,:,:,6),mij(:,:,:,6))
-      call filter2d(u,uf)
-      call filter2d(v,vf)
-      call filter2d(w,wf)
-#else
+#if !defined(_FILTER_2D)
       call filter(s0*sij(:,:,:,1),mij(:,:,:,1),is_fil2d_wall=.true.)
       call filter(s0*sij(:,:,:,2),mij(:,:,:,2),is_fil2d_wall=.true.)
       call filter(s0*sij(:,:,:,3),mij(:,:,:,3),is_fil2d_wall=.true.)
@@ -136,11 +129,21 @@ module mod_sgs
       call filter(u,uf,is_fil2d_wall=.true. )
       call filter(v,vf,is_fil2d_wall=.true. )
       call filter(w,wf,is_fil2d_wall=.false.)
+#else
+      call filter2d(s0*sij(:,:,:,1),mij(:,:,:,1))
+      call filter2d(s0*sij(:,:,:,2),mij(:,:,:,2))
+      call filter2d(s0*sij(:,:,:,3),mij(:,:,:,3))
+      call filter2d(s0*sij(:,:,:,4),mij(:,:,:,4))
+      call filter2d(s0*sij(:,:,:,5),mij(:,:,:,5))
+      call filter2d(s0*sij(:,:,:,6),mij(:,:,:,6))
+      call filter2d(u,uf)
+      call filter2d(v,vf)
+      call filter2d(w,wf)
 #endif
       ! all bc's are used here
       call bounduvw(cbcvel,n,bcuf,bcvf,bcwf,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind, &
                     .true.,.false.,uf,vf,wf)
-      call strain_rate(n,dli,dzci,dzfi,uf,vf,wf,s0,sij)
+      call strain_rate(n,dli,dzci,dzfi,is_bound,lwm,uf,vf,wf,s0,sij)
       do m = 1,6
         do k = 1,n(3)
           mij(:,:,k,m) = 2._rp*(mij(:,:,k,m)-alph2(k)*s0(:,:,k)*sij(:,:,k,m))

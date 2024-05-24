@@ -123,19 +123,25 @@ module mod_post
     !$acc wait
   end subroutine vorticity_one_component
   !
-  subroutine strain_rate(n,dli,dzci,dzfi,ux,uy,uz,s0,sij)
+  subroutine strain_rate(n,dli,dzci,dzfi,is_bound,lwm,ux,uy,uz,s0,sij)
     !
     ! Sij should be first computed at (or averaged to) cell center, then s0=sqrt(2SijSij)
-    ! at cell center. This is also done used by Bae and Orlandi. Pedro averages
+    ! at cell center. This implementation is also adopted by Bae and Orlandi. Pedro averages
     ! SijSij to cell center first, then computes s0, which always leads to larger s0,
-    ! especially when Sij have opposite signs at the cell edges. The current implementation
+    ! especially when Sij at the cell edges have opposite signs. The current implementation
     ! avoids repetitive computation of derivatives, so it is much more efficient. Note that
-    ! three seperate loops are required. The second and third loops cannot be combined.
+    ! three seperate loops are required; the second and third loops cannot be combined.
+    !
+    ! when a wall model is applied, the first layer of cells is large that discontinuity
+    ! appears near the wall, one-sided derivatives/averages should be used; averaging and
+    ! differencing should not be done across the discontinuity.
     !
     implicit none
     integer , intent(in ), dimension(3)        :: n
     real(rp), intent(in ), dimension(3)        :: dli
     real(rp), intent(in ), dimension(0:)       :: dzci,dzfi
+    logical , intent(in), dimension(0:1,3)     :: is_bound
+    integer , intent(in), dimension(0:1,3)     :: lwm
     real(rp), intent(in ), dimension(0:,0:,0:) :: ux,uy,uz
     real(rp), intent(out), dimension(0:,0:,0:) :: s0
     real(rp), intent(out), dimension(0:,0:,0:,1:) :: sij
@@ -153,9 +159,9 @@ module mod_post
     do k = 0,n(3)
       do j = 0,n(2)
         do i = 0,n(1)
-          sij(i,j,k,1) = (ux(i,j+1,k)-ux(i,j,k))*dyi     + (uy(i+1,j,k)-uy(i,j,k))*dxi
-          sij(i,j,k,2) = (ux(i,j,k+1)-ux(i,j,k))*dzci(k) + (uz(i+1,j,k)-uz(i,j,k))*dxi
-          sij(i,j,k,3) = (uy(i,j,k+1)-uy(i,j,k))*dzci(k) + (uz(i,j+1,k)-uz(i,j,k))*dyi
+          sij(i,j,k,1) = 0.5_rp*((ux(i,j+1,k)-ux(i,j,k))*dyi     + (uy(i+1,j,k)-uy(i,j,k))*dxi)
+          sij(i,j,k,2) = 0.5_rp*((ux(i,j,k+1)-ux(i,j,k))*dzci(k) + (uz(i+1,j,k)-uz(i,j,k))*dxi)
+          sij(i,j,k,3) = 0.5_rp*((uy(i,j,k+1)-uy(i,j,k))*dzci(k) + (uz(i,j+1,k)-uz(i,j,k))*dyi)
         end do
       end do
     end do
@@ -163,12 +169,29 @@ module mod_post
     do k = 1,n(3)
       do j = 1,n(2)
         do i = 1,n(1)
-          sij(i,j,k,4) = 0.125_rp*(sij(i,j,k,1)+sij(i-1,j,k,1)+sij(i,j-1,k,1)+sij(i-1,j-1,k,1))
-          sij(i,j,k,5) = 0.125_rp*(sij(i,j,k,2)+sij(i-1,j,k,2)+sij(i,j,k-1,2)+sij(i-1,j,k-1,2))
-          sij(i,j,k,6) = 0.125_rp*(sij(i,j,k,3)+sij(i,j-1,k,3)+sij(i,j,k-1,3)+sij(i,j-1,k-1,3))
+          sij(i,j,k,4) = 0.25_rp*(sij(i,j,k,1)+sij(i-1,j,k,1)+sij(i,j-1,k,1)+sij(i-1,j-1,k,1))
+          sij(i,j,k,5) = 0.25_rp*(sij(i,j,k,2)+sij(i-1,j,k,2)+sij(i,j,k-1,2)+sij(i-1,j,k-1,2))
+          sij(i,j,k,6) = 0.25_rp*(sij(i,j,k,3)+sij(i,j-1,k,3)+sij(i,j,k-1,3)+sij(i,j-1,k-1,3))
         end do
       end do
     end do
+    ! one-sided average for the first layer
+    if(is_bound(0,3).and.lwm(0,3)/=0) then
+      do j = 1,n(2)
+        do i = 1,n(1)
+          sij(i,j,1,5) = 0.5_rp*(sij(i,j,1,2)+sij(i-1,j,1,2))
+          sij(i,j,1,6) = 0.5_rp*(sij(i,j,1,3)+sij(i,j-1,1,3))
+        end do
+      end do
+    end if
+    if(is_bound(1,3).and.lwm(1,3)/=0) then
+      do j = 1,n(2)
+        do i = 1,n(1)
+          sij(i,j,n(3),5) = 0.5_rp*(sij(i,j,n(3)-1,2)+sij(i-1,j,n(3)-1,2))
+          sij(i,j,n(3),6) = 0.5_rp*(sij(i,j,n(3)-1,3)+sij(i-1,j,n(3)-1,3))
+        end do
+      end do
+    end if
     ! compute at cell center
     do k = 1,n(3)
       do j = 1,n(2)

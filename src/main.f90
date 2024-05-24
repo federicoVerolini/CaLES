@@ -85,6 +85,7 @@ program cans
   use mod_utils          , only: bulk_mean
   !@acc use mod_utils    , only: device_memory_footprint
   use mod_precision
+  use mod_wmodel         , only: correc_1st_point
   use mod_typedef        , only: cond_bound
   use omp_lib
   implicit none
@@ -386,6 +387,7 @@ program cans
   end if
   !
   !$acc enter data copyin(u,v,w,p) create(pp)
+  call correc_1st_point(n,is_bound,lwm,dl,dzc,dzf,u,v,w)
   call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm,&
                 .true.,.false.,u,v,w)
   call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
@@ -517,6 +519,7 @@ program cans
 #endif
 #endif
       dpdl(:) = dpdl(:) + f(:) ! dt multiplied
+      call correc_1st_point(n,is_bound,lwm,dl,dzc,dzf,u,v,w)
       call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm, &
                     .true.,.false.,u,v,w)
       call fillps(n,dli,dzfi,dtrki,u,v,w,pp)
@@ -524,6 +527,7 @@ program cans
       call solver(n,ng,arrplanp,normfftp,lambdaxyp,ap,bp,cp,cbcpre,['c','c','c'],pp)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,pp)
       call correc(n,dli,dzci,dtrk,pp,u,v,w)
+      call correc_1st_point(n,is_bound,lwm,dl,dzc,dzf,u,v,w)
       call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm, &
                     .true.,.true.,u,v,w)
       call updatep(n,dli,dzci,dzfi,alpha,pp,p)
