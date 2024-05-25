@@ -668,6 +668,10 @@ module mod_mom
                 dudtd_xy_s,dudtd_z_s   , &
                 dvdtd_xy_s,dvdtd_z_s   , &
                 dwdtd_xy_s,dwdtd_z_s
+    !
+    ! real(rp), dimension(0:nz+1) :: dzc,dzf
+    ! real(rp) :: d(3)
+    !
     !$acc parallel loop collapse(3) default(present) async(1) &
     !$acc private(u_ccm,u_pcm,u_cpm,u_cmc,u_pmc,u_mcc,u_ccc,u_pcc,u_mpc,u_cpc,u_cmp,u_mcp,u_ccp) &
     !$acc private(v_ccm,v_pcm,v_cpm,v_cmc,v_pmc,v_mcc,v_ccc,v_pcc,v_mpc,v_cpc,v_cmp,v_mcp,v_ccp) &
@@ -780,6 +784,17 @@ module mod_mom
           dudz_kp = (u_ccp-u_ccc)*dzci(k  )
           dudz_km = (u_ccc-u_ccm)*dzci(k-1)
           !
+          ! dzc = 1._rp/dzci
+          ! dzf = 1._rp/dzfi
+          ! d(2) = 0.5_rp*dzf(2)
+          ! d(3) = d(2) + dzc(2)
+          ! d(4) = d(3) + dzc(3)
+          ! if(k==1) then
+          !   dudz_kp = deriv_1st_ord(u(i,j,2:3),d(2:3),ibound=0)
+          ! else if(k==2) then
+          !   dudz_km = deriv_1st_ord(u(i,j,2:3),d(2:3),ibound=0)
+          ! end if
+          !
           dudx_ip = dudx_ip
           dudx_im = dudx_im
           dvdx_jp = (v_pcc-v_ccc)*dxi
@@ -825,6 +840,12 @@ module mod_mom
           dvdy_jm = (v_ccc-v_cmc)*dyi
           dvdz_kp = (v_ccp-v_ccc)*dzci(k  )
           dvdz_km = (v_ccc-v_ccm)*dzci(k-1)
+          !
+          ! if(k==1) then
+          !   dvdz_kp = deriv_1st_ord(v(i,j,2:3),d(2:3),ibound=0)
+          ! else if(k==2) then
+          !   dvdz_km = deriv_1st_ord(v(i,j,2:3),d(2:3),ibound=0)
+          ! end if
           !
           dudy_ip = (u_cpc-u_ccc)*dyi
           dudy_im = (u_mpc-u_mcc)*dyi
@@ -934,4 +955,39 @@ module mod_mom
     ! dudt,  explicit terms
     ! dudtd, implicit terms
   end subroutine mom_xyz_ad
+  !
+  function deriv_2nd_ord(p,d,ibound)
+    !
+    ! 1st derivative dp/dx with 2nd order accuracy
+    !
+    implicit none
+    real(rp) :: deriv_2nd_ord
+    real(rp), intent(in), dimension(2:) :: p,d
+    integer, intent(in) :: ibound
+    real(rp) :: sgn,d2,d3,d4,p2,p3,p4
+    !
+    sgn = (1-ibound)*(1._rp) + ibound*(-1._rp)
+    !
+    d2 = d(2); d3 = d(3); d4 = d(4)
+    p2 = p(2); p3 = p(3); p4 = p(4)
+    deriv_2nd_ord = sgn*(d2**2*(p3-p4)-d3**2*(p2-p4)+d4**2*(p2-p3)) / &
+                        (d2**2*(d3-d4)-d3**2*(d2-d4)+d4**2*(d2-d3))
+  end function deriv_2nd_ord
+  !
+  function deriv_1st_ord(p,d,ibound)
+    !
+    ! 1st derivative dp/dx with 1st order accuracy
+    !
+    implicit none
+    real(rp) :: deriv_1st_ord
+    real(rp), intent(in), dimension(2:) :: p,d
+    integer, intent(in) :: ibound
+    real(rp) :: sgn,d2,d3,p2,p3
+    !
+    sgn = (1-ibound)*(1._rp) + ibound*(-1._rp)
+    !
+    d2 = d(2); d3 = d(3)
+    p2 = p(2); p3 = p(3)
+    deriv_1st_ord = sgn*(p3-p2)/(d3-d2)
+  end function deriv_1st_ord
 end module mod_mom

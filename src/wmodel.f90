@@ -12,12 +12,17 @@ module mod_wmodel
   use mod_param, only: kap_log,b_log,eps
   implicit none
   private
-  public updt_wallmodelbc,correc_1st_point
+  public updt_wallmodelbc
   contains
     !
   subroutine updt_wallmodelbc(n,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind,u,v,w,bcu,bcv,bcw)
     !
     ! bcu,bcv,bcw determined via wall model
+    ! wall-parallel velocity at ghost cells is used only for computing the viscous terms, i.e., 
+    ! not for computing the convective terms. Hence, when a wall model is implemented, one can
+    ! (1) change the ghost cell values of wall-parallel velocity, or
+    ! (2) replace the viscous term on the wall directly.
+    ! The two methods should be equivalent.
     !
     ! index 0 must be calculated for the right/front/top walls, but not necessary 
     ! for the opposite walls. However, index 0 for the left/back/bottom walls
@@ -285,96 +290,62 @@ module mod_wmodel
     !
   end subroutine wallmodel
   !
-  subroutine correc_1st_point(n,is_bound,lwm,dl,dzc,dzf,u,v,w)
-    !
-    ! extrapolate the first off-wall point from the second and third off-wall points
-    ! This corrects only the inner points (1:n), ghost points are handled by bounduvw
-    ! as normally done. The wall-normal velocity is not corrected, since it does not
-    ! contain discontinuities. The correction procedure is done for correct computation
-    ! of the viscous terms (and advective terms), so it should be called before computing
-    ! them. Also, the wall-normal gradient is represented using the first off-wall and
-    ! ghost points, so the correction procedure should be called before bounduvw.
-    ! The correction is done for both the prediction and projection steps, because we assume
-    ! that the first off-wall point is always incorrect, so should be always replaced by 
-    ! the extrapolation. The correction may not be necessary for the intermidiate velocity.
-    ! The correction makes the velocity near the first off-wall point is not divergence-free.
-    !
-    implicit none
-    integer , intent(in), dimension(3) :: n
-    logical , intent(in), dimension(0:1,3) :: is_bound
-    integer , intent(in), dimension(0:1,3) :: lwm
-    real(rp), intent(in), dimension(3)  :: dl
-    real(rp), intent(in), dimension(0:) :: dzc,dzf
-    real(rp), intent(inout), dimension(0:,0:,0:) :: u,v,w
-    real(rp), dimension(0:n(3)+1) :: dzci,dzfi
-    real(rp) :: d(2:4),dd
-    integer  :: i,j,k
-    !
-    if(is_bound(0,3).and.lwm(0,3)/=0) then
-      d(2) = 0.5_rp*dzf(2)
-      d(3) = d(2) + dzc(2)
-      d(4) = d(3) + dzc(3)
-      do j = 1,n(2)
-        do i = 1,n(1)
-          dd = deriv_1st_ord(u(i,j,2:3),d(2:3),ibound=0)
-!         dd = deriv_2nd_ord(u(i,j,2:4),d(2:4),ibound=0)
-          u(i,j,1) = u(i,j,2) - dd*dzc(1)
-          dd = deriv_1st_ord(v(i,j,2:3),d(2:3),ibound=0)
-!         dd = deriv_2nd_ord(v(i,j,2:4),d(2:4),ibound=0)
-          v(i,j,1) = v(i,j,2) - dd*dzc(1)
-        end do
-      end do
-    end if
-    !
-    if(is_bound(1,3).and.lwm(1,3)/=0) then
-      d(2) = 0.5_rp*dzf(n(3)-1)
-      d(3) = d(2) + dzc(n(3)-2)
-      d(4) = d(3) + dzc(n(3)-3)
-      do j = 1,n(2)
-        do i = 1,n(1)
-          dd = deriv_1st_ord(u(i,j,n(3)-1:n(3)-2:-1),d(2:3),ibound=1)
-!         dd = deriv_2nd_ord(u(i,j,n(3)-1:n(3)-3:-1),d(2:4),ibound=1)
-          u(i,j,n(3)) = u(i,j,n(3)-1) + dd*dzc(n(3)-1)
-          dd = deriv_1st_ord(v(i,j,n(3)-1:n(3)-2:-1),d(2:3),ibound=1)
-!         dd = deriv_2nd_ord(v(i,j,n(3)-1:n(3)-3:-1),d(2:4),ibound=1)
-          v(i,j,n(3)) = v(i,j,n(3)-1) + dd*dzc(n(3)-1)
-        end do
-      end do
-    end if
-  end subroutine correc_1st_point
-  !
-  function deriv_1st_ord(p,d,ibound)
-    !
-    ! 1st derivative dp/dx with 1st order accuracy
-    !
-    implicit none
-    real(rp) :: deriv_1st_ord
-    real(rp), intent(in), dimension(2:) :: p,d
-    integer, intent(in) :: ibound
-    real(rp) :: sgn,d2,d3,p2,p3
-    !
-    sgn = (1-ibound)*(1._rp) + ibound*(-1._rp)
-    !
-    d2 = d(2); d3 = d(3)
-    p2 = p(2); p3 = p(3)
-    deriv_1st_ord = sgn*(p3-p2)/(d3-d2)
-  end function deriv_1st_ord
-  !
-  function deriv_2nd_ord(p,d,ibound)
-    !
-    ! 1st derivative dp/dx with 2nd order accuracy
-    !
-    implicit none
-    real(rp) :: deriv_2nd_ord
-    real(rp), intent(in), dimension(2:) :: p,d
-    integer, intent(in) :: ibound
-    real(rp) :: sgn,d2,d3,d4,p2,p3,p4
-    !
-    sgn = (1-ibound)*(1._rp) + ibound*(-1._rp)
-    !
-    d2 = d(2); d3 = d(3); d4 = d(4)
-    p2 = p(2); p3 = p(3); p4 = p(4)
-    deriv_2nd_ord = sgn*(d2**2*(p3-p4)-d3**2*(p2-p4)+d4**2*(p2-p3)) / &
-                        (d2**2*(d3-d4)-d3**2*(d2-d4)+d4**2*(d2-d3))
-  end function deriv_2nd_ord
+  ! subroutine correc_1st_point(n,is_bound,lwm,dl,dzc,dzf,u,v,w)
+  !   !
+  !   ! extrapolate the first off-wall point from the second and third off-wall points
+  !   ! This corrects only the inner points (1:n), ghost points are handled by bounduvw
+  !   ! as normally done. The wall-normal velocity is not corrected, since it does not
+  !   ! contain discontinuities. The correction procedure is done for correct computation
+  !   ! of the viscous terms (and advective terms), so it should be called before computing
+  !   ! them. Also, the wall-normal gradient is represented using the first off-wall and
+  !   ! ghost points, so the correction procedure should be called before bounduvw.
+  !   ! The correction is done for both the prediction and projection steps, because we assume
+  !   ! that the first off-wall point is always incorrect, so should be always replaced by 
+  !   ! the extrapolation. The correction may not be necessary for the intermidiate velocity.
+  !   ! The correction makes the velocity near the first off-wall point is not divergence-free.
+  !   !
+  !   !
+  !   implicit none
+  !   integer , intent(in), dimension(3) :: n
+  !   logical , intent(in), dimension(0:1,3) :: is_bound
+  !   integer , intent(in), dimension(0:1,3) :: lwm
+  !   real(rp), intent(in), dimension(3)  :: dl
+  !   real(rp), intent(in), dimension(0:) :: dzc,dzf
+  !   real(rp), intent(inout), dimension(0:,0:,0:) :: u,v,w
+  !   real(rp), dimension(0:n(3)+1) :: dzci,dzfi
+  !   real(rp) :: d(2:4),dd
+  !   integer  :: i,j,k
+  !   !
+  !   if(is_bound(0,3).and.lwm(0,3)/=0) then
+  !     d(2) = 0.5_rp*dzf(2)
+  !     d(3) = d(2) + dzc(2)
+  !     d(4) = d(3) + dzc(3)
+  !     do j = 1,n(2)
+  !       do i = 1,n(1)
+  !         dd = deriv_1st_ord(u(i,j,2:3),d(2:3),ibound=0)
+  !         ! dd = deriv_2nd_ord(u(i,j,2:4),d(2:4),ibound=0)
+  !         u(i,j,1) = u(i,j,2) - dd*dzc(1)
+  !         dd = deriv_1st_ord(v(i,j,2:3),d(2:3),ibound=0)
+  !         ! dd = deriv_2nd_ord(v(i,j,2:4),d(2:4),ibound=0)
+  !         v(i,j,1) = v(i,j,2) - dd*dzc(1)
+  !       end do
+  !     end do
+  !   end if
+  !   !
+  !   if(is_bound(1,3).and.lwm(1,3)/=0) then
+  !     d(2) = 0.5_rp*dzf(n(3)-1)
+  !     d(3) = d(2) + dzc(n(3)-2)
+  !     d(4) = d(3) + dzc(n(3)-3)
+  !     do j = 1,n(2)
+  !       do i = 1,n(1)
+  !         dd = deriv_1st_ord(u(i,j,n(3)-1:n(3)-2:-1),d(2:3),ibound=1)
+  !         ! dd = deriv_2nd_ord(u(i,j,n(3)-1:n(3)-3:-1),d(2:4),ibound=1)
+  !         u(i,j,n(3)) = u(i,j,n(3)-1) + dd*dzc(n(3)-1)
+  !         dd = deriv_1st_ord(v(i,j,n(3)-1:n(3)-2:-1),d(2:3),ibound=1)
+  !         ! dd = deriv_2nd_ord(v(i,j,n(3)-1:n(3)-3:-1),d(2:4),ibound=1)
+  !         v(i,j,n(3)) = v(i,j,n(3)-1) + dd*dzc(n(3)-1)
+  !       end do
+  !     end do
+  !   end if
+  ! end subroutine correc_1st_point
 end module mod_wmodel

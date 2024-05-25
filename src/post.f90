@@ -175,7 +175,7 @@ module mod_post
         end do
       end do
     end do
-    ! one-sided average for the first layer
+    ! one-sided differencing for the first off-wall layer
     if(is_bound(0,3).and.lwm(0,3)/=0) then
       do j = 1,n(2)
         do i = 1,n(1)
