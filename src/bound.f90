@@ -48,7 +48,7 @@ module mod_bound
     call updthalo_gpu(nh,cbc(0,:,3)//cbc(1,:,3)==['PP','PP','PP'],w)
 #endif
     !
-    ! impose_norm_bc=0, the correction does not change wall-normal velocity on walls
+    ! impose_norm_bc=0, the correction does not change wall-normal velocity on walls,
     ! this also holds when a wall model is used due to non-penetrating bc
     impose_norm_bc = (.not.is_correc).or.(cbc(0,1,1)//cbc(1,1,1) == 'PP')
     if(is_bound(0,1)) then
@@ -109,9 +109,8 @@ module mod_bound
     ! leading to correct values at the end ghost points. For two-wall channels,
     ! uh,vh and wh do have correct values at the end locations.
     !
-    ! updt_wallmodelbc, ~25% bounduvw time is saved, and ~1% total time is saved,
-    ! since bounduvw time is ~4% of the total time. The computational cost of
-    ! the log-law wall model is negligible.
+    ! updt_wallmodelbc, ~25% of bounduvw time is saved, equivalent to ~1% of the total time,
+    ! The computational cost of the log-law wall model is negligible.
     ! 
     !
     if(is_updt_wm) then

@@ -22,14 +22,20 @@ module mod_sgs
                       sij,lij,mij,bcuf,bcvf,bcwf,visct)
     !
     ! compute subgrid viscosity at cell centers
-    ! the current implementation of the dynamcic version is two times the 
+    ! the current implementation of the dynamcic version is two times the
     ! cost of the static one. Acceleration can be further achieved by
     ! call only one boundp to do the data exchange of multiple variables.
-    ! Note that it does not save time by simply masking wall bc's in boundp
+    ! Note that it does not save time to simply mask wall bc's in boundp
     ! 
     ! The dynamic version yields quite good results for Re_tau=395,550,1000,
-    ! with <=5% error in the friction coeffficient.
-    ! 
+    ! with <=5% error in the friction coefficient.
+    !
+    ! 2D filter is always used for the first off-wall layer, as is done by
+    ! Bae, Orlandi, LESGO, and
+    ! Balaras (1995), Finite-Difference Computations of High Reynolds Number
+    ! Flows Using the Dynamic Subgrid-Scale Model.
+    ! It might be impossible to do 3D filtering of Sij at the first layer, though
+    ! ok for the velocity.
     !
     implicit none
     character(len=*), intent(in) :: sgstype
@@ -77,8 +83,8 @@ module mod_sgs
       ! Lij
       !
       call interpolate(n,u,v,w,uc,vc,wc)
-      ! only periodic/patched bc's are used, since filtering is not performed
-      ! in the wall-normal direction for the first off-wall layer of cells
+      ! only periodic/patched bc's are used, because filtering is always not performed
+      ! in the wall-normal direction for the first off-wall layer
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,uc)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,vc)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,wc)
@@ -140,7 +146,14 @@ module mod_sgs
       call filter2d(v,vf)
       call filter2d(w,wf)
 #endif
-      ! all bc's are used here
+      ! when using no wall model, all bc's are used for computing strain rate, so 
+      ! bcu,bcv,bcw store the boundary values. When using a wall model, wall bc is
+      ! not used, due to one-sided difference. Here, bcuf, bcvf and bcwf are
+      ! defined to store the boundary values of uf,vf,wf. For no-slip wall, they are
+      ! equal to bcu/v/w=0. For wall model, they are in fact not used due to
+      ! one-sided difference. However, we keep them here for clarity and in case
+      ! of future needs.
+      ! 
       call bounduvw(cbcvel,n,bcuf,bcvf,bcwf,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind, &
                     .true.,.false.,uf,vf,wf)
       call strain_rate(n,dli,dzci,dzfi,is_bound,lwm,uf,vf,wf,s0,sij)

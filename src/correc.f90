@@ -13,6 +13,15 @@ module mod_correc
   subroutine correc(n,dli,dzci,dt,p,u,v,w)
     !
     ! corrects the velocity so that it is divergence free
+    ! when homogeneous neumann boundary condition is used for pressure, the
+    ! correction precedure does not change the wall-normal velocity at a wall,
+    ! so the wall-normal velocity keeps its zero value from the prediction step,
+    ! considering that impose_norm_bc=0 for the correction step
+    ! although the ghost cells are also corrected, the correction is superfluous
+    ! since the ghost cell values are replaced in the bounduvw step. Hence, the
+    ! correction step does not use the ghost cells in essence, which implies that
+    ! the ghost cell values of wall-paralel velocities are used only for computing
+    ! the viscous terms.
     !
     implicit none
     integer , intent(in), dimension(3) :: n

@@ -133,8 +133,10 @@ module mod_post
     ! three seperate loops are required; the second and third loops cannot be combined.
     !
     ! when a wall model is applied, the first layer of cells is large that discontinuity
-    ! appears near the wall, one-sided derivatives/averages should be used; averaging and
-    ! differencing should not be done across the discontinuity.
+    ! appears near the wall, one-sided average (difference) should be used; averaging
+    ! should not be done across the discontinuity, since the wall-normal derivatives can be
+    ! as different as several orders of magnitude. Using second-order one-sided approximation
+    ! does not bring any benefit.
     !
     implicit none
     integer , intent(in ), dimension(3)        :: n
@@ -180,22 +182,6 @@ module mod_post
     end do
     ! one-sided difference for the first off-wall layer
     if(is_bound(0,3).and.lwm(0,3)/=0) then
-      do j = 0,n(2)
-        do i = 0,n(1)
-          d12 = dzc(1)
-          d13 = d12+dzc(2)
-          f1 = ux(i,j,1)
-          f2 = ux(i,j,2)
-          f3 = ux(i,j,3)
-          dfdz = ((f2-f1)/d12**2 - (f3-f1)/d13**2) / (1._rp/d12-1._rp/d13)
-          sij(i,j,1,2) = 0.5_rp*(dfdz + (uz(i+1,j,1)-uz(i,j,1))*dxi)
-          f1 = uy(i,j,1)
-          f2 = uy(i,j,2)
-          f3 = uy(i,j,3)
-          dfdz = ((f2-f1)/d12**2 - (f3-f1)/d13**2) / (1._rp/d12-1._rp/d13)
-          sij(i,j,1,3) = 0.5_rp*(dfdz + (uz(i,j+1,1)-uz(i,j,1))*dyi)
-        end do
-      end do
       do j = 1,n(2)
         do i = 1,n(1)
           sij(i,j,1,5) = 0.5_rp*(sij(i,j,1,2)+sij(i-1,j,1,2))
@@ -204,22 +190,6 @@ module mod_post
       end do
     end if
     if(is_bound(1,3).and.lwm(1,3)/=0) then
-      do j = 0,n(2)
-        do i = 0,n(1)
-          d12 = dzc(n(3)-1)
-          d13 = d12+dzc(n(3)-2)
-          f1 = ux(i,j,n(3)  )
-          f2 = ux(i,j,n(3)-1)
-          f3 = ux(i,j,n(3)-2)
-          dfdz = -((f2-f1)/d12**2 - (f3-f1)/d13**2) / (1._rp/d12-1._rp/d13)
-          sij(i,j,n(3)-1,2) = 0.5_rp*(dfdz + (uz(i+1,j,n(3)-1)-uz(i,j,n(3)-1))*dxi)
-          f1 = uy(i,j,n(3)  )
-          f2 = uy(i,j,n(3)-1)
-          f3 = uy(i,j,n(3)-2)
-          dfdz = -((f2-f1)/d12**2 - (f3-f1)/d13**2) / (1._rp/d12-1._rp/d13)
-          sij(i,j,n(3)-1,3) = 0.5_rp*(dfdz + (uz(i,j+1,n(3)-1)-uz(i,j,n(3)-1))*dyi)
-        end do
-      end do
       do j = 1,n(2)
         do i = 1,n(1)
           sij(i,j,n(3),5) = 0.5_rp*(sij(i,j,n(3)-1,2)+sij(i-1,j,n(3)-1,2))

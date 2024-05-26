@@ -18,11 +18,23 @@ module mod_wmodel
   subroutine updt_wallmodelbc(n,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind,u,v,w,bcu,bcv,bcw)
     !
     ! bcu,bcv,bcw determined via wall model
-    ! wall-parallel velocity at ghost cells is used only for computing the viscous terms, i.e., 
-    ! not for computing the convective terms. Hence, when a wall model is implemented, one can
-    ! (1) change the ghost cell values of wall-parallel velocity, or
-    ! (2) replace the viscous term on the wall directly.
-    ! The two methods should be equivalent.
+    ! wall-parallel velocity at ghost cells is used only for computing the viscous terms,
+    ! including its left- and right-hand sides. It is not used for computing the convective
+    ! terms, or in the correction procedure. When a wall model is implemented, we can
+    ! (1) use Neumann bc, by modifying the ghost cell wall-parallel velocity
+    ! (2) use no-slip bc, but replace the viscous stress on the wall
+    ! For implicit schemes, when the second approach is used, one must care about the extra
+    ! term added to the right-hand-side for the first-layer of cells. The extra term must be
+    ! computed using velocity gradient (neumann bc), rather than no-slip bc. In contrast,
+    ! the first method completely lets the boundary condition serve for correctly
+    ! computing the viscous term, including both the left- and right-hand sides, at the first
+    ! off-wall layer of cells.
+    ! In WMLES, the wall should be considered as a no-slip wall with modified (more accurate)
+    ! wall stress. When the wall stress is required, such as viscous stress, it should be
+    ! regarded as a neumann bc. When the wall velocity is required, such as work,
+    ! it should be regarded as a no-slip wall, so zero work is done at the wall. When filtering
+    ! is required, the wall is a slip wall, with the velocity extrapolated from the interior.
+    ! Hence, a ghost point can have three possible values for different purposes.
     !
     ! index 0 must be calculated for the right/front/top walls, but not necessary 
     ! for the opposite walls. However, index 0 for the left/back/bottom walls
