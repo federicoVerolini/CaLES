@@ -145,8 +145,11 @@ module mod_post
     real(rp), intent(in ), dimension(0:,0:,0:) :: ux,uy,uz
     real(rp), intent(out), dimension(0:,0:,0:) :: s0
     real(rp), intent(out), dimension(0:,0:,0:,1:) :: sij
-    real(rp) :: dxi,dyi,dzci_k,dzfi_k
+    real(rp) :: dxi,dyi
     integer :: i,j,k
+    !
+    real(rp) :: d12,d13,f1,f2,f3,dfdz,dzc(0:n(3)+1)
+    dzc = 1./dzci
     !
     dxi = dli(1)
     dyi = dli(2)
@@ -175,8 +178,24 @@ module mod_post
         end do
       end do
     end do
-    ! one-sided differencing for the first off-wall layer
+    ! one-sided difference for the first off-wall layer
     if(is_bound(0,3).and.lwm(0,3)/=0) then
+      do j = 0,n(2)
+        do i = 0,n(1)
+          d12 = dzc(1)
+          d13 = d12+dzc(2)
+          f1 = ux(i,j,1)
+          f2 = ux(i,j,2)
+          f3 = ux(i,j,3)
+          dfdz = ((f2-f1)/d12**2 - (f3-f1)/d13**2) / (1._rp/d12-1._rp/d13)
+          sij(i,j,1,2) = 0.5_rp*(dfdz + (uz(i+1,j,1)-uz(i,j,1))*dxi)
+          f1 = uy(i,j,1)
+          f2 = uy(i,j,2)
+          f3 = uy(i,j,3)
+          dfdz = ((f2-f1)/d12**2 - (f3-f1)/d13**2) / (1._rp/d12-1._rp/d13)
+          sij(i,j,1,3) = 0.5_rp*(dfdz + (uz(i,j+1,1)-uz(i,j,1))*dyi)
+        end do
+      end do
       do j = 1,n(2)
         do i = 1,n(1)
           sij(i,j,1,5) = 0.5_rp*(sij(i,j,1,2)+sij(i-1,j,1,2))
@@ -185,6 +204,22 @@ module mod_post
       end do
     end if
     if(is_bound(1,3).and.lwm(1,3)/=0) then
+      do j = 0,n(2)
+        do i = 0,n(1)
+          d12 = dzc(n(3)-1)
+          d13 = d12+dzc(n(3)-2)
+          f1 = ux(i,j,n(3)  )
+          f2 = ux(i,j,n(3)-1)
+          f3 = ux(i,j,n(3)-2)
+          dfdz = -((f2-f1)/d12**2 - (f3-f1)/d13**2) / (1._rp/d12-1._rp/d13)
+          sij(i,j,n(3)-1,2) = 0.5_rp*(dfdz + (uz(i+1,j,n(3)-1)-uz(i,j,n(3)-1))*dxi)
+          f1 = uy(i,j,n(3)  )
+          f2 = uy(i,j,n(3)-1)
+          f3 = uy(i,j,n(3)-2)
+          dfdz = -((f2-f1)/d12**2 - (f3-f1)/d13**2) / (1._rp/d12-1._rp/d13)
+          sij(i,j,n(3)-1,3) = 0.5_rp*(dfdz + (uz(i,j+1,n(3)-1)-uz(i,j,n(3)-1))*dyi)
+        end do
+      end do
       do j = 1,n(2)
         do i = 1,n(1)
           sij(i,j,n(3),5) = 0.5_rp*(sij(i,j,n(3)-1,2)+sij(i-1,j,n(3)-1,2))
