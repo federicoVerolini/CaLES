@@ -11,7 +11,7 @@ module mod_output
   use mod_precision
   implicit none
   private
-  public out0d,gen_alias,out1d,out1d_chan,out2d,out3d,write_log_output,write_visu_2d,write_visu_3d
+  public out0d,gen_alias,out1d,out1d_chan,out2d,out3d,write_log_output,write_visu_2d,write_visu_3d,out2d_duct
   public out1d_single_point_chan
   contains
   subroutine out0d(fname,n,var)
