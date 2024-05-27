@@ -266,7 +266,7 @@ program cans
   if(myid == 0) print*, ''
   call initgrid(gtype,ng(3),gr,l(3),dzc_g,dzf_g,zc_g,zf_g)
   if(myid == 0) then
-    open(99,file=trim(datadir)//'grid.bin',access='stream')
+    open(99,file=trim(datadir)//'grid.bin',action='write',form='unformatted',access='stream',status='replace')
     write(99) dzc_g(1:ng(3)),dzf_g(1:ng(3)),zc_g(1:ng(3)),zf_g(1:ng(3))
     close(99)
     open(99,file=trim(datadir)//'grid.out')
@@ -303,7 +303,7 @@ program cans
   grid_vol_ratio_c(:) = dl(1)*dl(2)*dzc(:)/(l(1)*l(2)*l(3))
   grid_vol_ratio_f(:) = dl(1)*dl(2)*dzf(:)/(l(1)*l(2)*l(3))
   !$acc end kernels
-  !$acc update self(dzci,dzfi) async
+  !$acc update self(zc,zf,dzc,dzf,dzci,dzfi) async
   !$acc exit data copyout(zc_g,zf_g,dzc_g,dzf_g,dzci_g,dzfi_g) async ! not needed on the device
   !$acc wait
   !
@@ -376,7 +376,6 @@ program cans
   if(.not.restart) then
     istep = 0
     time = 0.
-    !$acc update self(zc,dzc,dzf)
     call initflow(inivel,bcvel,ng,lo,l,dl,zc,zf,dzc,dzf,visc, &
                   is_forced,velf,bforce,is_wallturb,u,v,w,p)
     if(myid == 0) print*, '*** Initial condition succesfully set ***'
@@ -409,7 +408,7 @@ program cans
   !
   call chkdt(n,dl,dzci,dzfi,visc,visct,u,v,w,dtmax)
   dt = min(cfl*dtmax,dtmin)
-  if(myid == 0) print*, 'dtmax = ', dtmax, 'dt = ',dt
+  if(myid == 0) print*, 'dtmax = ', dtmax, 'dt = ', dt
   dti = 1./dt
   kill = .false.
   !
@@ -554,7 +553,7 @@ program cans
       if(myid == 0) print*, 'Checking stability and divergence...'
       call chkdt(n,dl,dzci,dzfi,visc,visct,u,v,w,dtmax)
       dt = min(cfl*dtmax,dtmin)
-      if(myid == 0) print*, 'dtmax = ', dtmax, 'dt = ',dt
+      if(myid == 0) print*, 'dtmax = ', dtmax, 'dt = ', dt
       if(dtmax < small) then
         if(myid == 0) print*, 'ERROR: time step is too small.'
         if(myid == 0) print*, 'Aborting...'

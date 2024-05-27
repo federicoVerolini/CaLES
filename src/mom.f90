@@ -28,26 +28,26 @@ module mod_mom
     real(rp), dimension(0:,0:,0:), intent(in   ) :: u,v,w
     real(rp), dimension( :, :, :), intent(inout) :: dudt
     integer :: i,j,k
-    real(rp) :: uuip,uuim,uvjp,uvjm,uwkp,uwkm
+    real(rp) :: uuip,uuim,vujp,vujm,wukp,wukm
     !
-    !$acc parallel loop collapse(3) default(present) private(uuip,uuim,uvjp,uvjm,uwkp,uwkm) async(1)
-    !$OMP PARALLEL DO   COLLAPSE(3) DEFAULT(shared)  PRIVATE(uuip,uuim,uvjp,uvjm,uwkp,uwkm)
+    !$acc parallel loop collapse(3) default(present) private(uuip,uuim,vujp,vujm,wukp,wukm) async(1)
+    !$OMP PARALLEL DO   COLLAPSE(3) DEFAULT(shared)  PRIVATE(uuip,uuim,vujp,vujm,wukp,wukm)
     do k=1,nz
       do j=1,ny
         do i=1,nx
-          uuip  = 0.25*( u(i+1,j,k)+u(i,j,k) )*( u(i+1,j  ,k  )+u(i,j  ,k  ) )
-          uuim  = 0.25*( u(i-1,j,k)+u(i,j,k) )*( u(i-1,j  ,k  )+u(i,j  ,k  ) )
-          uvjp  = 0.25*( u(i,j+1,k)+u(i,j,k) )*( v(i+1,j  ,k  )+v(i,j  ,k  ) )
-          uvjm  = 0.25*( u(i,j-1,k)+u(i,j,k) )*( v(i+1,j-1,k  )+v(i,j-1,k  ) )
-          uwkp  = 0.25*( u(i,j,k+1)+u(i,j,k) )*( w(i+1,j  ,k  )+w(i,j  ,k  ) )
-          uwkm  = 0.25*( u(i,j,k-1)+u(i,j,k) )*( w(i+1,j  ,k-1)+w(i,j  ,k-1) )
+          uuip  = 0.25*( u(i+1,j  ,k  )+u(i,j  ,k  ) )*( u(i,j,k)+u(i+1,j,k) )
+          uuim  = 0.25*( u(i-1,j  ,k  )+u(i,j  ,k  ) )*( u(i,j,k)+u(i-1,j,k) )
+          vujp  = 0.25*( v(i+1,j  ,k  )+v(i,j  ,k  ) )*( u(i,j,k)+u(i,j+1,k) )
+          vujm  = 0.25*( v(i+1,j-1,k  )+v(i,j-1,k  ) )*( u(i,j,k)+u(i,j-1,k) )
+          wukp  = 0.25*( w(i+1,j  ,k  )+w(i,j  ,k  ) )*( u(i,j,k)+u(i,j,k+1) )
+          wukm  = 0.25*( w(i+1,j  ,k-1)+w(i,j  ,k-1) )*( u(i,j,k)+u(i,j,k-1) )
           !
           ! Momentum balance
           !
           dudt(i,j,k) = dudt(i,j,k) + &
                         dxi*(     -uuip + uuim ) + &
-                        dyi*(     -uvjp + uvjm ) + &
-                        dzfi(k)*( -uwkp + uwkm )
+                        dyi*(     -vujp + vujm ) + &
+                        dzfi(k)*( -wukp + wukm )
         end do
       end do
     end do
@@ -68,12 +68,12 @@ module mod_mom
     do k=1,nz
       do j=1,ny
         do i=1,nx
-          uvip  = 0.25*( v(i,j,k)+v(i+1,j,k) )*( u(i  ,j,k  )+u(i  ,j+1,k  ) )
-          uvim  = 0.25*( v(i,j,k)+v(i-1,j,k) )*( u(i-1,j,k  )+u(i-1,j+1,k  ) )
-          vvjp  = 0.25*( v(i,j,k)+v(i,j+1,k) )*( v(i  ,j,k  )+v(i  ,j+1,k  ) )
-          vvjm  = 0.25*( v(i,j,k)+v(i,j-1,k) )*( v(i  ,j,k  )+v(i  ,j-1,k  ) )
-          wvkp  = 0.25*( v(i,j,k)+v(i,j,k+1) )*( w(i  ,j,k  )+w(i  ,j+1,k  ) )
-          wvkm  = 0.25*( v(i,j,k)+v(i,j,k-1) )*( w(i  ,j,k-1)+w(i  ,j+1,k-1) )
+          uvip  = 0.25*( u(i  ,j,k  )+u(i  ,j+1,k  ) )*( v(i,j,k)+v(i+1,j,k) )
+          uvim  = 0.25*( u(i-1,j,k  )+u(i-1,j+1,k  ) )*( v(i,j,k)+v(i-1,j,k) )
+          vvjp  = 0.25*( v(i  ,j,k  )+v(i  ,j+1,k  ) )*( v(i,j,k)+v(i,j+1,k) )
+          vvjm  = 0.25*( v(i  ,j,k  )+v(i  ,j-1,k  ) )*( v(i,j,k)+v(i,j-1,k) )
+          wvkp  = 0.25*( w(i  ,j,k  )+w(i  ,j+1,k  ) )*( v(i,j,k)+v(i,j,k+1) )
+          wvkm  = 0.25*( w(i  ,j,k-1)+w(i  ,j+1,k-1) )*( v(i,j,k)+v(i,j,k-1) )
           !
           ! Momentum balance
           !
@@ -101,12 +101,12 @@ module mod_mom
     do k=1,nz
       do j=1,ny
         do i=1,nx
-          uwip  = 0.25*( w(i,j,k)+w(i+1,j,k) )*( u(i  ,j  ,k)+u(i  ,j  ,k+1) )
-          uwim  = 0.25*( w(i,j,k)+w(i-1,j,k) )*( u(i-1,j  ,k)+u(i-1,j  ,k+1) )
-          vwjp  = 0.25*( w(i,j,k)+w(i,j+1,k) )*( v(i  ,j  ,k)+v(i  ,j  ,k+1) )
-          vwjm  = 0.25*( w(i,j,k)+w(i,j-1,k) )*( v(i  ,j-1,k)+v(i  ,j-1,k+1) )
-          wwkp  = 0.25*( w(i,j,k)+w(i,j,k+1) )*( w(i  ,j  ,k)+w(i  ,j  ,k+1) )
-          wwkm  = 0.25*( w(i,j,k)+w(i,j,k-1) )*( w(i  ,j  ,k)+w(i  ,j  ,k-1) )
+          uwip  = 0.25*( u(i  ,j  ,k)+u(i  ,j  ,k+1) )*( w(i,j,k)+w(i+1,j,k) )
+          uwim  = 0.25*( u(i-1,j  ,k)+u(i-1,j  ,k+1) )*( w(i,j,k)+w(i-1,j,k) )
+          vwjp  = 0.25*( v(i  ,j  ,k)+v(i  ,j  ,k+1) )*( w(i,j,k)+w(i,j+1,k) )
+          vwjm  = 0.25*( v(i  ,j-1,k)+v(i  ,j-1,k+1) )*( w(i,j,k)+w(i,j-1,k) )
+          wwkp  = 0.25*( w(i  ,j  ,k)+w(i  ,j  ,k+1) )*( w(i,j,k)+w(i,j,k+1) )
+          wwkm  = 0.25*( w(i  ,j  ,k)+w(i  ,j  ,k-1) )*( w(i,j,k)+w(i,j,k-1) )
           !
           ! Momentum balance
           !

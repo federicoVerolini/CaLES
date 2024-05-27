@@ -117,7 +117,7 @@ contains
                        cudecomp_h_comm_backend,cudecomp_is_h_enable_nccl,cudecomp_is_h_enable_nvshmem
 #endif
     open(newunit=iunit,file='input.nml',status='old',action='read',iostat=ierr)
-      if( ierr == 0 ) then
+      if(ierr == 0) then
         read(iunit,nml=dns,iostat=ierr)
       else
         if(myid == 0) print*, 'Error reading the input file'
@@ -147,7 +147,7 @@ contains
     !
 #if defined(_OPENACC)
     !
-    ! read cuDecomp parameter file cudecomp.in, if it exists
+    ! reading cuDecomp parameters, if these are set
     !
     ! defaults
     !
@@ -158,7 +158,7 @@ contains
     cudecomp_is_t_enable_nvshmem = .true.
     cudecomp_is_h_enable_nvshmem = .true.
     open(newunit=iunit,file='input.nml',status='old',action='read',iostat=ierr)
-      if( ierr == 0 ) then
+      if(ierr == 0) then
         read(iunit,nml=cudecomp,iostat=ierr)
       else
         if(myid == 0) print*, 'Error reading the input file'
