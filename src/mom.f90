@@ -637,8 +637,12 @@ module mod_mom
   subroutine mom_xyz_ad(nx,ny,nz,dxi,dyi,dzci,dzfi,visc,u,v,w,visct,dudt,dvdt,dwdt,dudtd,dvdtd,dwdtd)
     !
     ! lump all r.h.s. of momentum terms (excluding pressure) into a single fast kernel
-    ! interpolation of eddy viscosity, tested by visct = x+y+z
-    ! extra cross-derivatives, tested by u,v,w = x*y*z
+    ! interpolation of eddy viscosity, verified by visct = x+y+z
+    ! extra cross-derivatives, verified by u,v,w = x*y*z
+    ! The calculation of the viscous flux for the first off-wall layer of cells uses
+    ! u(k=1) and u(k=2). It does not involve the wall, which is the reason that no special
+    ! treatment is needed for the viscous flux at the first cells. The incorrect layer
+    ! locates only between the wall and u(k=1).
     !
     integer , intent(in   ) :: nx,ny,nz
     real(rp), intent(in   ) :: dxi,dyi

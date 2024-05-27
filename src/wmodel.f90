@@ -21,20 +21,20 @@ module mod_wmodel
     ! wall-parallel velocity at ghost cells is used only for computing the viscous terms,
     ! including its left- and right-hand sides. It is not used for computing the convective
     ! terms, or in the correction procedure. When a wall model is implemented, we can
-    ! (1) use Neumann bc, by modifying the ghost cell wall-parallel velocity
-    ! (2) use no-slip bc, but replace the viscous stress on the wall
-    ! For implicit schemes, when the second approach is used, one must care about the extra
-    ! term added to the right-hand-side for the first-layer of cells. The extra term must be
-    ! computed using velocity gradient (neumann bc), rather than no-slip bc. In contrast,
-    ! the first method completely lets the boundary condition serve for correctly
-    ! computing the viscous term, including both the left- and right-hand sides, at the first
-    ! off-wall layer of cells.
+    ! (1) set Neumann bc, and modify the ghost cell wall-parallel velocity for correct stress
+    ! (2) set Neumann bc, and modify the ghost cell wall-parallel velocity as interpolation
+    !     from the interior points for correct strain rate/filtering
+    ! In method (1), the strain rate subroutine needs to be modified to do one-sided average/
+    ! difference at the wall, but no modifications for the viscous flux. In method (2), 
+    ! the viscous flux needs to be modified, but the strain rate subroutine remains unchanged.
+    !
     ! In WMLES, the wall should be considered as a no-slip wall with modified (more accurate)
     ! wall stress. When the wall stress is required, such as viscous stress, it should be
     ! regarded as a neumann bc. When the wall velocity is required, such as work,
-    ! it should be regarded as a no-slip wall, so zero work is done at the wall. When filtering
-    ! is required, the wall is a slip wall, with the velocity extrapolated from the interior.
-    ! Hence, a ghost point can have three possible values for different purposes.
+    ! it should be regarded as a no-slip wall, so zero work is done at the wall. When
+    ! filtering/differentiation is required, the wall is a slip wall, with the velocity
+    ! extrapolated from the interior. Hence, if ghost point is used, it can have three
+    ! different values for the different purposes.
     !
     ! index 0 must be calculated for the right/front/top walls, but not necessary 
     ! for the opposite walls. However, index 0 for the left/back/bottom walls
