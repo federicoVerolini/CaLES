@@ -130,7 +130,8 @@ module mod_post
     ! SijSij to cell center first, then computes s0, which always leads to larger s0,
     ! especially when Sij at the cell edges have opposite signs. The current implementation
     ! avoids repetitive computation of derivatives, so it is much more efficient. Note that
-    ! three seperate loops are required; the second and third loops cannot be combined.
+    ! three seperate loops are required; the second and third loops (special treatment does
+    ! not count) cannot be combined.
     !
     ! when a wall model is applied, the first layer of cells is large that discontinuity
     ! appears near the wall, one-sided average (difference) should be used; averaging

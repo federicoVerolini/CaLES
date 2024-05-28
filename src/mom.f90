@@ -657,7 +657,7 @@ module mod_mom
                 w_ccm,w_pcm,w_cpm,w_cmc,w_pmc,w_mcc,w_ccc,w_pcc,w_mpc,w_cpc,w_cmp,w_mcp,w_ccp, &
                 s_ccm,s_pcm,s_cpm,s_cmc,s_pmc,s_mcc,s_ccc,s_pcc,s_mpc,s_cpc,s_cmp,s_mcp,s_ccp, &
                 s_ppc,s_pcp,s_cpp
-    real(rp) :: uu_ip,uu_im,uv_jp,uv_jm,uw_kp,uw_km, &
+    real(rp) :: uu_ip,uu_im,vu_jp,vu_jm,wu_kp,wu_km, &
                 uv_ip,uv_im,vv_jp,vv_jm,wv_kp,wv_km, &
                 uw_ip,uw_im,vw_jp,vw_jm,ww_kp,ww_km
     real(rp) :: dudx_ip,dudx_im,dudy_jp,dudy_jm,dudz_kp,dudz_km, &
@@ -680,7 +680,7 @@ module mod_mom
     !$acc private(u_ccm,u_pcm,u_cpm,u_cmc,u_pmc,u_mcc,u_ccc,u_pcc,u_mpc,u_cpc,u_cmp,u_mcp,u_ccp) &
     !$acc private(v_ccm,v_pcm,v_cpm,v_cmc,v_pmc,v_mcc,v_ccc,v_pcc,v_mpc,v_cpc,v_cmp,v_mcp,v_ccp) &
     !$acc private(w_ccm,w_pcm,w_cpm,w_cmc,w_pmc,w_mcc,w_ccc,w_pcc,w_mpc,w_cpc,w_cmp,w_mcp,w_ccp) &
-    !$acc private(uu_ip,uu_im,uv_jp,uv_jm,uw_kp,uw_km) &
+    !$acc private(uu_ip,uu_im,vu_jp,vu_jm,wu_kp,wu_km) &
     !$acc private(uv_ip,uv_im,vv_jp,vv_jm,wv_kp,wv_km) &
     !$acc private(uw_ip,uw_im,vw_jp,vw_jm,ww_kp,ww_km) &
     !$acc private(dudx_ip,dudx_im,dudy_jp,dudy_jm,dudz_kp,dudz_km) &
@@ -695,7 +695,7 @@ module mod_mom
     !$OMP PRIVATE(u_ccm,u_pcm,u_cpm,u_cmc,u_pmc,u_mcc,u_ccc,u_pcc,u_mpc,u_cpc,u_cmp,u_mcp,u_ccp) &
     !$OMP PRIVATE(v_ccm,v_pcm,v_cpm,v_cmc,v_pmc,v_mcc,v_ccc,v_pcc,v_mpc,v_cpc,v_cmp,v_mcp,v_ccp) &
     !$OMP PRIVATE(w_ccm,w_pcm,w_cpm,w_cmc,w_pmc,w_mcc,w_ccc,w_pcc,w_mpc,w_cpc,w_cmp,w_mcp,w_ccp) &
-    !$OMP PRIVATE(uu_ip,uu_im,uv_jp,uv_jm,uw_kp,uw_km) &
+    !$OMP PRIVATE(uu_ip,uu_im,vu_jp,vu_jm,wu_kp,wu_km) &
     !$OMP PRIVATE(uv_ip,uv_im,vv_jp,vv_jm,wv_kp,wv_km) &
     !$OMP PRIVATE(uw_ip,uw_im,vw_jp,vw_jm,ww_kp,ww_km) &
     !$OMP PRIVATE(dudx_ip,dudx_im,dudy_jp,dudy_jm,dudz_kp,dudz_km) &
@@ -808,12 +808,12 @@ module mod_mom
           !
           ! x advection
           !
-          uu_ip  = 0.25_rp*(u_pcc+u_ccc)*(u_pcc+u_ccc)
-          uu_im  = 0.25_rp*(u_mcc+u_ccc)*(u_mcc+u_ccc)
-          uv_jp  = 0.25_rp*(u_cpc+u_ccc)*(v_pcc+v_ccc)
-          uv_jm  = 0.25_rp*(u_cmc+u_ccc)*(v_pmc+v_cmc)
-          uw_kp  = 0.25_rp*(u_ccp+u_ccc)*(w_pcc+w_ccc)
-          uw_km  = 0.25_rp*(u_ccm+u_ccc)*(w_pcm+w_ccm)
+          uu_ip  = 0.25_rp*(u_pcc+u_ccc)*(u_ccc+u_pcc)
+          uu_im  = 0.25_rp*(u_mcc+u_ccc)*(u_ccc+u_mcc)
+          vu_jp  = 0.25_rp*(v_pcc+v_ccc)*(u_ccc+u_cpc)
+          vu_jm  = 0.25_rp*(v_pmc+v_cmc)*(u_ccc+u_cmc)
+          wu_kp  = 0.25_rp*(w_pcc+w_ccc)*(u_ccc+u_ccp)
+          wu_km  = 0.25_rp*(w_pcm+w_ccm)*(u_ccc+u_ccm)
           !
           dudtd_xy_s = &
                         visc*(dudx_ip-dudx_im)*dxi + & ! d(dudx)/dx
@@ -822,8 +822,8 @@ module mod_mom
                         visc*(dudz_kp-dudz_km)*dzfi(k) ! d(dudz)/dz
           dudt_s     = &
                         -(uu_ip-uu_im)*dxi - &
-                         (uv_jp-uv_jm)*dyi - &
-                         (uw_kp-uw_km)*dzfi(k) &
+                         (vu_jp-vu_jm)*dyi - &
+                         (wu_kp-wu_km)*dzfi(k) &
                          !
                         +(visc_ip*(dudx_ip+dudx_ip)-visc_im*(dudx_im+dudx_im))*dxi + & ! d(dudx+dudx)/dx
                          (visc_jp*(dudy_jp+dvdx_jp)-visc_jm*(dudy_jm+dvdx_jm))*dyi + & ! d(dudy+dvdx)/dy
@@ -860,12 +860,12 @@ module mod_mom
           !
           ! y advection
           !
-          uv_ip  = 0.25_rp*(v_ccc+v_pcc)*(u_ccc+u_cpc)
-          uv_im  = 0.25_rp*(v_ccc+v_mcc)*(u_mcc+u_mpc)
+          uv_ip  = 0.25_rp*(u_ccc+u_cpc)*(v_ccc+v_pcc)
+          uv_im  = 0.25_rp*(u_mcc+u_mpc)*(v_ccc+v_mcc)
           vv_jp  = 0.25_rp*(v_ccc+v_cpc)*(v_ccc+v_cpc)
           vv_jm  = 0.25_rp*(v_ccc+v_cmc)*(v_ccc+v_cmc)
-          wv_kp  = 0.25_rp*(v_ccc+v_ccp)*(w_ccc+w_cpc)
-          wv_km  = 0.25_rp*(v_ccc+v_ccm)*(w_ccm+w_cpm)
+          wv_kp  = 0.25_rp*(w_ccc+w_cpc)*(v_ccc+v_ccp)
+          wv_km  = 0.25_rp*(w_ccm+w_cpm)*(v_ccc+v_ccm)
           !
           dvdtd_xy_s = &
                         visc*(dvdx_ip-dvdx_im)*dxi + & ! d(dvdx)/dx
@@ -906,10 +906,10 @@ module mod_mom
           !
           ! z advection
           !
-          uw_ip  = 0.25_rp*(w_ccc+w_pcc)*(u_ccc+u_ccp)
-          uw_im  = 0.25_rp*(w_ccc+w_mcc)*(u_mcc+u_mcp)
-          vw_jp  = 0.25_rp*(w_ccc+w_cpc)*(v_ccc+v_ccp)
-          vw_jm  = 0.25_rp*(w_ccc+w_cmc)*(v_cmc+v_cmp)
+          uw_ip  = 0.25_rp*(u_ccc+u_ccp)*(w_ccc+w_pcc)
+          uw_im  = 0.25_rp*(u_mcc+u_mcp)*(w_ccc+w_mcc)
+          vw_jp  = 0.25_rp*(v_ccc+v_ccp)*(w_ccc+w_cpc)
+          vw_jm  = 0.25_rp*(v_cmc+v_cmp)*(w_ccc+w_cmc)
           ww_kp  = 0.25_rp*(w_ccc+w_ccp)*(w_ccc+w_ccp)
           ww_km  = 0.25_rp*(w_ccc+w_ccm)*(w_ccc+w_ccm)
           !
