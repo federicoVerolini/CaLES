@@ -42,4 +42,4 @@
                      2,ng(2)/2,ng,time,istep, &
                      visct(1:n(1),1:n(2),1:n(3)))
   !
-  ! call out2d_duct(trim(datadir)//'velstats_fld_'//fldnum//'.out',ng,lo,hi,1,l,dl,zc_g,u,v,w)
+  call out2d_duct(trim(datadir)//'velstats_fld_'//fldnum//'.out',ng,lo,hi,1,l,dl,zc_g,u,v,w)
