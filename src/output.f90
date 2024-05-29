@@ -376,7 +376,7 @@ module mod_output
   !
   subroutine out2d_duct(fname,ng,lo,hi,idir,l,dl,z_g,u,v,w)
     !
-    ! for a duct
+    ! for a duct, cell-centered values
     !
     implicit none
     character(len=*), intent(in) :: fname

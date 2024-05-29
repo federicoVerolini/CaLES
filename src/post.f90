@@ -171,7 +171,56 @@ module mod_post
         end do
       end do
     end do
-    ! move to cell center
+    ! extrapolate to walls
+    if(is_bound(0,1).and.lwm(0,1)/=0) then
+      do k = 0,n(3)
+        do j = 0,n(2)
+          sij(0,j,k,1) = sij(1,j,k,1)
+          sij(0,j,k,2) = sij(1,j,k,2)
+        end do
+      end do
+    end if
+    if(is_bound(1,1).and.lwm(1,1)/=0) then
+      do k = 0,n(3)
+        do j = 0,n(2)
+          sij(n(1),j,k,1) = sij(n(1)-1,j,k,1)
+          sij(n(1),j,k,2) = sij(n(1)-1,j,k,2)
+        end do
+      end do
+    end if
+    if(is_bound(0,2).and.lwm(0,2)/=0) then
+      do k = 0,n(3)
+        do i = 0,n(1)
+          sij(i,0,k,1) = sij(i,1,k,1)
+          sij(i,0,k,3) = sij(i,1,k,3)
+        end do
+      end do
+    end if
+    if(is_bound(1,2).and.lwm(1,2)/=0) then
+      do k = 0,n(3)
+        do i = 0,n(1)
+          sij(i,n(2),k,1) = sij(i,n(2)-1,k,1)
+          sij(i,n(2),k,3) = sij(i,n(2)-1,k,3)
+        end do
+      end do
+    end if
+    if(is_bound(0,3).and.lwm(0,3)/=0) then
+      do j = 0,n(2)
+        do i = 0,n(1)
+          sij(i,j,0,2) = sij(i,j,1,2)
+          sij(i,j,0,3) = sij(i,j,1,3)
+        end do
+      end do
+    end if
+    if(is_bound(1,3).and.lwm(1,3)/=0) then
+      do j = 0,n(2)
+        do i = 0,n(1)
+          sij(i,j,n(3),2) = sij(i,j,n(3)-1,2)
+          sij(i,j,n(3),3) = sij(i,j,n(3)-1,3)
+        end do
+      end do
+    end if
+    ! average to cell center
     do k = 1,n(3)
       do j = 1,n(2)
         do i = 1,n(1)
@@ -181,23 +230,55 @@ module mod_post
         end do
       end do
     end do
-    ! one-sided difference for the first off-wall layer
-    if(is_bound(0,3).and.lwm(0,3)/=0) then
-      do j = 1,n(2)
-        do i = 1,n(1)
-          sij(i,j,1,5) = 0.5_rp*(sij(i,j,1,2)+sij(i-1,j,1,2))
-          sij(i,j,1,6) = 0.5_rp*(sij(i,j,1,3)+sij(i,j-1,1,3))
-        end do
-      end do
-    end if
-    if(is_bound(1,3).and.lwm(1,3)/=0) then
-      do j = 1,n(2)
-        do i = 1,n(1)
-          sij(i,j,n(3),5) = 0.5_rp*(sij(i,j,n(3)-1,2)+sij(i-1,j,n(3)-1,2))
-          sij(i,j,n(3),6) = 0.5_rp*(sij(i,j,n(3)-1,3)+sij(i-1,j,n(3)-1,3))
-        end do
-      end do
-    end if
+    ! ! one-sided difference for the first off-wall layer
+    ! if(is_bound(0,1).and.lwm(0,1)/=0) then
+    !   do k = 1,n(3)
+    !     do j = 1,n(2)
+    !       sij(1,j,k,4) = 0.25_rp*(sij(1,j,k,1)+sij(1,j-1,k,1))
+    !       sij(1,j,k,5) = 0.25_rp*(sij(1,j,k,2)+sij(1,j,k-1,2))
+    !     end do
+    !   end do
+    ! end if
+    ! if(is_bound(1,1).and.lwm(1,1)/=0) then
+    !   do k = 1,n(3)
+    !     do j = 1,n(2)
+    !       sij(n(1),j,k,4) = 0.25_rp*(sij(n(1)-1,j,k,1)+sij(n(1)-1,j-1,k,1))
+    !       sij(n(1),j,k,5) = 0.25_rp*(sij(n(1)-1,j,k,2)+sij(n(1)-1,j,k-1,2))
+    !     end do
+    !   end do
+    ! end if
+    ! if(is_bound(0,2).and.lwm(0,2)/=0) then
+    !   do k = 1,n(3)
+    !     do i = 1,n(1)
+    !       sij(i,1,k,4) = 0.25_rp*(sij(i,1,k,1)+sij(i-1,1,k,1))
+    !       sij(i,1,k,6) = 0.25_rp*(sij(i,1,k,3)+sij(i,1,k-1,3))
+    !     end do
+    !   end do
+    ! end if
+    ! if(is_bound(1,2).and.lwm(1,2)/=0) then
+    !   do k = 1,n(3)
+    !     do i = 1,n(1)
+    !       sij(i,n(2),k,4) = 0.25_rp*(sij(i,n(2)-1,k,1)+sij(i-1,n(2)-1,k,1))
+    !       sij(i,n(2),k,6) = 0.25_rp*(sij(i,n(2)-1,k,3)+sij(i,n(2)-1,k-1,3))
+    !     end do
+    !   end do
+    ! end if
+    ! if(is_bound(0,3).and.lwm(0,3)/=0) then
+    !   do j = 1,n(2)
+    !     do i = 1,n(1)
+    !       sij(i,j,1,5) = 0.5_rp*(sij(i,j,1,2)+sij(i-1,j,1,2))
+    !       sij(i,j,1,6) = 0.5_rp*(sij(i,j,1,3)+sij(i,j-1,1,3))
+    !     end do
+    !   end do
+    ! end if
+    ! if(is_bound(1,3).and.lwm(1,3)/=0) then
+    !   do j = 1,n(2)
+    !     do i = 1,n(1)
+    !       sij(i,j,n(3),5) = 0.5_rp*(sij(i,j,n(3)-1,2)+sij(i-1,j,n(3)-1,2))
+    !       sij(i,j,n(3),6) = 0.5_rp*(sij(i,j,n(3)-1,3)+sij(i-1,j,n(3)-1,3))
+    !     end do
+    !   end do
+    ! end if
     ! compute at cell center
     do k = 1,n(3)
       do j = 1,n(2)

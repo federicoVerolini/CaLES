@@ -26,7 +26,7 @@ cs1 = ax.contourf(x1, x2, fld,
                   cmap=plt.cm.jet)
 cbar = fig.colorbar(cs1, orientation='vertical')
 #
-# format figrue
+# format figure
 #
 ax.set_title(fgtitle)
 cbar.ax.set_title(cbtitle)

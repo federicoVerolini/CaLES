@@ -25,7 +25,7 @@ module mod_wmodel
     ! (2) set Neumann bc, and modify the ghost cell wall-parallel velocity as interpolation
     !     from the interior points for correct strain rate/filtering
     ! In method (1), the strain rate subroutine needs to be modified to do one-sided average/
-    ! difference at the wall, but no modifications for the viscous flux. In method (2), 
+    ! difference at the wall, but no modifications to the viscous flux. In method (2),
     ! the viscous flux needs to be modified, but the strain rate subroutine remains unchanged.
     !
     ! In WMLES, the wall should be considered as a no-slip wall with modified (more accurate)
@@ -34,7 +34,7 @@ module mod_wmodel
     ! it should be regarded as a no-slip wall, so zero work is done at the wall. When
     ! filtering/differentiation is required, the wall is a slip wall, with the velocity
     ! extrapolated from the interior. Hence, if ghost point is used, it can have three
-    ! different values for the different purposes.
+    ! different values for different purposes.
     !
     ! index 0 must be calculated for the right/front/top walls, but not necessary 
     ! for the opposite walls. However, index 0 for the left/back/bottom walls
