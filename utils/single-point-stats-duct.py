@@ -5,25 +5,6 @@ import os
 import re
 import glob
 #
-# profile folding function
-#
-def fold_2d(var, cf='C', isym2=1, isym1=1):
-  # support cf='C' and even numbers of cells
-  isym = isym2*isym1
-  if(abs(isym) != 1): exit()
-  n2, n1 = var.shape
-  s = 0
-  if cf == 'F':
-    s = 1
-  var[0:n2//2-s:+1, 0:n1//2-s:+1] =      (var[     0:n2//2-s:+1, 0:n1//2-s:+1] + \
-                                    isym2*var[n2-1-s:n2//2-1:-1, 0:n1//2-s:+1] + \
-                                    isym1*var[     0:n2//2-s:+1, n1-1-s:n1//2-1:-1] + \
-                                    isym *var[n2-1-s:n2//2-1:-1, n1-1-s:n1//2-1:-1])*0.25
-  var[n2//2-s:n2:+1,  0:n1//2-s:+1] = isym2*var[0:n2//2-s:+1, 0:n1//2-s:+1][::-1, :   ]
-  var[ 0:n2//2-s:+1, n1//2-s:n1:+1] = isym1*var[0:n2//2-s:+1, 0:n1//2-s:+1][   :, ::-1]
-  var[n2//2-s:n2:+1, n1//2-s:n1:+1] = isym *var[0:n2//2-s:+1, 0:n1//2-s:+1][::-1, ::-1]
-  return var
-#
 # compute mean pressure gradient
 #
 use_new_arrays = False
@@ -144,6 +125,25 @@ w2    = np.reshape(data_avg[:,7],(n2,n1),order='C')
 uv    = np.reshape(data_avg[:,8],(n2,n1),order='C')
 uw    = np.reshape(data_avg[:,9],(n2,n1),order='C')
 #
+# profile folding function
+#
+def fold_2d(var, cf='C', isym2=1, isym1=1):
+  # support cf='C' and even numbers of cells
+  isym = isym2*isym1
+  if(abs(isym) != 1): exit()
+  n2, n1 = var.shape
+  s = 0
+  if cf == 'F':
+    s = 1
+  var[0:n2//2-s:+1, 0:n1//2-s:+1] =      (var[     0:n2//2-s:+1, 0:n1//2-s:+1] + \
+                                    isym2*var[n2-1-s:n2//2-1:-1, 0:n1//2-s:+1] + \
+                                    isym1*var[     0:n2//2-s:+1, n1-1-s:n1//2-1:-1] + \
+                                    isym *var[n2-1-s:n2//2-1:-1, n1-1-s:n1//2-1:-1])*0.25
+  var[n2//2-s:n2:+1,  0:n1//2-s:+1] = isym2*var[0:n2//2-s:+1, 0:n1//2-s:+1][::-1, :   ]
+  var[ 0:n2//2-s:+1, n1//2-s:n1:+1] = isym1*var[0:n2//2-s:+1, 0:n1//2-s:+1][   :, ::-1]
+  var[n2//2-s:n2:+1, n1//2-s:n1:+1] = isym *var[0:n2//2-s:+1, 0:n1//2-s:+1][::-1, ::-1]
+  return var
+#
 u1 = fold_2d(u1,cf='C',isym2=+1, isym1=+1)
 v1 = fold_2d(v1,cf='C',isym2=+1, isym1=-1)
 w1 = fold_2d(w1,cf='C',isym2=-1, isym1=+1)
@@ -175,7 +175,7 @@ with open(fname, 'w') as file:
     file.write(f'ZONE I={n1}, J={n2}, DATAPACKING=POINT\n')
     np.savetxt(file, data_avg, fmt='%16.6e', delimiter='')
     # (e16.7,fortran) is equivalent to (16.6e,python)
-
+#
 def interp(n2, n1, y, u, h):
     u1_cl = np.zeros(n2)
     for k in range(n2):
@@ -198,7 +198,10 @@ uv_cl = interp(n2, n1, yc, uv, h)
 uw_cl = interp(n2, n1, yc, uw, h)
 fname = resultsdir + 'stats-single-point-duct-centerline-' + casename + fname_ext
 with open(fname, 'w') as file:
-    np.savetxt(file, np.c_[zc_cl,u1_cl,v1_cl,w1_cl,u2_cl,v2_cl,w2_cl,uv_cl,uw_cl], \
+    np.savetxt(file, np.c_[zc_cl[0:n2//2], \
+                           u1_cl[0:n2//2],v1_cl[0:n2//2],w1_cl[0:n2//2], \
+                           u2_cl[0:n2//2],v2_cl[0:n2//2],w2_cl[0:n2//2], \
+                           uv_cl[0:n2//2],uw_cl[0:n2//2]], \
                fmt='%16.6e', delimiter='')
 #
 # diagonal statistics, uniform grid in the cross-section
@@ -215,5 +218,8 @@ uv_diag = np.diag(uv)
 uw_diag = np.diag(uw)
 fname = resultsdir + 'stats-single-point-duct-diagonal-' + casename + fname_ext
 with open(fname, 'w') as file:
-    np.savetxt(file, np.c_[zc_diag,u1_diag,v1_diag,w1_diag,u2_diag,v2_diag,w2_diag,uv_diag,uw_diag], \
+    np.savetxt(file, np.c_[zc_diag[0:n2//2], \
+                           u1_diag[0:n2//2],v1_diag[0:n2//2],w1_diag[0:n2//2], \
+                           u2_diag[0:n2//2],v2_diag[0:n2//2],w2_diag[0:n2//2], \
+                           uv_diag[0:n2//2],uw_diag[0:n2//2]], \
                fmt='%16.6e', delimiter='')
