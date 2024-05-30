@@ -36,9 +36,10 @@ module mod_wmodel
     ! extrapolated from the interior. Hence, if ghost point is used, it can have three
     ! different values for different purposes.
     !
-    ! index 0 must be calculated for the right/front/top walls, but not necessary 
-    ! for the opposite walls. However, index 0 for the left/back/bottom walls
-    ! is necessary when eddy viscosity is introduced.
+    ! index 0 must be calculated for the right/front/top walls (used in chkdt, etc.),
+    ! but not necessary for the opposite walls. However, index 0 for the left/back/bottom walls
+    ! is necessary when a subgrid model is involved, including cmpt_dw_plus, etc. Hence,
+    ! the best way is to calculate index 0 for all walls.
     !
     implicit none
     integer , intent(in), dimension(3) :: n

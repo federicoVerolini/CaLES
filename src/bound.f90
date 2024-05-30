@@ -97,17 +97,19 @@ module mod_bound
     end if
     !
     ! Neumann bc must be zero at some locations to let the ghost points have the same
-    ! values from the bc implementations of different walls. For example, w(1,5,4) 
-    ! must be set as zero by both the upper wall (non-penetrating) and the front wall 
-    ! (Neumann). Wall models can guarantee this at those locations, since they do 
+    ! values from the bc implementations of different walls. For example, w(1,5,4)
+    ! must be set as zero by both the upper wall (non-penetrating) and the front wall
+    ! (Neumann). Wall models can guarantee this at those locations, since they do
     ! produce a zero gradient in the direction where the velocity component is zero.
     ! 
     ! bcu/v/w have correct values for all the loop locations in updt_wallmodelbc.
-    ! The only difference is that for square duct/six-wall cases, uh,vh and wh may 
+    ! The only difference is that for square duct/six-wall cases, uh,vh and wh may
     ! have incorrect values at the end locations. However, it is only the zero-value
-    ! component that is essentially used, which guarantees zero-gradient bc there, 
-    ! leading to correct values at the end ghost points. For two-wall channels,
-    ! uh,vh and wh do have correct values at the end locations.
+    ! component (wall-normal) that is essentially used, which guarantees
+    ! zero-gradient bc there, leading to correct values at the end ghost points.
+    ! For two-wall channels, uh,vh and wh do have correct values at the end locations.
+    ! Therefore, it makes no difference whether the wall-parallel velocity at the wall
+    ! is set to zero or not, as it is never utilized.
     !
     ! updt_wallmodelbc, ~25% of bounduvw time is saved, equivalent to ~1% of the total time,
     ! The computational cost of the log-law wall model is negligible.
@@ -142,9 +144,9 @@ module mod_bound
       call set_bc(cbc(1,3,2),1,3,nh,.true. ,bcv%z,dzc(n(3)),v)
     end if
     !
-    ! for square duct/six-wall cases, further add a loop for the end locations 
-    ! if all values of uh,vh and wh need to be correct at the end locations. 
-    ! This need should never arise. 
+    ! for square duct/six-wall cases, further add a loop for the end locations
+    ! if all values of uh,vh and wh need to be correct at the end locations.
+    ! This need should never arise.
     !
   end subroutine bounduvw
   !

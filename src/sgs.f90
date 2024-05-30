@@ -64,6 +64,8 @@ module mod_sgs
     case('none')
       visct(:,:,:) = 0._rp
     case('smag')
+      ! a better way is to extrapolate the velocity to the ghost cells,
+      ! and then compute the strain rate as normal. this is more modular
       call strain_rate(n,dli,dzci,dzfi,is_bound,lwm,u,v,w,s0,sij)
       call cmpt_dw_plus(cbcvel,n,is_bound,l,dl,zc,dzc,visc,u,v,w,dw,dw_plus)
       call sgs_smag(n,dl,dzf,dw_plus,s0,visct)
