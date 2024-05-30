@@ -26,4 +26,4 @@ for k in range(2,14):
 fname = 'stats-single-point-duct-diagonal.out'
 with open(fname, 'w') as file:
     np.savetxt(file, np.c_[zc_diag,yc_diag,avg_diag[:,2:]], \
-               fmt='%16.6e', delimiter='')
+               fmt='%17.9e', delimiter='')
