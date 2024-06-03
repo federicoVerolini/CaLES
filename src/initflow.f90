@@ -16,7 +16,7 @@ module mod_initflow
   subroutine initflow(inivel,bcvel,ng,lo,l,dl,zc,zf,dzc,dzf,visc, &
                       is_forced,velf,bforce,is_wallturb,u,v,w,p)
     !
-    ! computes initial conditions for the velocity field
+    ! initialize the velocity field
     !
     implicit none
     character(len=*), intent(in) :: inivel
@@ -60,9 +60,9 @@ module mod_initflow
     case('tbl')
       call temporal_bl(n(3),zc,1._rp,visc,uref,u1d)
       is_noise = .true.
-    case('iop') ! reversed 'poi'
+    case('iop')
       !
-      ! convective reference frame moving with velocit `ubulk`;
+      ! convective reference frame moving with velocity `ubulk`;
       ! walls have negative velocity equal to `ubulk` in the laboratory frame
       !
       ubulk = 0.5*abs(bcvel(0,3,1)+bcvel(1,3,1))

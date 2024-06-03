@@ -14,7 +14,7 @@ module mod_bound
   private
   public boundp,bounduvw,cmpt_rhs_b,updt_rhs_b,initbc
   contains
-  subroutine bounduvw(cbc,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind,is_updt_wm,is_correc,u,v,w)
+  subroutine bounduvw(cbc,n,bcu,bcv,bcw,bcu_mag,bcv_mag,bcw_mag,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind,is_updt_wm,is_correc,u,v,w)
     !
     ! imposes velocity boundary conditions
     !
@@ -22,6 +22,7 @@ module mod_bound
     character(len=1), intent(in), dimension(0:1,3,3) :: cbc
     integer         , intent(in), dimension(3) :: n
     type(cond_bound), intent(inout) :: bcu,bcv,bcw
+    type(cond_bound), intent(in) :: bcu_mag,bcv_mag,bcw_mag
     integer , intent(in), dimension(0:1,3) :: nb
     logical , intent(in), dimension(0:1,3) :: is_bound
     integer , intent(in), dimension(0:1,3) :: lwm,ind
@@ -113,10 +114,9 @@ module mod_bound
     !
     ! updt_wallmodelbc, ~25% of bounduvw time is saved, equivalent to ~1% of the total time,
     ! The computational cost of the log-law wall model is negligible.
-    ! 
     !
     if(is_updt_wm) then
-      call updt_wallmodelbc(n,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind,u,v,w,bcu,bcv,bcw)
+      call updt_wallmodelbc(n,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind,u,v,w,bcu,bcv,bcw,bcu_mag,bcv_mag,bcw_mag)
     end if
     !
     if(is_bound(0,1).and.lwm(0,1)/=0) then
@@ -722,15 +722,18 @@ module mod_bound
   end subroutine updthalo_gpu
 #endif
   !
-  subroutine initbc(sgstype,bcvel,bcpre,bcsgs,bcu,bcv,bcw,bcp,bcs,bcuf,bcvf,bcwf,n,is_bound,lwm,l,zc,dl,dzc,h,ind)
+  subroutine initbc(sgstype,cbcvel,bcvel,bcpre,bcsgs,bcu,bcv,bcw,bcp,bcs,bcu_mag,bcv_mag,bcw_mag,bcuf,bcvf,bcwf,n,is_bound,lwm,l,zc,dl,dzc,h,ind)
     !
-    ! initialize bcu,bcv,bcw,bcp,bcs
+    ! initialize bcu,bcv,bcw,bcp,bcs, and
+    ! bcu_mag,bcv_mag,bcw_mag, and
+    ! bcuf,bcvf,bcwf
     !
     implicit none
     character(len=*), intent(in) :: sgstype
+    character(len=1), intent(inout), dimension(0:1,3,3) :: cbcvel
     real(rp), intent(in), dimension(0:1,3,3) :: bcvel
     real(rp), intent(in), dimension(0:1,3) :: bcpre,bcsgs
-    type(cond_bound), intent(inout) :: bcu,bcv,bcw,bcp,bcs,bcuf,bcvf,bcwf
+    type(cond_bound), intent(inout) :: bcu,bcv,bcw,bcp,bcs,bcu_mag,bcv_mag,bcw_mag,bcuf,bcvf,bcwf
     integer , intent(in), dimension(3) :: n
     logical , intent(in), dimension(0:1,3) :: is_bound
     integer , intent(in), dimension(0:1,3) :: lwm
@@ -738,7 +741,21 @@ module mod_bound
     real(rp), intent(in), dimension(0:) :: zc,dzc
     real(rp), intent(in) :: h
     integer,  intent(out), dimension(0:1,3) :: ind
-    integer :: i,j,k,i1,i2,j1,j2,k1,k2
+    integer :: i,j,k,i1,i2,j1,j2,k1,k2,ivel,idir
+    !
+    do idir = 1,3
+      do i = 0,1
+        if(lwm(i,idir)/=0) then
+          do ivel = 1,3
+            if(ivel==idir) then
+              cbcvel(i,idir,ivel) = 'D'
+            else
+              cbcvel(i,idir,ivel) = 'N'
+            end if
+          end do
+        end if
+      end do
+    end do
     !
     ! unnecessary to consider wall model here, because
     ! bcu,bcv,bcw are overwritten by updt_wallmodelbc before set_bc, and that
@@ -776,6 +793,12 @@ module mod_bound
     bcs%y(:,:,1) = bcsgs(1,2)
     bcs%z(:,:,0) = bcsgs(0,3)
     bcs%z(:,:,1) = bcsgs(1,3)
+    !
+    ! magnitude (+/-) of velocity used for wall model
+    !
+    bcu_mag = bcu
+    bcv_mag = bcv
+    bcw_mag = bcw
     !
     bcuf = bcu
     bcvf = bcv

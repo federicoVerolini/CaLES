@@ -107,7 +107,7 @@ program cans
     real(rp), allocatable, dimension(:,:,:) :: z
   end type rhs_bound
   type(rhs_bound) :: rhsbp
-  type(cond_bound) :: bcu,bcv,bcw,bcp,bcs,bcuf,bcvf,bcwf
+  type(cond_bound) :: bcu,bcv,bcw,bcp,bcs,bcu_mag,bcv_mag,bcw_mag,bcuf,bcvf,bcwf
   real(rp) :: alpha
 #if defined(_IMPDIFF)
 #if !defined(_OPENACC)
@@ -199,6 +199,15 @@ program cans
            bcs%x(0:n(2)+1,0:n(3)+1,0:1), &
            bcs%y(0:n(1)+1,0:n(3)+1,0:1), &
            bcs%z(0:n(1)+1,0:n(2)+1,0:1))
+  allocate(bcu_mag%x(0:n(2)+1,0:n(3)+1,0:1), &
+           bcv_mag%x(0:n(2)+1,0:n(3)+1,0:1), &
+           bcw_mag%x(0:n(2)+1,0:n(3)+1,0:1), &
+           bcu_mag%y(0:n(1)+1,0:n(3)+1,0:1), &
+           bcv_mag%y(0:n(1)+1,0:n(3)+1,0:1), &
+           bcw_mag%y(0:n(1)+1,0:n(3)+1,0:1), &
+           bcu_mag%z(0:n(1)+1,0:n(2)+1,0:1), &
+           bcv_mag%z(0:n(1)+1,0:n(2)+1,0:1), &
+           bcw_mag%z(0:n(1)+1,0:n(2)+1,0:1))
 #if defined(_IMPDIFF)
   allocate(lambdaxyu(n_z(1),n_z(2)), &
            lambdaxyv(n_z(1),n_z(2)), &
@@ -319,12 +328,12 @@ program cans
   !
   ! initialize boundary condition variables
   !
-  call initbc(sgstype,bcvel,bcpre,bcsgs,bcu,bcv,bcw,bcp,bcs,bcuf,bcvf,bcwf, &
+  call initbc(sgstype,cbcvel,bcvel,bcpre,bcsgs,bcu,bcv,bcw,bcp,bcs,bcu_mag,bcv_mag,bcw_mag,bcuf,bcvf,bcwf, &
               n,is_bound,lwm,l,zc,dl,dzc,hwm,ind_wm)
   !
   ! initialize Poisson solver
   !
-  call initsolver(ng,n_x_fft,n_y_fft,lo_z,hi_z,dli,dzci_g,dzfi_g,cbcpre,bcp, &
+  call initsolver(ng,n_x_fft,n_y_fft,lo_z,hi_z,dli,dzci_g,dzfi_g,cbcpre, &
                   lambdaxyp,['c','c','c'],ap,bp,cp,arrplanp,normfftp)
   call cmpt_rhs_b(ng,dli,dzci_g,dzfi_g,cbcpre,bcp, ['c','c','c'],rhsbp%x,rhsbp%y,rhsbp%z)
   !$acc enter data copyin(lambdaxyp,ap,bp,cp) async
@@ -334,11 +343,11 @@ program cans
   !
   ! initialize Helmholtz solver, three velocities
   !
-  call initsolver(ng,n_x_fft,n_y_fft,lo_z,hi_z,dli,dzci_g,dzfi_g,cbcvel(:,:,1),bcu, &
+  call initsolver(ng,n_x_fft,n_y_fft,lo_z,hi_z,dli,dzci_g,dzfi_g,cbcvel(:,:,1), &
                   lambdaxyu,['f','c','c'],au,bu,cu,arrplanu,normfftu)
-  call initsolver(ng,n_x_fft,n_y_fft,lo_z,hi_z,dli,dzci_g,dzfi_g,cbcvel(:,:,2),bcv, &
+  call initsolver(ng,n_x_fft,n_y_fft,lo_z,hi_z,dli,dzci_g,dzfi_g,cbcvel(:,:,2), &
                   lambdaxyv,['c','f','c'],av,bv,cv,arrplanv,normfftv)
-  call initsolver(ng,n_x_fft,n_y_fft,lo_z,hi_z,dli,dzci_g,dzfi_g,cbcvel(:,:,3),bcw, &
+  call initsolver(ng,n_x_fft,n_y_fft,lo_z,hi_z,dli,dzci_g,dzfi_g,cbcvel(:,:,3), &
                   lambdaxyw,['c','c','f'],aw,bw,cw,arrplanw,normfftw)
 #if defined(_IMPDIFF_1D)
   deallocate(lambdaxyu,lambdaxyv,lambdaxyw,lambdaxy)
@@ -385,12 +394,12 @@ program cans
   end if
   !
   !$acc enter data copyin(u,v,w,p) create(pp)
-  call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm,&
+  call bounduvw(cbcvel,n,bcu,bcv,bcw,bcu_mag,bcv_mag,bcw_mag,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm,&
                 .true.,.false.,u,v,w)
   call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
-  call cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcpre,bcu,bcv,bcw,bcp,nb,is_bound,lwm,l,dl, &
+  call cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcpre,bcp,nb,is_bound,lwm,l,dl, &
                 zc,zf,dzc,dzf,visc,hwm,ind_wm,u,v,w,dw,dw_plus,s0,uc,vc,wc,uf,vf,wf, &
-                sij,lij,mij,bcuf,bcvf,bcwf,visct)
+                sij,lij,mij,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,visct)
   call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,visct) ! corner ghost cells included
   !
   ! post-process and write initial condition
@@ -517,20 +526,20 @@ program cans
 #endif
 #endif
       dpdl(:) = dpdl(:) + f(:) ! dt multiplied
-      call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm, &
+      call bounduvw(cbcvel,n,bcu,bcv,bcw,bcu_mag,bcv_mag,bcw_mag,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm, &
                     .true.,.false.,u,v,w)
       call fillps(n,dli,dzfi,dtrki,u,v,w,pp)
       call updt_rhs_b(['c','c','c'],cbcpre,n,is_bound,rhsbp%x,rhsbp%y,rhsbp%z,pp)
       call solver(n,ng,arrplanp,normfftp,lambdaxyp,ap,bp,cp,cbcpre,['c','c','c'],pp)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,pp)
       call correc(n,dli,dzci,dtrk,pp,u,v,w)
-      call bounduvw(cbcvel,n,bcu,bcv,bcw,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm, &
+      call bounduvw(cbcvel,n,bcu,bcv,bcw,bcu_mag,bcv_mag,bcw_mag,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm, &
                     .true.,.true.,u,v,w)
       call updatep(n,dli,dzci,dzfi,alpha,pp,p)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
-      call cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcpre,bcu,bcv,bcw,bcp,nb,is_bound,lwm,l,dl, &
+      call cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcpre,bcp,nb,is_bound,lwm,l,dl, &
                     zc,zf,dzc,dzf,visc,hwm,ind_wm,u,v,w,dw,dw_plus,s0,uc,vc,wc,uf,vf,wf, &
-                    sij,lij,mij,bcuf,bcvf,bcwf,visct)
+                    sij,lij,mij,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,visct)
       call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,visct)
     end do
     dpdl(:) = -dpdl(:)*dti

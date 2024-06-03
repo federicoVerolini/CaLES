@@ -13,7 +13,7 @@ module mod_initsolver
   private
   public initsolver
   contains
-  subroutine initsolver(ng,n_x_fft,n_y_fft,lo_z,hi_z,dli,dzci,dzfi,cbc,bc,lambdaxy,c_or_f,a,b,c,arrplan,normfft)
+  subroutine initsolver(ng,n_x_fft,n_y_fft,lo_z,hi_z,dli,dzci,dzfi,cbc,lambdaxy,c_or_f,a,b,c,arrplan,normfft)
     !
     ! initializes the Poisson/Helmholtz solver
     ! tridiagonal system only in the z direction
@@ -23,7 +23,6 @@ module mod_initsolver
     real(rp), intent(in), dimension(3 ) :: dli
     real(rp), intent(in), dimension(0:) :: dzci,dzfi
     character(len=1), intent(in), dimension(0:1,3) :: cbc
-    type(cond_bound), intent(in) :: bc
     real(rp), intent(out), dimension(lo_z(1):,lo_z(2):) :: lambdaxy
     character(len=1), intent(in), dimension(3) :: c_or_f
     real(rp), intent(out), dimension(:) :: a,b,c
@@ -63,15 +62,15 @@ module mod_initsolver
     call fftini(ng,n_x_fft,n_y_fft,cbc(:,1:2),c_or_f(1:2),arrplan,normfft)
   end subroutine initsolver
   !
-  subroutine eigenvalues(n,bc,c_or_f,lambda)
+  subroutine eigenvalues(n,cbc,c_or_f,lambda)
     use mod_param, only: pi
     implicit none
     integer , intent(in ) :: n
-    character(len=1), intent(in), dimension(0:1) :: bc
+    character(len=1), intent(in), dimension(0:1) :: cbc
     character(len=1), intent(in) :: c_or_f ! c -> cell-centered; f -> face-centered
     real(rp), intent(out), dimension(n) :: lambda
     integer :: l
-    select case(bc(0)//bc(1))
+    select case(cbc(0)//cbc(1))
     case('PP')
       do l=1,n
         lambda(l  )   = -2.*(1.-cos((2*(l-1))*pi/(1.*n)))

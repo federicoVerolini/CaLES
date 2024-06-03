@@ -16,7 +16,6 @@ module mod_sanity
   use mod_fillps    , only: fillps
   use mod_initflow  , only: add_noise
   use mod_initmpi   , only: initmpi
-  use mod_initsolver, only: initsolver
   use mod_param     , only: small
 #if !defined(_OPENACC)
   use mod_solver    , only: solver
@@ -210,17 +209,13 @@ module mod_sanity
       do i = 0,1
         if(lwm(i,idir)/=0) then
           do ivel = 1,3
-            if(ivel==idir) then
-              passed_loc = passed_loc.and.cbcvel(i,idir,ivel)=='D'
-            else
-              passed_loc = passed_loc.and.cbcvel(i,idir,ivel)=='N'
-            end if
+            passed_loc = passed_loc.and.cbcvel(i,idir,ivel)=='D'
           end do
         end if
       end do
     end do
     if(myid == 0.and.(.not.passed_loc)) &
-    print*, 'ERROR: wall model BCs must be Neumann (wall-parallel) and Dirichlet (wall-normal).'
+    print*, 'ERROR: wall model BCs must be Dirichlet.'
     passed = passed.and.passed_loc
     !
     passed_loc = .true.

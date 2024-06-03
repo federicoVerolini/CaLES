@@ -15,7 +15,7 @@ module mod_wmodel
   public updt_wallmodelbc
   contains
     !
-  subroutine updt_wallmodelbc(n,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind,u,v,w,bcu,bcv,bcw)
+  subroutine updt_wallmodelbc(n,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind,u,v,w,bcu,bcv,bcw,bcu_mag,bcv_mag,bcw_mag)
     !
     ! bcu,bcv,bcw determined via wall model
     ! wall-parallel velocity at ghost cells is used only for computing the viscous terms,
@@ -50,7 +50,8 @@ module mod_wmodel
     real(rp), intent(in) :: visc,h
     real(rp), intent(in), dimension(0:,0:,0:) :: u,v,w
     type(cond_bound), intent(inout) :: bcu,bcv,bcw
-    real(rp) :: wei,coef,uh,vh,wh,u1,u2,v1,v2,w1,w2,tauw(2),visci
+    type(cond_bound), intent(in) :: bcu_mag,bcv_mag,bcw_mag
+    real(rp) :: wei,coef,uh,vh,wh,u1,u2,v1,v2,w1,w2,u_mag,v_mag,w_mag,tauw(2),visci
     integer  :: i,j,k,i1,i2,j1,j2,k1,k2
     !
     visci = 1._rp/visc
@@ -197,6 +198,10 @@ module mod_wmodel
           v2 = 0.25_rp*(v(i,j,k2) + v(i+1,j,k2) + v(i,j-1,k2) + v(i+1,j-1,k2))
           uh = (1._rp-coef)*u1 + coef*u2
           vh = (1._rp-coef)*v1 + coef*v2
+          u_mag = bcu_mag%z(i,j,0)
+          v_mag = 0.25_rp*(bcv_mag%z(i,j,0) + bcv_mag%z(i+1,j,0) + bcv_mag%z(i,j-1,0) + bcv_mag%z(i+1,j-1,0))
+          uh = uh - u_mag
+          vh = vh - v_mag
           call wallmodel(lwm(0,3),uh,vh,h,l(3),visc,tauw)
           bcu%z(i,j,0) = visci*tauw(1)
         end do
@@ -209,6 +214,10 @@ module mod_wmodel
           v2 = v(i,j,k2)
           uh = (1._rp-coef)*u1 + coef*u2
           vh = (1._rp-coef)*v1 + coef*v2
+          u_mag = 0.25_rp*(bcu_mag%z(i-1,j,0) + bcu_mag%z(i,j,0) + bcu_mag%z(i-1,j+1,0) + bcu_mag%z(i,j+1,0))
+          v_mag = bcv_mag%z(i,j,0)
+          uh = uh - u_mag
+          vh = vh - v_mag
           call wallmodel(lwm(0,3),uh,vh,h,l(3),visc,tauw)
           bcv%z(i,j,0) = visci*tauw(2)
         end do
@@ -226,6 +235,10 @@ module mod_wmodel
           v2 = 0.25_rp*(v(i,j,k2) + v(i+1,j,k2) + v(i,j-1,k2) + v(i+1,j-1,k2))
           uh = (1._rp-coef)*u1 + coef*u2
           vh = (1._rp-coef)*v1 + coef*v2
+          u_mag = bcu_mag%z(i,j,1)
+          v_mag = 0.25_rp*(bcv_mag%z(i,j,1) + bcv_mag%z(i+1,j,1) + bcv_mag%z(i,j-1,1) + bcv_mag%z(i+1,j-1,1))
+          uh = uh - u_mag
+          vh = vh - v_mag
           call wallmodel(lwm(1,3),uh,vh,h,l(3),visc,tauw)
           bcu%z(i,j,1) = -visci*tauw(1)
         end do
@@ -238,6 +251,10 @@ module mod_wmodel
           v2 = v(i,j,k2)
           uh = (1._rp-coef)*u1 + coef*u2
           vh = (1._rp-coef)*v1 + coef*v2
+          u_mag = 0.25_rp*(bcu_mag%z(i-1,j,1) + bcu_mag%z(i,j,1) + bcu_mag%z(i-1,j+1,1) + bcu_mag%z(i,j+1,1))
+          v_mag = bcv_mag%z(i,j,1)
+          uh = uh - u_mag
+          vh = vh - v_mag
           call wallmodel(lwm(1,3),uh,vh,h,l(3),visc,tauw)
           bcv%z(i,j,1) = -visci*tauw(2)
         end do
@@ -274,8 +291,6 @@ module mod_wmodel
     real(rp), intent(out), dimension(2) :: tauw
     real(rp) :: upar,utau,f,fp,conv,utau_old,tauw_tot
     real(rp) :: umax,del
-    !
-    integer :: i,ierr
     !
     select case(mtype)
     case(WM_LOG)

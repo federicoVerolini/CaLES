@@ -16,10 +16,10 @@ module mod_sgs
   private
   public cmpt_sgs
   contains
-    !
-  subroutine cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcpre,bcu,bcv,bcw,bcp,nb,is_bound,lwm,l,dl, &
+  !
+  subroutine cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcpre,bcp,nb,is_bound,lwm,l,dl, &
                       zc,zf,dzc,dzf,visc,h,ind,u,v,w,dw,dw_plus,s0,uc,vc,wc,uf,vf,wf, &
-                      sij,lij,mij,bcuf,bcvf,bcwf,visct)
+                      sij,lij,mij,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,visct)
     !
     ! compute subgrid viscosity at cell centers
     ! the current implementation of the dynamcic version is two times the
@@ -42,8 +42,9 @@ module mod_sgs
     integer , intent(in ), dimension(3) :: n,ng,lo,hi
     character(len=1), intent(in), dimension(0:1,3,3) :: cbcvel
     character(len=1), intent(in), dimension(0:1,3)   :: cbcpre
-    type(cond_bound), intent(in )                :: bcu,bcv,bcw,bcp
+    type(cond_bound), intent(in )                :: bcp
     type(cond_bound), intent(inout)              :: bcuf,bcvf,bcwf
+    type(cond_bound), intent(in )                :: bcu_mag,bcv_mag,bcw_mag
     integer , intent(in ), dimension(0:1,3)      :: nb,lwm,ind
     logical , intent(in ), dimension(0:1,3)      :: is_bound
     real(rp), intent(in ), dimension(3)          :: l,dl
@@ -148,15 +149,15 @@ module mod_sgs
       call filter2d(v,vf)
       call filter2d(w,wf)
 #endif
-      ! when using no wall model, all bc's are used for computing strain rate, so 
+      ! when using no wall model, all bc's are used for computing strain rate, so
       ! bcu,bcv,bcw store the boundary values. When using a wall model, wall bc is
-      ! not used, due to one-sided difference. Here, bcuf, bcvf and bcwf are
+      ! not used due to one-sided differentiation. Here, bcuf, bcvf and bcwf are
       ! defined to store the boundary values of uf,vf,wf. For no-slip wall, they are
       ! equal to bcu/v/w=0. For wall model, they are in fact not used due to
       ! one-sided difference. However, we keep them here for clarity and in case
       ! of future needs.
-      ! 
-      call bounduvw(cbcvel,n,bcuf,bcvf,bcwf,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind, &
+      !
+      call bounduvw(cbcvel,n,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind, &
                     .true.,.false.,uf,vf,wf)
       call strain_rate(n,dli,dzci,dzfi,is_bound,lwm,uf,vf,wf,s0,sij)
       do m = 1,6

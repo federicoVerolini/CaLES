@@ -144,7 +144,6 @@ contains
       end if
     close(iunit)
     !
-    !
 #if defined(_OPENACC)
     !
     ! reading cuDecomp parameters, if these are set
