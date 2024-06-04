@@ -53,8 +53,8 @@ module mod_initflow
       call couette(   n(3),zc/l(3),uref ,u1d)
       uref = abs(uref)
     case('poi')
-      ! MPI_SUM called by set_mean, so small differences obtained
-      ! from using various cpus
+      ! MPI_SUM is called in set_mean, so small differences generated
+      ! from using different numbers of processors
       call poiseuille(n(3),zc/l(3),ubulk,u1d)
       is_mean = .true.
     case('tbl')

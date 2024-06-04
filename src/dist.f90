@@ -14,8 +14,8 @@ module mod_dist
   subroutine wall_dist(cbc,n,is_bound,l,dl,zc,dzc,dw)
     !
     ! distance to the nearest wall. Identification of walls is based on
-    ! non-penetration boundary conditions, which applied to both the no-slip
-    ! and free-slip (wall model) cases.
+    ! non-penetration boundary conditions, which applies to both no-slip
+    ! and wall model cases.
     !
     implicit none
     character(len=1), intent(in), dimension(0:1,3,3) :: cbc

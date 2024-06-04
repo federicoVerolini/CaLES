@@ -68,6 +68,10 @@ module mod_wmodel
           w2 = 0.25_rp*(w(i2,j,k) + w(i2,j+1,k) + w(i2,j,k-1) + w(i2,j+1,k-1))
           vh = (1._rp-coef)*v1 + coef*v2
           wh = (1._rp-coef)*w1 + coef*w2
+          v_mag = bcv_mag%x(j,k,0)
+          w_mag = 0.25_rp*(bcw_mag%x(j,k,0) + bcw_mag%x(j+1,k,0) + bcw_mag%x(j,k-1,0) + bcw_mag%x(j+1,k-1,0))
+          vh = vh - v_mag
+          wh = wh - w_mag
           call wallmodel(lwm(0,1),vh,wh,h,l(1),visc,tauw)
           bcv%x(j,k,0) = visci*tauw(1)
         end do
@@ -83,6 +87,11 @@ module mod_wmodel
           w2 = w(i2,j,k)
           vh = (1._rp-coef)*v1 + coef*v2
           wh = (1._rp-coef)*w1 + coef*w2
+          v_mag = (1._rp-wei)*(bcv_mag%x(j-1,k,0) + bcv_mag%x(j,k,0)) + wei*(bcv_mag%x(j-1,k+1,0) + bcv_mag%x(j,k+1,0))
+          v_mag = 0.5_rp*v_mag
+          w_mag = bcw_mag%x(j,k,0)
+          vh = vh - v_mag
+          wh = wh - w_mag
           call wallmodel(lwm(0,1),vh,wh,h,l(1),visc,tauw)
           bcw%x(j,k,0) = visci*tauw(2)
         end do
@@ -100,6 +109,10 @@ module mod_wmodel
           w2 = 0.25_rp*(w(i2,j,k) + w(i2,j+1,k) + w(i2,j,k-1) + w(i2,j+1,k-1))
           vh = (1._rp-coef)*v1 + coef*v2
           wh = (1._rp-coef)*w1 + coef*w2
+          v_mag = bcv_mag%x(j,k,1)
+          w_mag = 0.25_rp*(bcw_mag%x(j,k,1) + bcw_mag%x(j+1,k,1) + bcw_mag%x(j,k-1,1) + bcw_mag%x(j+1,k-1,1))
+          vh = vh - v_mag
+          wh = wh - w_mag
           call wallmodel(lwm(1,1),vh,wh,h,l(1),visc,tauw)
           bcv%x(j,k,1) = -visci*tauw(1)
         end do
@@ -115,6 +128,11 @@ module mod_wmodel
           w2 = w(i2,j,k)
           vh = (1._rp-coef)*v1 + coef*v2
           wh = (1._rp-coef)*w1 + coef*w2
+          v_mag = (1._rp-wei)*(bcv_mag%x(j-1,k,1) + bcv_mag%x(j,k,1)) + wei*(bcv_mag%x(j-1,k+1,1) + bcv_mag%x(j,k+1,1))
+          v_mag = 0.5_rp*v_mag
+          w_mag = bcw_mag%x(j,k,1)
+          vh = vh - v_mag
+          wh = wh - w_mag
           call wallmodel(lwm(1,1),vh,wh,h,l(1),visc,tauw)
           bcw%x(j,k,1) = -visci*tauw(2)
         end do
@@ -133,6 +151,10 @@ module mod_wmodel
           w2 = 0.25_rp*(w(i,j2,k) + w(i+1,j2,k) + w(i,j2,k-1) + w(i+1,j2,k-1))
           uh = (1._rp-coef)*u1 + coef*u2
           wh = (1._rp-coef)*w1 + coef*w2
+          u_mag = bcu_mag%y(i,k,0)
+          w_mag = 0.25_rp*(bcw_mag%y(i,k,0) + bcw_mag%y(i+1,k,0) + bcw_mag%y(i,k-1,0) + bcw_mag%y(i+1,k-1,0))
+          uh = uh - u_mag
+          wh = wh - w_mag
           call wallmodel(lwm(0,2),uh,wh,h,l(2),visc,tauw)
           bcu%y(i,k,0) = visci*tauw(1)
         end do
@@ -148,6 +170,11 @@ module mod_wmodel
           w2 = w(i,j2,k)
           uh = (1._rp-coef)*u1 + coef*u2
           wh = (1._rp-coef)*w1 + coef*w2
+          u_mag = (1._rp-wei)*(bcu_mag%y(i-1,k,0) + bcu_mag%y(i,k,0)) + wei*(bcu_mag%y(i-1,k+1,0) + bcu_mag%y(i,k+1,0))
+          u_mag = 0.5_rp*u_mag
+          w_mag = bcw_mag%y(i,k,0)
+          uh = uh - u_mag
+          wh = wh - w_mag
           call wallmodel(lwm(0,2),uh,wh,h,l(2),visc,tauw)
           bcw%y(i,k,0) = visci*tauw(2)
         end do
@@ -165,6 +192,10 @@ module mod_wmodel
           w2 = 0.25_rp*(w(i,j2,k) + w(i+1,j2,k) + w(i,j2,k-1) + w(i+1,j2,k-1))
           uh = (1._rp-coef)*u1 + coef*u2
           wh = (1._rp-coef)*w1 + coef*w2
+          u_mag = bcu_mag%y(i,k,1)
+          w_mag = 0.25_rp*(bcw_mag%y(i,k,1) + bcw_mag%y(i+1,k,1) + bcw_mag%y(i,k-1,1) + bcw_mag%y(i+1,k-1,1))
+          uh = uh - u_mag
+          wh = wh - w_mag
           call wallmodel(lwm(1,2),uh,wh,h,l(2),visc,tauw)
           bcu%y(i,k,1) = -visci*tauw(1)
         end do
@@ -180,6 +211,11 @@ module mod_wmodel
           w2 = w(i,j2,k)
           uh = (1._rp-coef)*u1 + coef*u2
           wh = (1._rp-coef)*w1 + coef*w2
+          u_mag = (1._rp-wei)*(bcu_mag%y(i-1,k,1) + bcu_mag%y(i,k,1)) + wei*(bcu_mag%y(i-1,k+1,1) + bcu_mag%y(i,k+1,1))
+          u_mag = 0.5_rp*u_mag
+          w_mag = bcw_mag%y(i,k,1)
+          uh = uh - u_mag
+          wh = wh - w_mag
           call wallmodel(lwm(1,2),uh,wh,h,l(2),visc,tauw)
           bcw%y(i,k,1) = -visci*tauw(2)
         end do
