@@ -54,7 +54,7 @@ integer , dimension(2) :: dims
 !
 integer, dimension(0:1,3) :: nb
 logical, dimension(0:1,3) :: is_bound
-character(len=1), protected, dimension(0:1,3,3) ::  cbcvel
+character(len=1),            dimension(0:1,3,3) ::  cbcvel
 real(rp)        , protected, dimension(0:1,3,3) ::   bcvel
 character(len=1), protected, dimension(0:1,3)   ::  cbcpre
 real(rp)        , protected, dimension(0:1,3)   ::   bcpre
@@ -143,7 +143,6 @@ contains
         error stop
       end if
     close(iunit)
-    !
 #if defined(_OPENACC)
     !
     ! reading cuDecomp parameters, if these are set

@@ -84,13 +84,13 @@ module mod_sgs
       ! Lij
       !
       call interpolate(n,u,v,w,uc,vc,wc)
-      ! only periodic/patched bc's are used, because filtering is always not performed
+      ! periodic/patched bc's are essentially used, because filtering is not performed
       ! in the wall-normal direction for the first off-wall layer
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,uc)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,vc)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,wc)
 #if !defined(_FILTER_2D)
-      call filter(uc*uc,lij(:,:,:,1),is_fil2d_wall=.true.)
+      call filter(uc*uc,lij(:,:,:,1),is_fil2d_wall=.true.) ! modify
       call filter(vc*vc,lij(:,:,:,2),is_fil2d_wall=.true.)
       call filter(wc*wc,lij(:,:,:,3),is_fil2d_wall=.true.)
       call filter(uc*vc,lij(:,:,:,4),is_fil2d_wall=.true.)
@@ -100,7 +100,7 @@ module mod_sgs
       call filter(vc,vf,is_fil2d_wall=.true.)
       call filter(wc,wf,is_fil2d_wall=.true.)
 #else
-      call filter2d(uc*uc,lij(:,:,:,1))
+      call filter2d(uc*uc,lij(:,:,:,1)) ! modify
       call filter2d(vc*vc,lij(:,:,:,2))
       call filter2d(wc*wc,lij(:,:,:,3))
       call filter2d(uc*vc,lij(:,:,:,4))
@@ -127,7 +127,7 @@ module mod_sgs
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,5))
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,6))
 #if !defined(_FILTER_2D)
-      call filter(s0*sij(:,:,:,1),mij(:,:,:,1),is_fil2d_wall=.true.)
+      call filter(s0*sij(:,:,:,1),mij(:,:,:,1),is_fil2d_wall=.true.) ! modify
       call filter(s0*sij(:,:,:,2),mij(:,:,:,2),is_fil2d_wall=.true.)
       call filter(s0*sij(:,:,:,3),mij(:,:,:,3),is_fil2d_wall=.true.)
       call filter(s0*sij(:,:,:,4),mij(:,:,:,4),is_fil2d_wall=.true.)
@@ -137,7 +137,7 @@ module mod_sgs
       call filter(v,vf,is_fil2d_wall=.true. )
       call filter(w,wf,is_fil2d_wall=.false.)
 #else
-      call filter2d(s0*sij(:,:,:,1),mij(:,:,:,1))
+      call filter2d(s0*sij(:,:,:,1),mij(:,:,:,1)) ! modify
       call filter2d(s0*sij(:,:,:,2),mij(:,:,:,2))
       call filter2d(s0*sij(:,:,:,3),mij(:,:,:,3))
       call filter2d(s0*sij(:,:,:,4),mij(:,:,:,4))
@@ -147,7 +147,7 @@ module mod_sgs
       call filter2d(v,vf)
       call filter2d(w,wf)
 #endif
-      ! when using no wall model, all bc's are used for computing strain rate, so
+      ! when using no wall model, all bc's are used for computing strain rate, and
       ! bcu,bcv,bcw store the boundary values. When using a wall model, wall bc is
       ! not used due to one-sided differentiation. Here, bcuf, bcvf and bcwf are
       ! defined to store the boundary values of uf,vf,wf. For no-slip wall, they are
@@ -155,8 +155,8 @@ module mod_sgs
       ! one-sided difference. However, we keep them here for clarity and in case
       ! of future needs.
       !
-      call bounduvw(cbcvel,n,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind, &
-                    .true.,.false.,uf,vf,wf)
+      call bounduvw(cbcvel,n,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf, &
+                    visc,h,ind,.true.,.false.,uf,vf,wf)
       call strain_rate(n,dli,dzci,dzfi,is_bound,lwm,uf,vf,wf,s0,sij)
       do m = 1,6
         do k = 1,n(3)
@@ -516,8 +516,7 @@ module mod_sgs
   !
   subroutine interpolate(n,u,v,w,uc,vc,wc)
     !
-    ! interpolate velocity to cell centers,
-    ! equivalent to reconstruction (FV)
+    ! interpolate velocity to cell centers, equivalent to reconstruction (FV)
     !
     implicit none
     integer , intent(in ), dimension(3)        :: n

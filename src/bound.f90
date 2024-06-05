@@ -14,7 +14,8 @@ module mod_bound
   private
   public boundp,bounduvw,cmpt_rhs_b,updt_rhs_b,initbc
   contains
-  subroutine bounduvw(cbc,n,bcu,bcv,bcw,bcu_mag,bcv_mag,bcw_mag,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind,is_updt_wm,is_correc,u,v,w)
+  subroutine bounduvw(cbc,n,bcu,bcv,bcw,bcu_mag,bcv_mag,bcw_mag,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf, &
+                      visc,h,ind,is_updt_wm,is_correc,u,v,w)
     !
     ! imposes velocity boundary conditions
     !
@@ -722,7 +723,8 @@ module mod_bound
   end subroutine updthalo_gpu
 #endif
   !
-  subroutine initbc(sgstype,cbcvel,bcvel,bcpre,bcsgs,bcu,bcv,bcw,bcp,bcs,bcu_mag,bcv_mag,bcw_mag,bcuf,bcvf,bcwf,n,is_bound,lwm,l,zc,dl,dzc,h,ind)
+  subroutine initbc(sgstype,cbcvel,bcvel,bcpre,bcsgs,bcu,bcv,bcw,bcp,bcs,bcu_mag,bcv_mag,bcw_mag, &
+                    bcuf,bcvf,bcwf,n,is_bound,lwm,l,zc,dl,dzc,h,ind)
     !
     ! initialize bcu,bcv,bcw,bcp,bcs, and
     ! bcu_mag,bcv_mag,bcw_mag, and

@@ -229,8 +229,8 @@ module mod_sanity
     passed = passed.and.passed_loc
     !
 #if defined(_IMPDIFF) && !defined(_IMPDIFF_1D)
-    !implicit: bcs in x and y must be 'D0' or 'P',
-    !so implicit mode can not be used for WMLES of square ducts
+    ! implicit: bcs in x and y must be 'D0' or 'P',
+    ! so implicit mode can not be used for WMLES of square ducts
     passed_loc = .true.
     do ivel = 1,3
       do idir=1,2

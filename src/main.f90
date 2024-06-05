@@ -328,8 +328,8 @@ program cans
   !
   ! initialize boundary condition variables
   !
-  call initbc(sgstype,cbcvel,bcvel,bcpre,bcsgs,bcu,bcv,bcw,bcp,bcs,bcu_mag,bcv_mag,bcw_mag,bcuf,bcvf,bcwf, &
-              n,is_bound,lwm,l,zc,dl,dzc,hwm,ind_wm)
+  call initbc(sgstype,cbcvel,bcvel,bcpre,bcsgs,bcu,bcv,bcw,bcp,bcs,bcu_mag,bcv_mag,bcw_mag, &
+              bcuf,bcvf,bcwf,n,is_bound,lwm,l,zc,dl,dzc,hwm,ind_wm)
   !
   ! initialize Poisson solver
   !
@@ -394,8 +394,8 @@ program cans
   end if
   !
   !$acc enter data copyin(u,v,w,p) create(pp)
-  call bounduvw(cbcvel,n,bcu,bcv,bcw,bcu_mag,bcv_mag,bcw_mag,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm,&
-                .true.,.false.,u,v,w)
+  call bounduvw(cbcvel,n,bcu,bcv,bcw,bcu_mag,bcv_mag,bcw_mag,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf, &
+                visc,hwm,ind_wm,.true.,.false.,u,v,w)
   call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
   call cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcpre,bcp,nb,is_bound,lwm,l,dl, &
                 zc,zf,dzc,dzf,visc,hwm,ind_wm,u,v,w,dw,dw_plus,s0,uc,vc,wc,uf,vf,wf, &
@@ -526,15 +526,15 @@ program cans
 #endif
 #endif
       dpdl(:) = dpdl(:) + f(:) ! dt multiplied
-      call bounduvw(cbcvel,n,bcu,bcv,bcw,bcu_mag,bcv_mag,bcw_mag,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm, &
-                    .true.,.false.,u,v,w)
+      call bounduvw(cbcvel,n,bcu,bcv,bcw,bcu_mag,bcv_mag,bcw_mag,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf, &
+                    visc,hwm,ind_wm,.true.,.false.,u,v,w)
       call fillps(n,dli,dzfi,dtrki,u,v,w,pp)
       call updt_rhs_b(['c','c','c'],cbcpre,n,is_bound,rhsbp%x,rhsbp%y,rhsbp%z,pp)
       call solver(n,ng,arrplanp,normfftp,lambdaxyp,ap,bp,cp,cbcpre,['c','c','c'],pp)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,pp)
       call correc(n,dli,dzci,dtrk,pp,u,v,w)
-      call bounduvw(cbcvel,n,bcu,bcv,bcw,bcu_mag,bcv_mag,bcw_mag,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,hwm,ind_wm, &
-                    .true.,.true.,u,v,w)
+      call bounduvw(cbcvel,n,bcu,bcv,bcw,bcu_mag,bcv_mag,bcw_mag,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf, &
+                    visc,hwm,ind_wm,.true.,.true.,u,v,w)
       call updatep(n,dli,dzci,dzfi,alpha,pp,p)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
       call cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcpre,bcp,nb,is_bound,lwm,l,dl, &
@@ -557,7 +557,7 @@ program cans
       tw = (MPI_WTIME()-twi)/3600.
       if(tw    >= tw_max  ) is_done = is_done.or..true.
     end if
-    if(mod(istep,icheck) == 0) then 
+    if(mod(istep,icheck) == 0) then
       ! set icheck=1 to let restart=.not.restart
       if(myid == 0) print*, 'Checking stability and divergence...'
       call chkdt(n,dl,dzci,dzfi,visc,visct,u,v,w,dtmax)
