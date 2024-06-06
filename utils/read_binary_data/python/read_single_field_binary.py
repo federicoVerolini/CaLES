@@ -68,15 +68,12 @@ if __name__ == "__main__":
 
     import matplotlib.pyplot as plt
     # u along z direction
-    # plt.plot(0.5*(data[63,63,:]+data[63,64,:])/2.0,zp)
-    # plt.xlim(-0.5, 0.5)
-    # plt.ylim(0.0, 2.0)
+    plt.plot(0.5*(data[63,63,:]+data[63,64,:])/2.0,zp)
+    plt.xlim(-0.5, 0.5)
+    plt.ylim(0.0, 2.0)
     
     # w along x direction
-    # plt.plot(xp,0.5*(data[:,63,63]+data[:,64,63])/2.0)
-    # plt.xlim(0.0, 2.0)
-    # plt.ylim(-0.5, 0.5)
-    # plt.show()
-
-    np.savetxt('u_i1.dat', data[0,:,:], delimiter=' ')
-    np.savetxt('u_i2.dat', data[1,:,:], delimiter=' ')
+    plt.plot(xp,0.5*(data[:,63,63]+data[:,64,63])/2.0)
+    plt.xlim(0.0, 2.0)
+    plt.ylim(-0.5, 0.5)
+    plt.show()
