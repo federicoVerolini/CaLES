@@ -237,6 +237,7 @@ program cans
            rhsby(  n(1),n(3),0:1), &
            rhsbz(  n(1),n(2),0:1))
 #endif
+  allocate(dw(0:n(1)+1,0:n(2)+1,0:n(3)+1))
   !
   if(myid == 0) print*, 'This executable of CaNS was built with compiler: ', compiler_version()
   if(myid == 0) print*, 'Using the options: ', compiler_options()
