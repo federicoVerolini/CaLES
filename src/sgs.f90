@@ -92,7 +92,9 @@ module mod_sgs
                  mij(0:n(1)+1,0:n(2)+1,0:n(3)+1,6))
       end if
 #if !defined(_FILTER_2D)
-      alph2(:) = 4.00_rp
+      alph2(:)    = 4.00_rp
+      alph2(1)    = 2.52_rp
+      alph2(n(3)) = 2.52_rp
 #else
       alph2(:) = 2.52_rp
 #endif
