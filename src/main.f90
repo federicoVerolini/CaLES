@@ -89,8 +89,7 @@ program cans
   use omp_lib
   implicit none
   integer , dimension(3) :: lo,hi,n,n_x_fft,n_y_fft,lo_z,hi_z,n_z
-  real(rp), allocatable, dimension(:,:,:) :: u,v,w,p,pp,visct,dw,dw_plus,s0,uc,vc,wc,uf,vf,wf
-  real(rp), allocatable, dimension(:,:,:,:) :: sij,lij,mij
+  real(rp), allocatable, dimension(:,:,:) :: u,v,w,p,pp,visct,dw
   real(rp), dimension(3) :: tauxo,tauyo,tauzo
   real(rp), dimension(3) :: f
 #if !defined(_OPENACC)
@@ -107,7 +106,7 @@ program cans
     real(rp), allocatable, dimension(:,:,:) :: z
   end type rhs_bound
   type(rhs_bound) :: rhsbp
-  type(cond_bound) :: bcu,bcv,bcw,bcp,bcs,bcu_mag,bcv_mag,bcw_mag,bcuf,bcvf,bcwf
+  type(cond_bound) :: bcu,bcv,bcw,bcp,bcs,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag
   real(rp) :: alpha
 #if defined(_IMPDIFF)
 #if !defined(_OPENACC)
@@ -138,9 +137,8 @@ program cans
   character(len=4  ) :: chkptnum
   character(len=100) :: filename
   integer :: i,j,k,kk
-  logical :: is_done,kill,is_updt_wm
+  logical :: is_done,kill
   character(len=1) :: ctmp
-  real(rp) :: tmp
   !
   call MPI_INIT(ierr)
   call MPI_COMM_RANK(MPI_COMM_WORLD,myid,ierr)
@@ -199,6 +197,15 @@ program cans
            bcs%x(0:n(2)+1,0:n(3)+1,0:1), &
            bcs%y(0:n(1)+1,0:n(3)+1,0:1), &
            bcs%z(0:n(1)+1,0:n(2)+1,0:1))
+  allocate(bcuf%x(0:n(2)+1,0:n(3)+1,0:1), &
+           bcvf%x(0:n(2)+1,0:n(3)+1,0:1), &
+           bcwf%x(0:n(2)+1,0:n(3)+1,0:1), &
+           bcuf%y(0:n(1)+1,0:n(3)+1,0:1), &
+           bcvf%y(0:n(1)+1,0:n(3)+1,0:1), &
+           bcwf%y(0:n(1)+1,0:n(3)+1,0:1), &
+           bcuf%z(0:n(1)+1,0:n(2)+1,0:1), &
+           bcvf%z(0:n(1)+1,0:n(2)+1,0:1), &
+           bcwf%z(0:n(1)+1,0:n(2)+1,0:1))
   allocate(bcu_mag%x(0:n(2)+1,0:n(3)+1,0:1), &
            bcv_mag%x(0:n(2)+1,0:n(3)+1,0:1), &
            bcw_mag%x(0:n(2)+1,0:n(3)+1,0:1), &
@@ -230,34 +237,6 @@ program cans
            rhsby(  n(1),n(3),0:1), &
            rhsbz(  n(1),n(2),0:1))
 #endif
-  !
-  select case(trim(sgstype))
-  case('smag')
-    allocate(s0     (0:n(1)+1,0:n(2)+1,0:n(3)+1), &
-             dw     (0:n(1)+1,0:n(2)+1,0:n(3)+1), &
-             dw_plus(0:n(1)+1,0:n(2)+1,0:n(3)+1), &
-             sij    (0:n(1)+1,0:n(2)+1,0:n(3)+1,6))
-  case('dsmag')
-    allocate(s0 (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
-             uc (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
-             vc (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
-             wc (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
-             uf (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
-             vf (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
-             wf (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
-             sij(0:n(1)+1,0:n(2)+1,0:n(3)+1,6), &
-             lij(0:n(1)+1,0:n(2)+1,0:n(3)+1,6), &
-             mij(0:n(1)+1,0:n(2)+1,0:n(3)+1,6))
-    allocate(bcuf%x(0:n(2)+1,0:n(3)+1,0:1), &
-             bcvf%x(0:n(2)+1,0:n(3)+1,0:1), &
-             bcwf%x(0:n(2)+1,0:n(3)+1,0:1), &
-             bcuf%y(0:n(1)+1,0:n(3)+1,0:1), &
-             bcvf%y(0:n(1)+1,0:n(3)+1,0:1), &
-             bcwf%y(0:n(1)+1,0:n(3)+1,0:1), &
-             bcuf%z(0:n(1)+1,0:n(2)+1,0:1), &
-             bcvf%z(0:n(1)+1,0:n(2)+1,0:1), &
-             bcwf%z(0:n(1)+1,0:n(2)+1,0:1))
-  end select
   !
   if(myid == 0) print*, 'This executable of CaNS was built with compiler: ', compiler_version()
   if(myid == 0) print*, 'Using the options: ', compiler_options()
@@ -380,8 +359,8 @@ program cans
                   device_memory_footprint(n,n_z)/(1._sp*1024**3), ' ***'
 #endif
   !
-  write(ctmp,'(i1)') myid
-  open(55,file=trim(datadir)//'debug'//trim(ctmp),status='replace')
+  ! write(ctmp,'(i1)') myid
+  ! open(55,file=trim(datadir)//'debug'//trim(ctmp),status='replace')
   if(.not.restart) then
     istep = 0
     time = 0.
@@ -397,9 +376,8 @@ program cans
   call bounduvw(cbcvel,n,bcu,bcv,bcw,bcu_mag,bcv_mag,bcw_mag,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf, &
                 visc,hwm,ind_wm,.true.,.false.,u,v,w)
   call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
-  call cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcpre,bcp,nb,is_bound,lwm,l,dl, &
-                zc,zf,dzc,dzf,visc,hwm,ind_wm,u,v,w,dw,dw_plus,s0,uc,vc,wc,uf,vf,wf, &
-                sij,lij,mij,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,visct)
+  call cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcpre,bcp,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf, &
+                visc,hwm,ind_wm,u,v,w,dw,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,visct)
   call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,visct) ! corner ghost cells included
   !
   ! post-process and write initial condition
@@ -537,9 +515,8 @@ program cans
                     visc,hwm,ind_wm,.true.,.true.,u,v,w)
       call updatep(n,dli,dzci,dzfi,alpha,pp,p)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
-      call cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcpre,bcp,nb,is_bound,lwm,l,dl, &
-                    zc,zf,dzc,dzf,visc,hwm,ind_wm,u,v,w,dw,dw_plus,s0,uc,vc,wc,uf,vf,wf, &
-                    sij,lij,mij,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,visct)
+      call cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcpre,bcp,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf, &
+                    visc,hwm,ind_wm,u,v,w,dw,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,visct)
       call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,visct)
     end do
     dpdl(:) = -dpdl(:)*dti

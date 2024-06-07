@@ -17,9 +17,8 @@ module mod_sgs
   public cmpt_sgs
   contains
   !
-  subroutine cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcpre,bcp,nb,is_bound,lwm,l,dl, &
-                      zc,zf,dzc,dzf,visc,h,ind,u,v,w,dw,dw_plus,s0,uc,vc,wc,uf,vf,wf, &
-                      sij,lij,mij,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,visct)
+  subroutine cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcpre,bcp,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf, &
+                      visc,h,ind,u,v,w,dw,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,visct)
     !
     ! compute subgrid viscosity at cell centers
     ! the current implementation of the dynamcic version is two times the
@@ -34,8 +33,9 @@ module mod_sgs
     ! Bae, Orlandi, LESGO, and
     ! Balaras (1995), Finite-Difference Computations of High Reynolds Number
     ! Flows Using the Dynamic Subgrid-Scale Model.
-    ! It might be impossible to do 3D filtering of Sij at the first layer, though
-    ! ok for the velocity.
+    ! It is difficult to do 3D filtering of Sij for the first layer, though
+    ! feasible for the velocity. alpha is set as a constant for the whole field,
+    ! since it hardly influence the results.
     !
     implicit none
     character(len=*), intent(in) :: sgstype
@@ -51,10 +51,13 @@ module mod_sgs
     real(rp), intent(in ), dimension(0:)         :: zc,zf,dzc,dzf
     real(rp), intent(in )                        :: visc,h
     real(rp), intent(in ), dimension(0:,0:,0:)   :: u,v,w,dw
-    real(rp), intent(out), dimension(0:,0:,0:)   :: dw_plus,s0,uc,vc,wc,uf,vf,wf,visct
-    real(rp), intent(out), dimension(0:,0:,0:,1:) :: sij,lij,mij
+    real(rp), intent(out), dimension(0:,0:,0:)   :: visct
+    !
+    real(rp), allocatable, dimension(:,:,:)  , save :: dw_plus,s0,uc,vc,wc,uf,vf,wf
+    real(rp), allocatable, dimension(:,:,:,:), save :: sij,lij,mij
     real(rp), dimension(3)        :: dli
     real(rp), dimension(0:n(3)+1) :: dzci,dzfi,alph2
+    logical, save :: is_first = .true.
     integer :: i,j,k,m
     !
     dli(:)  = dl( :)**(-1)
@@ -65,14 +68,31 @@ module mod_sgs
     case('none')
       visct(:,:,:) = 0._rp
     case('smag')
+      if(is_first) then
+        is_first = .false.
+        allocate(s0     (0:n(1)+1,0:n(2)+1,0:n(3)+1  ))
+        allocate(dw_plus(0:n(1)+1,0:n(2)+1,0:n(3)+1  ))
+        allocate(sij    (0:n(1)+1,0:n(2)+1,0:n(3)+1,6))
+      end if
       call strain_rate(n,dli,dzci,dzfi,is_bound,lwm,u,v,w,s0,sij)
       call cmpt_dw_plus(cbcvel,n,is_bound,l,dl,zc,dzc,visc,u,v,w,dw,dw_plus)
       call sgs_smag(n,dl,dzf,dw_plus,s0,visct)
     case('dsmag')
+      if(is_first) then
+        is_first = .false.
+        allocate(s0 (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
+                 uc (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
+                 vc (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
+                 wc (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
+                 uf (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
+                 vf (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
+                 wf (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
+                 sij(0:n(1)+1,0:n(2)+1,0:n(3)+1,6), &
+                 lij(0:n(1)+1,0:n(2)+1,0:n(3)+1,6), &
+                 mij(0:n(1)+1,0:n(2)+1,0:n(3)+1,6))
+      end if
 #if !defined(_FILTER_2D)
       alph2(:) = 4.00_rp
-      alph2(1) = 2.52_rp
-      alph2(n(3)) = 2.52_rp
 #else
       alph2(:) = 2.52_rp
 #endif
@@ -84,23 +104,23 @@ module mod_sgs
       ! Lij
       !
       call interpolate(n,u,v,w,uc,vc,wc)
-      ! periodic/patched bc's are essentially used, because filtering is not performed
-      ! in the wall-normal direction for the first off-wall layer
+      ! only periodic and patched bc's are used, wall bc ghost points are always set
+      ! by extrapolation from the interior, for both no-slip and wall model bc's.
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,uc)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,vc)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,wc)
 #if !defined(_FILTER_2D)
-      call filter(uc*uc,lij(:,:,:,1),is_fil2d_wall=.true.) ! modify
-      call filter(vc*vc,lij(:,:,:,2),is_fil2d_wall=.true.)
-      call filter(wc*wc,lij(:,:,:,3),is_fil2d_wall=.true.)
-      call filter(uc*vc,lij(:,:,:,4),is_fil2d_wall=.true.)
-      call filter(uc*wc,lij(:,:,:,5),is_fil2d_wall=.true.)
-      call filter(vc*wc,lij(:,:,:,6),is_fil2d_wall=.true.)
-      call filter(uc,uf,is_fil2d_wall=.true.)
-      call filter(vc,vf,is_fil2d_wall=.true.)
-      call filter(wc,wf,is_fil2d_wall=.true.)
+      call filter(cbcvel,is_bound,uc*uc,lij(:,:,:,1),iface=0)
+      call filter(cbcvel,is_bound,vc*vc,lij(:,:,:,2),iface=0)
+      call filter(cbcvel,is_bound,wc*wc,lij(:,:,:,3),iface=0)
+      call filter(cbcvel,is_bound,uc*vc,lij(:,:,:,4),iface=0)
+      call filter(cbcvel,is_bound,uc*wc,lij(:,:,:,5),iface=0)
+      call filter(cbcvel,is_bound,vc*wc,lij(:,:,:,6),iface=0)
+      call filter(cbcvel,is_bound,uc,uf,iface=0)
+      call filter(cbcvel,is_bound,vc,vf,iface=0)
+      call filter(cbcvel,is_bound,wc,wf,iface=0)
 #else
-      call filter2d(uc*uc,lij(:,:,:,1)) ! modify
+      call filter2d(uc*uc,lij(:,:,:,1))
       call filter2d(vc*vc,lij(:,:,:,2))
       call filter2d(wc*wc,lij(:,:,:,3))
       call filter2d(uc*vc,lij(:,:,:,4))
@@ -119,6 +139,8 @@ module mod_sgs
       !
       ! Mij
       !
+      ! only periodic and patched bc's are used, wall bc ghost points are always set
+      ! by extrapolation from the interior, for both no-slip and wall model bc's.
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,s0)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,1))
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,2))
@@ -127,17 +149,17 @@ module mod_sgs
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,5))
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,6))
 #if !defined(_FILTER_2D)
-      call filter(s0*sij(:,:,:,1),mij(:,:,:,1),is_fil2d_wall=.true.) ! modify
-      call filter(s0*sij(:,:,:,2),mij(:,:,:,2),is_fil2d_wall=.true.)
-      call filter(s0*sij(:,:,:,3),mij(:,:,:,3),is_fil2d_wall=.true.)
-      call filter(s0*sij(:,:,:,4),mij(:,:,:,4),is_fil2d_wall=.true.)
-      call filter(s0*sij(:,:,:,5),mij(:,:,:,5),is_fil2d_wall=.true.)
-      call filter(s0*sij(:,:,:,6),mij(:,:,:,6),is_fil2d_wall=.true.)
-      call filter(u,uf,is_fil2d_wall=.true. )
-      call filter(v,vf,is_fil2d_wall=.true. )
-      call filter(w,wf,is_fil2d_wall=.false.)
+      call filter(cbcvel,is_bound,s0*sij(:,:,:,1),mij(:,:,:,1),iface=0)
+      call filter(cbcvel,is_bound,s0*sij(:,:,:,2),mij(:,:,:,2),iface=0)
+      call filter(cbcvel,is_bound,s0*sij(:,:,:,3),mij(:,:,:,3),iface=0)
+      call filter(cbcvel,is_bound,s0*sij(:,:,:,4),mij(:,:,:,4),iface=0)
+      call filter(cbcvel,is_bound,s0*sij(:,:,:,5),mij(:,:,:,5),iface=0)
+      call filter(cbcvel,is_bound,s0*sij(:,:,:,6),mij(:,:,:,6),iface=0)
+      call filter(cbcvel,is_bound,u,uf,iface=1)
+      call filter(cbcvel,is_bound,v,vf,iface=2)
+      call filter(cbcvel,is_bound,w,wf,iface=3)
 #else
-      call filter2d(s0*sij(:,:,:,1),mij(:,:,:,1)) ! modify
+      call filter2d(s0*sij(:,:,:,1),mij(:,:,:,1))
       call filter2d(s0*sij(:,:,:,2),mij(:,:,:,2))
       call filter2d(s0*sij(:,:,:,3),mij(:,:,:,3))
       call filter2d(s0*sij(:,:,:,4),mij(:,:,:,4))
@@ -272,60 +294,94 @@ module mod_sgs
     end select
   end subroutine ave2d
   !
-  subroutine filter(p,pf,is_fil2d_wall)
+  subroutine filter(cbc,is_bound,p,pf,iface)
     !
     ! top-hat filter 3D, second-order trapezoidal rule
-    ! we do not define temporary variables to store array elements, since
-    ! each element is used only once, which is different from mom_xyz_ad.
-    ! The current implementation's cost is ~50% of that of computing eight
-    ! cubes as done in Bae's code and Davidson's book.
+    ! we do not define temporary variables to touch array elements, since each element is
+    ! used only once, which is different from mom_xyz_ad. The current implementation's cost
+    ! is ~50% of that of computing eight cubes as done in Bae's code and Davidson's book.
+    ! 2D filtering is always used for the first off-wall layer, for both wall-resolved and
+    ! wall-modeled LES. The 2d filtering is achieved via linear extrapolation to the ghost
+    ! points from the interior, so the filtering operation requires >= 2 off-wall layers.
+    ! Note that the treatment of filtering is different from that of the strain rate, whose
+    ! calculation depend on whether wall model is used or not.
     !
     implicit none
+    character(len=1), intent(in), dimension(0:1,3,3) :: cbc
+    logical , intent(in), dimension(0:1,3)     :: is_bound
     real(rp), intent(in ), dimension(0:,0:,0:) :: p
     real(rp), intent(out), dimension(0:,0:,0:) :: pf
-    logical , intent(in ) :: is_fil2d_wall
+    integer , intent(in), optional :: iface
     integer :: n(3),i,j,k
     !
+    real(rp), allocatable, dimension(:,:,:), save :: wk
+    logical, save :: is_first = .true.
+    !
     n = shape(p)-2
+    !
+    if(is_first) then
+      is_first = .false.
+      allocate(wk(0:n(1)+1,0:n(2)+1,0:n(3)+1))
+    end if
+    wk = p
     pf = 0._rp
+    !
+    if(is_bound(0,1).and.cbc(0,1,1)=='D'.and.iface/=1) then
+      wk(0,:,:) = 2._rp*wk(1,:,:) - wk(2,:,:)
+    end if
+    if(is_bound(1,1).and.cbc(1,1,1)=='D'.and.iface/=1) then
+      wk(n(1)+1,:,:) = 2._rp*wk(n(1),:,:) - wk(n(1)-1,:,:)
+    end if
+    if(is_bound(0,2).and.cbc(0,2,2)=='D'.and.iface/=2) then
+      wk(:,0,:) = 2._rp*wk(:,1,:) - wk(:,2,:)
+    end if
+    if(is_bound(1,2).and.cbc(1,2,2)=='D'.and.iface/=2) then
+      wk(:,n(2)+1,:) = 2._rp*wk(:,n(2),:) - wk(:,n(2)-1,:)
+    end if
+    if(is_bound(0,3).and.cbc(0,3,3)=='D'.and.iface/=3) then
+      wk(:,:,0) = 2._rp*wk(:,:,1) - wk(:,:,2)
+    end if
+    if(is_bound(1,3).and.cbc(1,3,3)=='D'.and.iface/=3) then
+      wk(:,:,n(3)+1) = 2._rp*wk(:,:,n(3)) - wk(:,:,n(3)-1)
+    end if
     !
     do k = 1,n(3)
       do j = 1,n(2)
         do i = 1,n(1)
-          pf(i,j,k) = 8._rp*(p(i,j,k)) + &
-                      4._rp*(p(i-1,j,k) + p(i,j-1,k) + p(i,j,k-1) + &
-                             p(i+1,j,k) + p(i,j+1,k) + p(i,j,k+1)) + &
-                      2._rp*(p(i,j+1,k+1) + p(i+1,j,k+1) + p(i+1,j+1,k) + &
-                             p(i,j-1,k-1) + p(i-1,j,k-1) + p(i-1,j-1,k) + &
-                             p(i,j-1,k+1) + p(i-1,j,k+1) + p(i-1,j+1,k) + &
-                             p(i,j+1,k-1) + p(i+1,j,k-1) + p(i+1,j-1,k)) + &
-                      1._rp*(p(i-1,j-1,k-1) + p(i+1,j-1,k-1) + p(i-1,j+1,k-1) + p(i+1,j+1,k-1) + &
-                             p(i-1,j-1,k+1) + p(i+1,j-1,k+1) + p(i-1,j+1,k+1) + p(i+1,j+1,k+1))
+          pf(i,j,k) = 8._rp*(wk(i,j,k)) + &
+                      4._rp*(wk(i-1,j,k) + wk(i,j-1,k) + wk(i,j,k-1) + &
+                             wk(i+1,j,k) + wk(i,j+1,k) + wk(i,j,k+1)) + &
+                      2._rp*(wk(i,j+1,k+1) + wk(i+1,j,k+1) + wk(i+1,j+1,k) + &
+                             wk(i,j-1,k-1) + wk(i-1,j,k-1) + wk(i-1,j-1,k) + &
+                             wk(i,j-1,k+1) + wk(i-1,j,k+1) + wk(i-1,j+1,k) + &
+                             wk(i,j+1,k-1) + wk(i+1,j,k-1) + wk(i+1,j-1,k)) + &
+                      1._rp*(wk(i-1,j-1,k-1) + wk(i+1,j-1,k-1) + wk(i-1,j+1,k-1) + wk(i+1,j+1,k-1) + &
+                             wk(i-1,j-1,k+1) + wk(i+1,j-1,k+1) + wk(i-1,j+1,k+1) + wk(i+1,j+1,k+1))
           pf(i,j,k) = pf(i,j,k)/64._rp
         end do
       end do
     end do
-    ! first off-wall layer, zc(1) and zc(n(3))
-    if(is_fil2d_wall) then
-      ! bottom wall
-      do j = 1,n(2)
-        do i = 1,n(1)
-          pf(i,j,1) = 4._rp*(p(i,j,1)) + &
-                      2._rp*(p(i-1,j,1) + p(i,j-1,1) + p(i+1,j,1) + p(i,j+1,1)) + &
-                      1._rp*(p(i-1,j-1,1) + p(i+1,j-1,1) + p(i-1,j+1,1) + p(i+1,j+1,1))
-          pf(i,j,1) = pf(i,j,1)/16._rp
-        end do
-      end do
-      ! top wall
-      do j = 1,n(2)
-        do i = 1,n(1)
-          pf(i,j,n(3)) = 4._rp*(p(i,j,n(3))) + &
-                         2._rp*(p(i-1,j,n(3)) + p(i,j-1,n(3)) + p(i+1,j,n(3)) + p(i,j+1,n(3))) + &
-                         1._rp*(p(i-1,j-1,n(3)) + p(i+1,j-1,n(3)) + p(i-1,j+1,n(3)) + p(i+1,j+1,n(3)))
-          pf(i,j,n(3)) = pf(i,j,n(3))/16._rp
-        end do
-      end do
-    end if
+    ! ! first off-wall layer, zc(1) and zc(n(3))
+    ! if(is_fil2d_wall) then
+    !   ! bottom wall
+    !   do j = 1,n(2)
+    !     do i = 1,n(1)
+    !       pf(i,j,1) = 4._rp*(p(i,j,1)) + &
+    !                   2._rp*(p(i-1,j,1) + p(i,j-1,1) + p(i+1,j,1) + p(i,j+1,1)) + &
+    !                   1._rp*(p(i-1,j-1,1) + p(i+1,j-1,1) + p(i-1,j+1,1) + p(i+1,j+1,1))
+    !       pf(i,j,1) = pf(i,j,1)/16._rp
+    !     end do
+    !   end do
+    !   ! top wall
+    !   do j = 1,n(2)
+    !     do i = 1,n(1)
+    !       pf(i,j,n(3)) = 4._rp*(p(i,j,n(3))) + &
+    !                      2._rp*(p(i-1,j,n(3)) + p(i,j-1,n(3)) + p(i+1,j,n(3)) + p(i,j+1,n(3))) + &
+    !                      1._rp*(p(i-1,j-1,n(3)) + p(i+1,j-1,n(3)) + p(i-1,j+1,n(3)) + p(i+1,j+1,n(3)))
+    !       pf(i,j,n(3)) = pf(i,j,n(3))/16._rp
+    !     end do
+    !   end do
+    ! end if
   end subroutine filter
   !
   subroutine filter2d(p,pf)
@@ -339,6 +395,7 @@ module mod_sgs
     real(rp), intent(in ), dimension(0:,0:,0:) :: p
     real(rp), intent(out), dimension(0:,0:,0:) :: pf
     integer :: n(3),i,j,k
+    !
     !
     n = shape(p)-2
     pf = 0._rp

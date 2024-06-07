@@ -85,12 +85,12 @@ if __name__ == "__main__":
     #
     # u along z direction
     #
-    data, xp, yp, zp, xu, yv, zw = read_single_field_binary('vex_fld_0010000.bin',iskip)
+    data, xp, yp, zp, xu, yv, zw = read_single_field_binary('vex_fld_0005000.bin',iskip)
     fname = resultsdir + 'stats-single-point-cavi-vertical-' + casename + fname_ext
     np.savetxt(fname, np.column_stack((zp, 0.5*(data[63,63,:]+data[63,64,:])/2.0)), fmt='%16.6e', delimiter='')
     #
     # w along x direction
     #
-    data, xp, yp, zp, xu, yv, zw = read_single_field_binary('vez_fld_0010000.bin',iskip)
+    data, xp, yp, zp, xu, yv, zw = read_single_field_binary('vez_fld_0005000.bin',iskip)
     fname = resultsdir + 'stats-single-point-cavi-horizontal-' + casename + fname_ext
     np.savetxt(fname, np.column_stack((xp, 0.5*(data[:,63,63]+data[:,64,63])/2.0)), fmt='%16.6e', delimiter='')

@@ -38,8 +38,25 @@ module mod_wmodel
     !
     ! index 0 must be calculated for the right/front/top walls (used in chkdt, etc.),
     ! but not necessary for the opposite walls. However, index 0 for the left/back/bottom walls
-    ! is necessary when a subgrid model is involved, including cmpt_dw_plus, etc. Hence,
+    ! is necessary when a subgrid model is involved, such as cmpt_dw_plus. Hence,
     ! the best way is to calculate index 0 for all walls.
+    !
+    ! The singularity at the corner for cavity flow affects the calculation of time step.
+    ! However, the velocity is small at the corner, so it does not impose a limitation on
+    ! the time step. Hence, no special treatment is necessary for the corner.
+    ! The ghost point outside of the singularity is essentially not used for computing
+    ! u and w at the corners, since u and w at the corners are set as zero by the
+    ! no-penetration boundary condition. When eddy viscosity (strain rate) is used,
+    ! its calculation uses the ghost point outside of the singularity. However,
+    ! when wall model is used, one-sided difference is used in the calculation of
+    ! of wall gradients (strain rate), so the ghost point outside of the singularity is
+    ! not used. If van Driest damping is used, the ghost point outside of the singularity
+    ! is used, but the damping is not important at the corner. In summary,
+    ! WMLES: the van Driest damping and time step calculation use the ghost point
+    ! outside of the singularity.
+    ! WRLES: the van Driest damping, time step calculation and strain rate calculation
+    ! use the ghost point outside of the singularity.
+    ! DNS: time step calculation uses the ghost point outside of the singularity.
     !
     implicit none
     integer , intent(in), dimension(3) :: n
