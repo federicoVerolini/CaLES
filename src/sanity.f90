@@ -230,7 +230,7 @@ module mod_sanity
     !
 #if defined(_IMPDIFF) && !defined(_IMPDIFF_1D)
     ! implicit: bcs in x and y must be 'D0' or 'P',
-    ! so implicit mode can not be used for WMLES of square ducts
+    ! so implicit mode cannot be used for WMLES of square ducts
     passed_loc = .true.
     do ivel = 1,3
       do idir=1,2
@@ -251,6 +251,14 @@ module mod_sanity
     if(myid == 0.and.(.not.passed_loc)) &
       print*, 'ERROR: velocity BCs with implicit diffusion in directions x and y must be homogeneous (value = 0.).'
     passed = passed.and.passed_loc
+    !
+    passed_loc = .true.
+    passed_loc = passed_loc.and.( lwm(0,1)==0.and.lwm(1,1)==0.and. &
+                                  lwm(0,2)==0.and.lwm(1,2)==0 )
+    if(myid == 0.and.(.not.passed_loc)) &
+      print*, 'ERROR: wall model BCs cannot be used in x and y directions when 3D implicit diffusion is applied.'
+    passed = passed.and.passed_loc
+    !
 #endif
 #if defined(_OPENACC)
     do idir=1,2

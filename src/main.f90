@@ -315,7 +315,7 @@ program cans
   !
   call initsolver(ng,n_x_fft,n_y_fft,lo_z,hi_z,dli,dzci_g,dzfi_g,cbcpre, &
                   lambdaxyp,['c','c','c'],ap,bp,cp,arrplanp,normfftp)
-  call cmpt_rhs_b(ng,dli,dzci_g,dzfi_g,cbcpre,bcp, ['c','c','c'],rhsbp%x,rhsbp%y,rhsbp%z)
+  call cmpt_rhs_b(ng,dli,dzci_g,dzfi_g,cbcpre,bcp,['c','c','c'],rhsbp%x,rhsbp%y,rhsbp%z)
   !$acc enter data copyin(lambdaxyp,ap,bp,cp) async
   !$acc enter data copyin(rhsbp,rhsbp%x,rhsbp%y,rhsbp%z) async
   !$acc wait

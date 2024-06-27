@@ -63,6 +63,71 @@ module mod_post
     !$acc wait
   end subroutine vorticity
   !
+  subroutine strain_rate(n,dli,dzci,dzfi,ux,uy,uz,s0,sij)
+    !
+    ! computes the strain rate field
+    !
+    ! Sij is first computed at (or averaged to) cell center, then s0=sqrt(2SijSij)
+    ! at cell center (Bae and Orlandi's codes). The implementation is efficient, since
+    ! it avoids repetitive computation of derivatives. Costa first averages SijSij to
+    ! cell center, then computes s0, which leads to larger s0, especially when Sij
+    ! at the cell edges have opposite signs. The second and third loops cannot combine.
+    ! please modify this back to Costa's version for memory saving
+    !
+    implicit none
+    integer , intent(in ), dimension(3)        :: n
+    real(rp), intent(in ), dimension(3)        :: dli
+    real(rp), intent(in ), dimension(0:)       :: dzci,dzfi
+    real(rp), intent(in ), dimension(0:,0:,0:) :: ux,uy,uz
+    real(rp), intent(out), dimension(0:,0:,0:) :: s0
+    real(rp), intent(out), dimension(0:,0:,0:,1:) :: sij
+    real(rp) :: dxi,dyi,dzc(0:n(3)+1)
+    integer :: i,j,k
+    !
+    dzc = 1._rp/dzci
+    dxi = dli(1)
+    dyi = dli(2)
+    !
+    ! compute s0 = sqrt(2*sij*sij), where sij = (1/2)(du_i/dx_j + du_j/dx_i)
+    !
+    !$acc parallel loop collapse(3) default(present) private(s11,s12,s13,s22,s23,s33)
+    !$OMP PARALLEL DO   COLLAPSE(3) DEFAULT(shared)  PRIVATE(s11,s12,s13,s22,s23,s33)
+    ! compute at cell edge
+    do k = 0,n(3)
+      do j = 0,n(2)
+        do i = 0,n(1)
+          sij(i,j,k,1) = 0.5_rp*((ux(i,j+1,k)-ux(i,j,k))*dyi     + (uy(i+1,j,k)-uy(i,j,k))*dxi)
+          sij(i,j,k,2) = 0.5_rp*((ux(i,j,k+1)-ux(i,j,k))*dzci(k) + (uz(i+1,j,k)-uz(i,j,k))*dxi)
+          sij(i,j,k,3) = 0.5_rp*((uy(i,j,k+1)-uy(i,j,k))*dzci(k) + (uz(i,j+1,k)-uz(i,j,k))*dyi)
+        end do
+      end do
+    end do
+    ! average to cell center
+    do k = 1,n(3)
+      do j = 1,n(2)
+        do i = 1,n(1)
+          sij(i,j,k,4) = 0.25_rp*(sij(i,j,k,1)+sij(i-1,j,k,1)+sij(i,j-1,k,1)+sij(i-1,j-1,k,1))
+          sij(i,j,k,5) = 0.25_rp*(sij(i,j,k,2)+sij(i-1,j,k,2)+sij(i,j,k-1,2)+sij(i-1,j,k-1,2))
+          sij(i,j,k,6) = 0.25_rp*(sij(i,j,k,3)+sij(i,j-1,k,3)+sij(i,j,k-1,3)+sij(i,j-1,k-1,3))
+        end do
+      end do
+    end do
+    ! compute at cell center
+    do k = 1,n(3)
+      do j = 1,n(2)
+        do i = 1,n(1)
+          sij(i,j,k,1) = (ux(i,j,k)-ux(i-1,j,k))*dxi
+          sij(i,j,k,2) = (uy(i,j,k)-uy(i,j-1,k))*dyi
+          sij(i,j,k,3) = (uz(i,j,k)-uz(i,j,k-1))*dzfi(k)
+        end do
+      end do
+    end do
+    !
+    s0 = sij(:,:,:,1)**2 + sij(:,:,:,2)**2 + sij(:,:,:,3)**2 + &
+        (sij(:,:,:,4)**2 + sij(:,:,:,5)**2 + sij(:,:,:,6)**2)*2._rp
+    s0 = sqrt(2._rp*s0)
+  end subroutine strain_rate
+  !
   subroutine vorticity_one_component(idir,n,dli,dzci,ux,uy,uz,vo)
     !
     ! computes the vorticity field
@@ -122,129 +187,6 @@ module mod_post
     end select
     !$acc wait
   end subroutine vorticity_one_component
-  !
-  subroutine strain_rate(n,dli,dzci,dzfi,is_bound,lwm,ux,uy,uz,s0,sij)
-    !
-    ! Sij should be first computed at (or averaged to) cell center, then s0=sqrt(2SijSij)
-    ! at cell center. This implementation is also adopted by Bae and Orlandi. Pedro averages
-    ! SijSij to cell center first, then computes s0, which always leads to larger s0,
-    ! especially when Sij at the cell edges have opposite signs. The current implementation
-    ! avoids repetitive computation of derivatives, so it is much more efficient. Note that
-    ! three seperate loops are required; the second and third loops (special treatment does
-    ! not count) cannot be combined.
-    !
-    ! when a wall model is applied, the first layer of cells is large that discontinuity
-    ! appears near the wall, one-sided average (difference) should be used; averaging
-    ! should not be done across the discontinuity, since the wall-normal derivatives can be
-    ! as different as several orders of magnitude. Using second-order one-sided approximation
-    ! does not bring any benefit.
-    !
-    implicit none
-    integer , intent(in ), dimension(3)        :: n
-    real(rp), intent(in ), dimension(3)        :: dli
-    real(rp), intent(in ), dimension(0:)       :: dzci,dzfi
-    logical , intent(in), dimension(0:1,3)     :: is_bound
-    integer , intent(in), dimension(0:1,3)     :: lwm
-    real(rp), intent(in ), dimension(0:,0:,0:) :: ux,uy,uz
-    real(rp), intent(out), dimension(0:,0:,0:) :: s0
-    real(rp), intent(out), dimension(0:,0:,0:,1:) :: sij
-    real(rp) :: dxi,dyi
-    integer :: i,j,k
-    !
-    real(rp) :: d12,d13,f1,f2,f3,dfdz,dzc(0:n(3)+1)
-    dzc = 1./dzci
-    !
-    dxi = dli(1)
-    dyi = dli(2)
-    !
-    ! compute s0 = sqrt(2*sij*sij), where sij = (1/2)(du_i/dx_j + du_j/dx_i)
-    !
-    !$acc parallel loop collapse(3) default(present) private(s11,s12,s13,s22,s23,s33)
-    !$OMP PARALLEL DO   COLLAPSE(3) DEFAULT(shared)  PRIVATE(s11,s12,s13,s22,s23,s33)
-    ! compute at cell edge
-    do k = 0,n(3)
-      do j = 0,n(2)
-        do i = 0,n(1)
-          sij(i,j,k,1) = 0.5_rp*((ux(i,j+1,k)-ux(i,j,k))*dyi     + (uy(i+1,j,k)-uy(i,j,k))*dxi)
-          sij(i,j,k,2) = 0.5_rp*((ux(i,j,k+1)-ux(i,j,k))*dzci(k) + (uz(i+1,j,k)-uz(i,j,k))*dxi)
-          sij(i,j,k,3) = 0.5_rp*((uy(i,j,k+1)-uy(i,j,k))*dzci(k) + (uz(i,j+1,k)-uz(i,j,k))*dyi)
-        end do
-      end do
-    end do
-    ! extrapolate to walls
-    if(is_bound(0,1).and.lwm(0,1)/=0) then
-      do k = 0,n(3)
-        do j = 0,n(2)
-          sij(0,j,k,1) = sij(1,j,k,1)
-          sij(0,j,k,2) = sij(1,j,k,2)
-        end do
-      end do
-    end if
-    if(is_bound(1,1).and.lwm(1,1)/=0) then
-      do k = 0,n(3)
-        do j = 0,n(2)
-          sij(n(1),j,k,1) = sij(n(1)-1,j,k,1)
-          sij(n(1),j,k,2) = sij(n(1)-1,j,k,2)
-        end do
-      end do
-    end if
-    if(is_bound(0,2).and.lwm(0,2)/=0) then
-      do k = 0,n(3)
-        do i = 0,n(1)
-          sij(i,0,k,1) = sij(i,1,k,1)
-          sij(i,0,k,3) = sij(i,1,k,3)
-        end do
-      end do
-    end if
-    if(is_bound(1,2).and.lwm(1,2)/=0) then
-      do k = 0,n(3)
-        do i = 0,n(1)
-          sij(i,n(2),k,1) = sij(i,n(2)-1,k,1)
-          sij(i,n(2),k,3) = sij(i,n(2)-1,k,3)
-        end do
-      end do
-    end if
-    if(is_bound(0,3).and.lwm(0,3)/=0) then
-      do j = 0,n(2)
-        do i = 0,n(1)
-          sij(i,j,0,2) = sij(i,j,1,2)
-          sij(i,j,0,3) = sij(i,j,1,3)
-        end do
-      end do
-    end if
-    if(is_bound(1,3).and.lwm(1,3)/=0) then
-      do j = 0,n(2)
-        do i = 0,n(1)
-          sij(i,j,n(3),2) = sij(i,j,n(3)-1,2)
-          sij(i,j,n(3),3) = sij(i,j,n(3)-1,3)
-        end do
-      end do
-    end if
-    ! average to cell center
-    do k = 1,n(3)
-      do j = 1,n(2)
-        do i = 1,n(1)
-          sij(i,j,k,4) = 0.25_rp*(sij(i,j,k,1)+sij(i-1,j,k,1)+sij(i,j-1,k,1)+sij(i-1,j-1,k,1))
-          sij(i,j,k,5) = 0.25_rp*(sij(i,j,k,2)+sij(i-1,j,k,2)+sij(i,j,k-1,2)+sij(i-1,j,k-1,2))
-          sij(i,j,k,6) = 0.25_rp*(sij(i,j,k,3)+sij(i,j-1,k,3)+sij(i,j,k-1,3)+sij(i,j-1,k-1,3))
-        end do
-      end do
-    end do
-    ! compute at cell center
-    do k = 1,n(3)
-      do j = 1,n(2)
-        do i = 1,n(1)
-          sij(i,j,k,1) = (ux(i,j,k)-ux(i-1,j,k))*dxi
-          sij(i,j,k,2) = (uy(i,j,k)-uy(i,j-1,k))*dyi
-          sij(i,j,k,3) = (uz(i,j,k)-uz(i,j,k-1))*dzfi(k)
-        end do
-      end do
-    end do
-    !
-    s0 = sij(:,:,:,1)**2 + sij(:,:,:,2)**2 + sij(:,:,:,3)**2 + &
-        (sij(:,:,:,4)**2 + sij(:,:,:,5)**2 + sij(:,:,:,6)**2)*2._rp
-    s0 = sqrt(2._rp*s0)
-  end subroutine strain_rate
   !
   subroutine rotation_rate(n,dli,dzci,ux,uy,uz,ens)
     implicit none

@@ -19,7 +19,7 @@ module mod_chkdt
     ! for the stability conditions of the advective and diffusion terms
     !
     ! the eddy viscosity term is taken into account in the calculation of dt.
-    ! It is also acceptable not to consider it, since it is smaller than both
+    ! It is acceptable not to consider it, since it is larger than both
     ! the viscous and advective terms. In WRLES, the viscous term is commonly
     ! implicitly treated, so the eddy viscosity term does not influence dtmax,
     ! even when the grid is very fine
