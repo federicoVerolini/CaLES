@@ -35,8 +35,7 @@ module mod_sgs
     ! Balaras (1995), Finite-Difference Computations of High Reynolds Number
     ! Flows Using the Dynamic Subgrid-Scale Model.
     ! It is difficult to do 3D filtering of Sij for the first layer, though
-    ! feasible for the velocity. alpha is set as a constant for the whole field,
-    ! since it hardly influence the results.
+    ! feasible for the velocity.
     !
     implicit none
     character(len=*), intent(in) :: sgstype
@@ -55,11 +54,10 @@ module mod_sgs
     real(rp), intent(out), dimension(0:,0:,0:)   :: visct
     !
     real(rp), allocatable, dimension(:,:,:)  , save :: dw_plus,s0,uc,vc,wc,uf,vf,wf, &
-                                                       wk,wk1,wk2,wk3
+                                                       wk,wk1,wk2,wk3,alph2
     real(rp), allocatable, dimension(:,:,:,:), save :: sij,lij,mij
     real(rp), dimension(3)        :: dli
-    real(rp), dimension(0:n(3)+1) :: dzci,dzfi,alph2
-    ! real(rp) :: alph2
+    real(rp), dimension(0:n(3)+1) :: dzci,dzfi
     logical, save :: is_first = .true.
     integer :: i,j,k,m
     !
@@ -104,14 +102,9 @@ module mod_sgs
                  sij(0:n(1)+1,0:n(2)+1,0:n(3)+1,6), &
                  lij(0:n(1)+1,0:n(2)+1,0:n(3)+1,6), &
                  mij(0:n(1)+1,0:n(2)+1,0:n(3)+1,6))
+        allocate(alph2(0:n(1)+1,0:n(2)+1,0:n(3)+1))
+        call cmpt_alph2(n,is_bound,cbcvel,alph2)
       end if
-#if !defined(_FILTER_2D)
-      alph2(:)    = 4.00_rp
-      alph2(1)    = 2.52_rp
-      alph2(n(3)) = 2.52_rp
-#else
-      alph2(:) = 2.52_rp
-#endif
       !
       call extrapolate(n,is_bound,dzci,u,wk1,iface=1,lwm=lwm)
       call extrapolate(n,is_bound,dzci,v,wk2,iface=2,lwm=lwm)
@@ -220,13 +213,8 @@ module mod_sgs
       call extrapolate(n,is_bound,dzci,vf,wk2,iface=2,lwm=lwm)
       call extrapolate(n,is_bound,dzci,wf,wk3,iface=3,lwm=lwm)
       call strain_rate(n,dli,dzci,dzfi,wk1,wk2,wk3,s0,sij)
-      ! do m = 1,6
-      !   mij(:,:,:,m) = 2._rp*(mij(:,:,:,m)-alph2*s0(:,:,:)*sij(:,:,:,m))
-      ! end do
       do m = 1,6
-        do k = 1,n(3)
-          mij(:,:,k,m) = 2._rp*(mij(:,:,k,m)-alph2(k)*s0(:,:,k)*sij(:,:,k,m))
-        end do
+        mij(:,:,:,m) = 2._rp*(mij(:,:,:,m)-alph2(:,:,:)*s0(:,:,:)*sij(:,:,:,m))
       end do
       !
       ! cs = c_smag^2*del**2
@@ -864,6 +852,33 @@ module mod_sgs
     if(is_ext(0,3)) wk(:     ,:     ,0     ) = wk(:   ,:   ,1   ) - (wk(:   ,:   ,2   )-wk(:     ,:     ,1     ))*factor(0)
     if(is_ext(1,3)) wk(:     ,:     ,n(3)+1) = wk(:   ,:   ,n(3)) + (wk(:   ,:   ,n(3))-wk(:     ,:     ,n(3)-1))*factor(1)
   end subroutine extrapolate
+  !
+  subroutine cmpt_alph2(n,is_bound,cbc,alph2)
+    !
+    ! compute filter ratio, alph2, used in the dynamic Smagorinsky model
+    ! using alph2=2.52 in the first off-wall layer yields more accurate results than 4.00
+    ! in practical simulations. Specifically, the near-wall velocity profile is more
+    ! accurate. The effect also depends on the grid aspect ratio, with more obvious
+    ! effects at AR=1 than AR=2.
+    !
+    implicit none
+    integer, intent(in), dimension(3)        :: n
+    logical, intent(in), dimension(0:1,3)    :: is_bound
+    character(len=1), intent(in), dimension(0:1,3,3), optional :: cbc
+    real(rp), intent(out), dimension(0:,0:,0:) :: alph2
+    !
+#if !defined(_FILTER_2D)
+    alph2 = 4.00_rp
+    if(is_bound(0,1).and.cbc(0,1,1)=='D') alph2(1   ,:,:) = 2.52_rp
+    if(is_bound(1,1).and.cbc(1,1,1)=='D') alph2(n(1),:,:) = 2.52_rp
+    if(is_bound(0,2).and.cbc(0,2,2)=='D') alph2(:,1   ,:) = 2.52_rp
+    if(is_bound(1,2).and.cbc(1,2,2)=='D') alph2(:,n(2),:) = 2.52_rp
+    if(is_bound(0,3).and.cbc(0,3,3)=='D') alph2(:,:,1   ) = 2.52_rp
+    if(is_bound(1,3).and.cbc(1,3,3)=='D') alph2(:,:,n(3)) = 2.52_rp
+#else
+    alph2 = 2.52_rp
+#endif
+  end subroutine cmpt_alph2
   !
   subroutine filter2d(p,pf)
     !
