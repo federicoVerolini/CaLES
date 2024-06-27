@@ -58,8 +58,8 @@ module mod_sgs
                                                        wk,wk1,wk2,wk3
     real(rp), allocatable, dimension(:,:,:,:), save :: sij,lij,mij
     real(rp), dimension(3)        :: dli
-    real(rp), dimension(0:n(3)+1) :: dzci,dzfi
-    real(rp) :: alph2
+    real(rp), dimension(0:n(3)+1) :: dzci,dzfi,alph2
+    ! real(rp) :: alph2
     logical, save :: is_first = .true.
     integer :: i,j,k,m
     !
@@ -106,9 +106,11 @@ module mod_sgs
                  mij(0:n(1)+1,0:n(2)+1,0:n(3)+1,6))
       end if
 #if !defined(_FILTER_2D)
-      alph2 = 4.00_rp
+      alph2(:)    = 4.00_rp
+      alph2(1)    = 2.52_rp
+      alph2(n(3)) = 2.52_rp
 #else
-      alph2 = 2.52_rp
+      alph2(:) = 2.52_rp
 #endif
       !
       call extrapolate(n,is_bound,dzci,u,wk1,iface=1,lwm=lwm)
@@ -218,8 +220,13 @@ module mod_sgs
       call extrapolate(n,is_bound,dzci,vf,wk2,iface=2,lwm=lwm)
       call extrapolate(n,is_bound,dzci,wf,wk3,iface=3,lwm=lwm)
       call strain_rate(n,dli,dzci,dzfi,wk1,wk2,wk3,s0,sij)
+      ! do m = 1,6
+      !   mij(:,:,:,m) = 2._rp*(mij(:,:,:,m)-alph2*s0(:,:,:)*sij(:,:,:,m))
+      ! end do
       do m = 1,6
-        mij(:,:,:,m) = 2._rp*(mij(:,:,:,m)-alph2*s0(:,:,:)*sij(:,:,:,m))
+        do k = 1,n(3)
+          mij(:,:,k,m) = 2._rp*(mij(:,:,k,m)-alph2(k)*s0(:,:,k)*sij(:,:,k,m))
+        end do
       end do
       !
       ! cs = c_smag^2*del**2
