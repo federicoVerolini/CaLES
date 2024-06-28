@@ -845,12 +845,12 @@ module mod_sgs
       is_ext(:,3) = is_bound(:,3).and.lwm(:,3)/=0.and.iface/=3
     end if
     !
-    if(is_ext(0,1)) wk(0     ,:     ,:     ) = wk(1   ,:   ,:   ) - (wk(2   ,:   ,:   )-wk(1     ,:     ,:     ))
-    if(is_ext(1,1)) wk(n(1)+1,:     ,:     ) = wk(n(1),:   ,:   ) + (wk(n(1),:   ,:   )-wk(n(1)-1,:     ,:     ))
-    if(is_ext(0,2)) wk(:     ,0     ,:     ) = wk(:   ,1   ,:   ) - (wk(:   ,2   ,:   )-wk(:     ,1     ,:     ))
-    if(is_ext(1,2)) wk(:     ,n(2)+1,:     ) = wk(:   ,n(2),:   ) + (wk(:   ,n(2),:   )-wk(:     ,n(2)-1,:     ))
-    if(is_ext(0,3)) wk(:     ,:     ,0     ) = wk(:   ,:   ,1   ) - (wk(:   ,:   ,2   )-wk(:     ,:     ,1     ))*factor(0)
-    if(is_ext(1,3)) wk(:     ,:     ,n(3)+1) = wk(:   ,:   ,n(3)) + (wk(:   ,:   ,n(3))-wk(:     ,:     ,n(3)-1))*factor(1)
+    if(is_ext(0,1)) wk(0     ,:     ,:     ) =             2._rp*wk(1   ,:   ,:   ) -           wk(2     ,:     ,:     )
+    if(is_ext(1,1)) wk(n(1)+1,:     ,:     ) =             2._rp*wk(n(1),:   ,:   ) -           wk(n(1)-1,:     ,:     )
+    if(is_ext(0,2)) wk(:     ,0     ,:     ) =             2._rp*wk(:   ,1   ,:   ) -           wk(:     ,2     ,:     )
+    if(is_ext(1,2)) wk(:     ,n(2)+1,:     ) =             2._rp*wk(:   ,n(2),:   ) -           wk(:     ,n(2)-1,:     )
+    if(is_ext(0,3)) wk(:     ,:     ,0     ) = (1._rp+factor(0))*wk(:   ,:   ,1   ) - factor(0)*wk(:     ,:     ,2     )
+    if(is_ext(1,3)) wk(:     ,:     ,n(3)+1) = (1._rp+factor(1))*wk(:   ,:   ,n(3)) - factor(1)*wk(:     ,:     ,n(3)-1)
   end subroutine extrapolate
   !
   subroutine cmpt_alph2(n,is_bound,cbc,alph2)
