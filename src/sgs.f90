@@ -4,7 +4,6 @@
 ! SPDX-License-Identifier: MIT
 !
 ! -
-#define _AVE_CHA
 module mod_sgs
   use mpi
   use mod_common_mpi, only: ierr
@@ -225,10 +224,12 @@ module mod_sgs
                  (mij(:,:,:,4)*lij(:,:,:,4) + &
                   mij(:,:,:,5)*lij(:,:,:,5) + &
                   mij(:,:,:,6)*lij(:,:,:,6))*2._rp
-#if defined(_AVE_CHA)
+#if defined(_CHANNEL)
       call ave1d_channel(ng,lo,hi,3,l,dl,dzf,s0)
-#elif defined(_AVE_DUC)
+#elif defined(_DUCT)
       call ave2d_duct(ng,lo,hi,1,l,dl,dzf,s0)
+#elif defined(_CAVITY)
+      !
 #endif
       visct = visct*s0
       s0(:,:,:) = mij(:,:,:,1)*mij(:,:,:,1) + &
@@ -237,10 +238,12 @@ module mod_sgs
                  (mij(:,:,:,4)*mij(:,:,:,4) + &
                   mij(:,:,:,5)*mij(:,:,:,5) + &
                   mij(:,:,:,6)*mij(:,:,:,6))*2._rp
-#if defined(_AVE_CHA)
+#if defined(_CHANNEL)
       call ave1d_channel(ng,lo,hi,3,l,dl,dzf,s0)
-#elif defined(_AVE_DUC)
+#elif defined(_DUCT)
       call ave2d_duct(ng,lo,hi,1,l,dl,dzf,s0)
+#elif defined(_CAVITY)
+      !
 #endif
       visct = visct/s0
     case('amd')
@@ -859,7 +862,7 @@ module mod_sgs
     ! using alph2=2.52 in the first off-wall layer yields more accurate results than 4.00
     ! in practical simulations. Specifically, the near-wall velocity profile is more
     ! accurate. The effect also depends on the grid aspect ratio, with more obvious
-    ! effects at AR=1 than AR=2.
+    ! effects at AR=1 than AR=2. The choice has negligible influence on WRLES.
     !
     implicit none
     integer, intent(in), dimension(3)        :: n
