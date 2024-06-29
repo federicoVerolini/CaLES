@@ -323,7 +323,7 @@ module mod_output
     select case(idir)
     case(3)
       grid_area_ratio = dl(1)*dl(2)/(l(1)*l(2))
-      allocate(um(0:q+1),vm(0:q+1),wm(0:q+1),u2(0:q+1),v2(0:q+1),w2(0:q+1),uw(0:q+1))
+      allocate(um(q),vm(q),wm(q),u2(q),v2(q),w2(q),uw(q))
       um(:) = 0.
       vm(:) = 0.
       wm(:) = 0.
@@ -334,7 +334,7 @@ module mod_output
       do k=lo(3),hi(3)
         do j=lo(2),hi(2)
           do i=lo(1),hi(1)
-            ! always use zc for plotting
+            ! located at zc
             um(k) = um(k) + u(i,j,k)
             vm(k) = vm(k) + v(i,j,k)
             wm(k) = wm(k) + 0.50*(w(i,j,k-1) + w(i,j,k))
@@ -356,10 +356,10 @@ module mod_output
       um(:) = um(:)*grid_area_ratio
       vm(:) = vm(:)*grid_area_ratio
       wm(:) = wm(:)*grid_area_ratio
-      u2(:) = u2(:)*grid_area_ratio - um(:)**2
-      v2(:) = v2(:)*grid_area_ratio - vm(:)**2
-      w2(:) = w2(:)*grid_area_ratio - wm(:)**2
-      uw(:) = uw(:)*grid_area_ratio - um(:)*wm(:)
+      u2(:) = u2(:)*grid_area_ratio
+      v2(:) = v2(:)*grid_area_ratio
+      w2(:) = w2(:)*grid_area_ratio
+      uw(:) = uw(:)*grid_area_ratio
       if(myid == 0) then
         open(newunit=iunit,file=fname)
         do k=1,ng(3)
@@ -394,68 +394,11 @@ module mod_output
     select case(idir) ! streamwise direction
     case(3)
     case(2)
-      grid_area_ratio = dl(2)/l(2)
-      p = ng(1)
-      q = ng(3)
-      allocate(um(p,q),vm(p,q),wm(p,q),u2(p,q),v2(p,q),w2(p,q),uv(p,q),vw(p,q))
-      !
-      um(:,:) = 0.
-      vm(:,:) = 0.
-      wm(:,:) = 0.
-      u2(:,:) = 0.
-      v2(:,:) = 0.
-      w2(:,:) = 0.
-      uv(:,:) = 0.
-      vw(:,:) = 0.
-      do k=lo(3),hi(3)
-        do i=lo(1),hi(1)
-          do j=lo(2),hi(2)
-            um(i,k) = um(i,k) + 0.5*(u(i-1,j,k)+u(i,j,k))
-            vm(i,k) = vm(i,k) + v(i,j,k)
-            wm(i,k) = wm(i,k) + 0.5*(w(i,j,k-1)+w(i,j,k))
-            u2(i,k) = u2(i,k) + 0.5*(u(i-1,j,k)**2+u(i,j,k)**2)
-            v2(i,k) = v2(i,k) + v(i,j,k)**2
-            w2(i,k) = w2(i,k) + 0.5*(w(i,j,k-1)**2+w(i,j,k)**2)
-            vw(i,k) = vw(i,k) + 0.25*(v(i,j-1,k) + v(i,j,k))* &
-                                     (w(i,j,k-1) + w(i,j,k))
-            uv(i,k) = uv(i,k) + 0.25*(u(i-1,j,k) + u(i,j,k))* &
-                                     (v(i,j-1,k) + v(i,j,k))
-          end do
-        end do
-      end do
-      call MPI_ALLREDUCE(MPI_IN_PLACE,um(1,1),ng(1)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,vm(1,1),ng(1)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,wm(1,1),ng(1)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,u2(1,1),ng(1)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,v2(1,1),ng(1)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,w2(1,1),ng(1)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,vw(1,1),ng(1)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(MPI_IN_PLACE,uv(1,1),ng(1)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-      um(:,:) =      um(:,:)*grid_area_ratio
-      vm(:,:) =      vm(:,:)*grid_area_ratio
-      wm(:,:) =      wm(:,:)*grid_area_ratio
-      u2(:,:) = sqrt(u2(:,:)*grid_area_ratio - um(:,:)**2)
-      v2(:,:) = sqrt(v2(:,:)*grid_area_ratio - vm(:,:)**2)
-      w2(:,:) = sqrt(w2(:,:)*grid_area_ratio - wm(:,:)**2)
-      vw(:,:) =      vw(:,:)*grid_area_ratio - vm(:,:)*wm(:,:)
-      uv(:,:) =      uv(:,:)*grid_area_ratio - um(:,:)*vm(:,:)
-      if(myid == 0) then
-        open(newunit=iunit,file=fname)
-        do k=1,ng(3)
-          do i=1,ng(1)
-            x_g = (i-.5)*dl(1)
-            write(iunit,'(10E16.7e3)') x_g,z_g(k),um(i,k),vm(i,k),wm(i,k), &
-                                                  u2(i,k),v2(i,k),w2(i,k), &
-                                                  vw(i,k),uv(i,k)
-          end do
-        end do
-        close(iunit)
-      end if
     case(1)
       grid_area_ratio = dl(1)/l(1)
       p = ng(2)
       q = ng(3)
-      allocate(um(p,q),vm(p,q),wm(p,q),u2(p,q),v2(p,q),w2(p,q),uv(p,q),uw(p,q))
+      allocate(um(p,q),vm(p,q),wm(p,q),u2(p,q),v2(p,q),w2(p,q),uv(p,q),uw(p,q),vw(p,q))
       !
       um(:,:) = 0.
       vm(:,:) = 0.
@@ -465,6 +408,7 @@ module mod_output
       w2(:,:) = 0.
       uv(:,:) = 0.
       uw(:,:) = 0.
+      vw(:,:) = 0.
       do k=lo(3),hi(3)
         do j=lo(2),hi(2)
           do i=lo(1),hi(1)
@@ -478,6 +422,8 @@ module mod_output
                                      (v(i,j-1,k) + v(i,j,k))
             uw(j,k) = uw(j,k) + 0.25*(u(i-1,j,k) + u(i,j,k))* &
                                      (w(i,j,k-1) + w(i,j,k))
+            vw(j,k) = vw(j,k) + 0.25*(v(i,j-1,k) + v(i,j,k))* &
+                                     (w(i,j,k-1) + w(i,j,k))
           end do
         end do
       end do
@@ -489,22 +435,24 @@ module mod_output
       call MPI_ALLREDUCE(MPI_IN_PLACE,w2(1,1),ng(2)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
       call MPI_ALLREDUCE(MPI_IN_PLACE,uv(1,1),ng(2)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
       call MPI_ALLREDUCE(MPI_IN_PLACE,uw(1,1),ng(2)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-      um(:,:) =      um(:,:)*grid_area_ratio
-      vm(:,:) =      vm(:,:)*grid_area_ratio
-      wm(:,:) =      wm(:,:)*grid_area_ratio
-      u2(:,:) = sqrt(u2(:,:)*grid_area_ratio - um(:,:)**2)
-      v2(:,:) = sqrt(v2(:,:)*grid_area_ratio - vm(:,:)**2)
-      w2(:,:) = sqrt(w2(:,:)*grid_area_ratio - wm(:,:)**2)
-      uv(:,:) =      uv(:,:)*grid_area_ratio - um(:,:)*vm(:,:)
-      uw(:,:) =      uw(:,:)*grid_area_ratio - um(:,:)*wm(:,:)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,vw(1,1),ng(2)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      um(:,:) = um(:,:)*grid_area_ratio
+      vm(:,:) = vm(:,:)*grid_area_ratio
+      wm(:,:) = wm(:,:)*grid_area_ratio
+      u2(:,:) = u2(:,:)*grid_area_ratio
+      v2(:,:) = v2(:,:)*grid_area_ratio
+      w2(:,:) = w2(:,:)*grid_area_ratio
+      uv(:,:) = uv(:,:)*grid_area_ratio
+      uw(:,:) = uw(:,:)*grid_area_ratio
+      vw(:,:) = vw(:,:)*grid_area_ratio
       if(myid == 0) then
         open(newunit=iunit,file=fname)
         do k=1,ng(3)
           do j=1,ng(2)
-            y_g = (j-.5)*dl(2)
-            write(iunit,'(10E16.7e3)') y_g,z_g(k),um(j,k),vm(j,k),wm(j,k), &
+            y_g = (j-0.5)*dl(2)
+            write(iunit,'(11E16.7e3)') y_g,z_g(k),um(j,k),vm(j,k),wm(j,k), &
                                                   u2(j,k),v2(j,k),w2(j,k), &
-                                                  uv(j,k),uw(j,k)
+                                                  uv(j,k),uw(j,k),vw(j,k)
           end do
         end do
         close(iunit)

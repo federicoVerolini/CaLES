@@ -114,16 +114,17 @@ for ifld in flds[:]:
         data_avg += data
 data_avg = data_avg*norm
 #
-yc    = np.reshape(data    [:,0],(n2,n1),order='C')
-zc    = np.reshape(data    [:,1],(n2,n1),order='C')
-u1    = np.reshape(data_avg[:,2],(n2,n1),order='C')
-v1    = np.reshape(data_avg[:,3],(n2,n1),order='C')
-w1    = np.reshape(data_avg[:,4],(n2,n1),order='C')
-u2    = np.reshape(data_avg[:,5],(n2,n1),order='C')
-v2    = np.reshape(data_avg[:,6],(n2,n1),order='C')
-w2    = np.reshape(data_avg[:,7],(n2,n1),order='C')
-uv    = np.reshape(data_avg[:,8],(n2,n1),order='C')
-uw    = np.reshape(data_avg[:,9],(n2,n1),order='C')
+yc    = np.reshape(data    [:,0 ],(n2,n1),order='C')
+zc    = np.reshape(data    [:,1 ],(n2,n1),order='C')
+u1    = np.reshape(data_avg[:,2 ],(n2,n1),order='C')
+v1    = np.reshape(data_avg[:,3 ],(n2,n1),order='C')
+w1    = np.reshape(data_avg[:,4 ],(n2,n1),order='C')
+u2    = np.reshape(data_avg[:,5 ],(n2,n1),order='C')
+v2    = np.reshape(data_avg[:,6 ],(n2,n1),order='C')
+w2    = np.reshape(data_avg[:,7 ],(n2,n1),order='C')
+uv    = np.reshape(data_avg[:,8 ],(n2,n1),order='C')
+uw    = np.reshape(data_avg[:,9 ],(n2,n1),order='C')
+vw    = np.reshape(data_avg[:,10],(n2,n1),order='C')
 #
 # profile folding function
 #
@@ -152,23 +153,26 @@ v2 = fold_2d(v2,cf='C',isym2=+1, isym1=+1)
 w2 = fold_2d(w2,cf='C',isym2=+1, isym1=+1)
 uv = fold_2d(uv,cf='C',isym2=+1, isym1=-1)
 uw = fold_2d(uw,cf='C',isym2=-1, isym1=+1)
+vw = fold_2d(vw,cf='C',isym2=-1, isym1=-1)
 #
 u2[:] -= u1[:]**2
 v2[:] -= v1[:]**2
 w2[:] -= w1[:]**2
 uv[:] -= u1[:]*v1[:]
 uw[:] -= u1[:]*w1[:]
+vw[:] -= v1[:]*w1[:]
 #
-data_avg[:,0] = np.reshape(yc,(n1*n2),order='C')
-data_avg[:,1] = np.reshape(zc,(n1*n2),order='C')
-data_avg[:,2] = np.reshape(u1,(n1*n2),order='C')
-data_avg[:,3] = np.reshape(v1,(n1*n2),order='C')
-data_avg[:,4] = np.reshape(w1,(n1*n2),order='C')
-data_avg[:,5] = np.reshape(u2,(n1*n2),order='C')
-data_avg[:,6] = np.reshape(v2,(n1*n2),order='C')
-data_avg[:,7] = np.reshape(w2,(n1*n2),order='C')
-data_avg[:,8] = np.reshape(uv,(n1*n2),order='C')
-data_avg[:,9] = np.reshape(uw,(n1*n2),order='C')
+data_avg[:,0 ] = np.reshape(yc,(n1*n2),order='C')
+data_avg[:,1 ] = np.reshape(zc,(n1*n2),order='C')
+data_avg[:,2 ] = np.reshape(u1,(n1*n2),order='C')
+data_avg[:,3 ] = np.reshape(v1,(n1*n2),order='C')
+data_avg[:,4 ] = np.reshape(w1,(n1*n2),order='C')
+data_avg[:,5 ] = np.reshape(u2,(n1*n2),order='C')
+data_avg[:,6 ] = np.reshape(v2,(n1*n2),order='C')
+data_avg[:,7 ] = np.reshape(w2,(n1*n2),order='C')
+data_avg[:,8 ] = np.reshape(uv,(n1*n2),order='C')
+data_avg[:,9 ] = np.reshape(uw,(n1*n2),order='C')
+data_avg[:,10] = np.reshape(vw,(n1*n2),order='C')
 #
 fname = resultsdir + 'stats-single-point-duct-' + casename + fname_ext
 with open(fname, 'w') as file:
@@ -196,12 +200,13 @@ v2_cl = interp(n2, n1, yc, v2, h)
 w2_cl = interp(n2, n1, yc, w2, h)
 uv_cl = interp(n2, n1, yc, uv, h)
 uw_cl = interp(n2, n1, yc, uw, h)
+vw_cl = interp(n2, n1, yc, vw, h)
 fname = resultsdir + 'stats-single-point-duct-centerline-' + casename + fname_ext
 with open(fname, 'w') as file:
     np.savetxt(file, np.c_[zc_cl[0:n2//2], \
                            u1_cl[0:n2//2],v1_cl[0:n2//2],w1_cl[0:n2//2], \
                            u2_cl[0:n2//2],v2_cl[0:n2//2],w2_cl[0:n2//2], \
-                           uv_cl[0:n2//2],uw_cl[0:n2//2]], \
+                           uv_cl[0:n2//2],uw_cl[0:n2//2],vw_cl[0:n2//2]], \
                fmt='%16.6e', delimiter='')
 #
 # diagonal statistics, uniform grid in the cross-section
@@ -216,10 +221,11 @@ v2_diag = np.diag(v2)
 w2_diag = np.diag(w2)
 uv_diag = np.diag(uv)
 uw_diag = np.diag(uw)
+vw_diag = np.diag(vw)
 fname = resultsdir + 'stats-single-point-duct-diagonal-' + casename + fname_ext
 with open(fname, 'w') as file:
     np.savetxt(file, np.c_[zc_diag[0:n2//2], \
                            u1_diag[0:n2//2],v1_diag[0:n2//2],w1_diag[0:n2//2], \
                            u2_diag[0:n2//2],v2_diag[0:n2//2],w2_diag[0:n2//2], \
-                           uv_diag[0:n2//2],uw_diag[0:n2//2]], \
+                           uv_diag[0:n2//2],uw_diag[0:n2//2],vw_diag[0:n2//2]], \
                fmt='%16.6e', delimiter='')
