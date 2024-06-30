@@ -21,17 +21,17 @@ module mod_sgs
                       visc,h,ind,u,v,w,dw,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,visct)
     !
     ! compute subgrid viscosity at cell centers
-    ! the current implementation of the dynamcic version is two times the
-    ! cost of the static one. Acceleration can be further achieved by
-    ! call only one boundp to do the data exchange of multiple variables.
-    ! Note that it does not save time to simply mask wall bc's in boundp
+    ! the current implementation of the dynamcic version is two times the cost of
+    ! the static one. Acceleration can be further achieved by calling only one boundp to do
+    ! the data exchange of multiple variables. Note that it does not save time to simply mask
+    ! wall bc's in boundp
     ! 
     ! The dynamic version yields quite good results for Re_tau=395,550,1000,
-    ! with <=5% error in the friction coefficient.
+    ! with <=5% error in the friction coefficient. Clipping is necessary to avoid negative
+    ! eddy viscosity after averaging.
     !
-    ! 2D filter is always used for the first off-wall layer, as is done by
-    ! Bae, Orlandi, LESGO, and
-    ! Balaras (1995), Finite-Difference Computations of High Reynolds Number
+    ! 2D filter is used for the first off-wall layer, as done by Bae, Orlandi, LESGO,
+    ! and Balaras (1995), Finite-Difference Computations of High Reynolds Number
     ! Flows Using the Dynamic Subgrid-Scale Model.
     ! It is difficult to do 3D filtering of Sij for the first layer, though
     ! feasible for the velocity.
@@ -246,6 +246,7 @@ module mod_sgs
       !
 #endif
       visct = visct/s0
+      visct = max(visct,0._rp)
     case('amd')
       print*, 'ERROR: AMD model not yet implemented'
     case default
