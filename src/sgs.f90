@@ -668,7 +668,7 @@ module mod_sgs
       call MPI_ALLREDUCE(MPI_IN_PLACE,p2d(1,1),ng(1)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
       p2d(:,:) = p2d(:,:)*grid_area_ratio
       do j=lo(2),hi(2)
-        p(lo(1):hi(1),j,lo(3):hi(3)) = p2d(lo(1):hi(1),j,lo(3):hi(3))
+        p(lo(1):hi(1),j,lo(3):hi(3)) = p2d(lo(1):hi(1),lo(3):hi(3))
       end do
     case(1)
       grid_area_ratio = dl(1)/l(1)
