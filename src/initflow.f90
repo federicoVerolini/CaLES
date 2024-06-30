@@ -30,10 +30,10 @@ module mod_initflow
     logical , intent(in)               :: is_wallturb
     real(rp), dimension(0:,0:,0:), intent(out) :: u,v,w,p
     real(rp), allocatable, dimension(:) :: u1d
-    !real(rp), allocatable, dimension(:,:) :: u2d
-    integer :: i,j,k
+    integer :: i,j,k,m
     logical :: is_noise,is_mean,is_pair
     real(rp) :: xc,yc,zcc,xf,yf,zff
+    real(rp) :: ly,lz,xi,eta,cosh_term,cos_term,term,sum_term
     real(rp), allocatable, dimension(:) :: zc2
     real(rp) :: uref,lref
     real(rp) :: ubulk,reb,retau
@@ -44,7 +44,7 @@ module mod_initflow
     is_noise = .false.
     is_mean  = .false.
     is_pair  = .false.
-    uref  = 1.
+    uref  = 1._rp
     ubulk = uref
     if(is_forced(1)) ubulk = velf(1)
     select case(trim(inivel))
@@ -65,12 +65,12 @@ module mod_initflow
       ! convective reference frame moving with velocity `ubulk`;
       ! walls have negative velocity equal to `ubulk` in the laboratory frame
       !
-      ubulk = 0.5*abs(bcvel(0,3,1)+bcvel(1,3,1))
+      ubulk = .5_rp*abs(bcvel(0,3,1)+bcvel(1,3,1))
       call poiseuille(n(3),zc/l(3),ubulk,u1d)
       u1d(:) = u1d(:) - ubulk
       is_mean = .true.
     case('zer')
-      u1d(:) = 0.
+      u1d(:) = 0._rp
     case('uni')
       u1d(:) = uref
     case('log')
@@ -104,43 +104,43 @@ module mod_initflow
       do k=1,n(3)
         zcc = zc(k)/l(3)*2.*pi
         do j=1,n(2)
-          yc = (j+lo(2)-1-.5)*dl(2)/l(2)*2.*pi
-          yf = (j+lo(2)-1-.0)*dl(2)/l(2)*2.*pi
+          yc = (j+lo(2)-1-.5_rp)*dl(2)/l(2)*2.*pi
+          yf = (j+lo(2)-1-.0_rp)*dl(2)/l(2)*2.*pi
           do i=1,n(1)
-            xc = (i+lo(1)-1-.5)*dl(1)/l(1)*2.*pi
-            xf = (i+lo(1)-1-.0)*dl(1)/l(1)*2.*pi
+            xc = (i+lo(1)-1-.5_rp)*dl(1)/l(1)*2.*pi
+            xf = (i+lo(1)-1-.0_rp)*dl(1)/l(1)*2.*pi
             u(i,j,k) =  sin(xf)*cos(yc)*cos(zcc)*uref
             v(i,j,k) = -cos(xc)*sin(yf)*cos(zcc)*uref
-            w(i,j,k) = 0.
-            p(i,j,k) = 0.!(cos(2.*xc)+cos(2.*yc))*(cos(2.*zcc)+2.)/16.*uref**2
+            w(i,j,k) = 0._rp
+            p(i,j,k) = 0._rp!(cos(2.*xc)+cos(2.*yc))*(cos(2.*zcc)+2.)/16.*uref**2
           end do
         end do
       end do
     case('tgw')
       do k=1,n(3)
         do j=1,n(2)
-          yc = (j+lo(2)-1-.5)*dl(2)
-          yf = (j+lo(2)-1-.0)*dl(2)
+          yc = (j+lo(2)-1-.5_rp)*dl(2)
+          yf = (j+lo(2)-1-.0_rp)*dl(2)
           do i=1,n(1)
-            xc = (i+lo(1)-1-.5)*dl(1)
-            xf = (i+lo(1)-1-.0)*dl(1)
+            xc = (i+lo(1)-1-.5_rp)*dl(1)
+            xf = (i+lo(1)-1-.0_rp)*dl(1)
             u(i,j,k) =  cos(xf)*sin(yc)*uref
             v(i,j,k) = -sin(xc)*cos(yf)*uref
-            w(i,j,k) = 0.
-            p(i,j,k) = -(cos(2.*xc)+cos(2.*yc))/4.*uref**2
+            w(i,j,k) = 0._rp
+            p(i,j,k) = -(cos(2.*xc)+cos(2.*yc))/4._rp*uref**2
           end do
         end do
       end do
     case('pdc','hdc')
       lref  = l(3)/2.
-      if(trim(inivel) /= 'pdc') lref = 2.*lref
+      if(trim(inivel) /= 'pdc') lref = 2._rp*lref
       if(is_wallturb) then ! turbulent flow
         uref  = (bforce(1)*lref)**(0.5)
         retau = uref*lref/visc
-        reb   = (retau/.09)**(1./.88)
+        reb   = (retau/.09_rp)**(1._rp/.88_rp)
         ubulk = reb*visc/(2*lref)
       else                 ! laminar flow
-        ubulk = (bforce(1)*lref**2/(3.*visc))
+        ubulk = (bforce(1)*lref**2/(3._rp*visc))
       end if
       if(trim(inivel) == 'pdc') then
         call poiseuille(n(3),zc/l(3),ubulk,u1d)
@@ -155,6 +155,28 @@ module mod_initflow
         call poiseuille(2*n(3),zc2/(2*l(3)),ubulk,u1d)
       end if
       is_mean = .true.
+    case('duc')
+      do k = 1,n(3)
+        do j = 1,n(2)
+          sum_term = 0._rp
+          ly = .5_rp*l(2)
+          lz = .5_rp*l(3)
+          xi  = -1._rp + (j+lo(2)-1.5_rp)*dl(2)/ly
+          zcc = -1._rp + zc(k)/lz
+          do m = 0,100
+            cosh_term = cosh((2*m+1)*pi*ly/(2*lz)*xi) / &
+                        cosh((2*m+1)*pi*ly/(2*lz))
+            cos_term  = cos ((2*m+1)*pi/2*eta)
+            term = (-1._rp)**m/(2*m+1)**3*cosh_term*cos_term
+            sum_term = sum_term + term
+          end do
+          u(:,j,k) = .5_rp*lz**2*(1._rp-eta**2-4._rp*(2._rp/pi)**3*sum_term)
+          v(:,j,k) = 0._rp
+          w(:,j,k) = 0._rp
+          p(:,j,k) = 0._rp
+        end do
+      end do
+      is_mean = .true.
     case default
       if(myid == 0) print*, 'ERROR: invalid name for initial velocity field'
       if(myid == 0) print*, ''
@@ -163,14 +185,14 @@ module mod_initflow
       call MPI_FINALIZE(ierr)
       error stop
     end select
-    if(.not.any(inivel == ['tgv','tgw'])) then
+    if(.not.any(inivel == ['tgv','tgw','duc'])) then
       do k=1,n(3)
         do j=1,n(2)
           do i=1,n(1)
             u(i,j,k) = u1d(k)
-            v(i,j,k) = 0.
-            w(i,j,k) = 0.
-            p(i,j,k) = 0.
+            v(i,j,k) = 0._rp
+            w(i,j,k) = 0._rp
+            p(i,j,k) = 0._rp
           end do
         end do
       end do
@@ -198,18 +220,18 @@ module mod_initflow
       ! see Henningson and Kim, JFM 1991
       !
       do k=1,n(3)
-        zcc = 2.*zc(k)/l(3) - 1. ! z rescaled to be between -1 and +1
-        zff = 2.*(zc(k)/l(3) + .5*dzf(k)/l(3)) - 1.
+        zcc = 2._rp*zc(k)/l(3) - 1._rp ! z rescaled to be between -1 and +1
+        zff = 2._rp*(zc(k)/l(3) + .5_rp*dzf(k)/l(3)) - 1._rp
         do j=1,n(2)
-          yc = ((lo(2)-1+j-0.5)*dl(2)-.5*l(2))*2./l(3)
-          yf = ((lo(2)-1+j-0.0)*dl(2)-.5*l(2))*2./l(3)
+          yc = ((lo(2)-1+j-0.5_rp)*dl(2)-.5_rp*l(2))*2._rp/l(3)
+          yf = ((lo(2)-1+j-0.0_rp)*dl(2)-.5_rp*l(2))*2._rp/l(3)
           do i=1,n(1)
-            xc = ((lo(1)-1+i-0.5)*dl(1)-.5*l(1))*2./l(3)
-            xf = ((lo(1)-1+i-0.0)*dl(1)-.5*l(1))*2./l(3)
+            xc = ((lo(1)-1+i-0.5_rp)*dl(1)-.5_rp*l(1))*2._rp/l(3)
+            xf = ((lo(1)-1+i-0.0_rp)*dl(1)-.5_rp*l(1))*2._rp/l(3)
             !u(i,j,k) = u1d(k)
-            v(i,j,k) = -1.*gxy(yf,xc)*dfz(zcc)*ubulk*1.5
-            w(i,j,k) =  1.*fz(zff)*dgxy(yc,xc)*ubulk*1.5
-            p(i,j,k) = 0.
+            v(i,j,k) = -1._rp*gxy(yf,xc)*dfz(zcc)*ubulk*1.5_rp
+            w(i,j,k) =  1._rp*fz(zff)*dgxy(yc,xc)*ubulk*1.5_rp
+            p(i,j,k) = 0._rp
           end do
         end do
       end do
