@@ -162,7 +162,7 @@ module mod_initflow
           ly = .5_rp*l(2)
           lz = .5_rp*l(3)
           xi  = -1._rp + (j+lo(2)-1.5_rp)*dl(2)/ly
-          zcc = -1._rp + zc(k)/lz
+          eta = -1._rp + zc(k)/lz
           do m = 0,100
             cosh_term = cosh((2*m+1)*pi*ly/(2*lz)*xi) / &
                         cosh((2*m+1)*pi*ly/(2*lz))
