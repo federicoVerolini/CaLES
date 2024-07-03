@@ -70,5 +70,7 @@ if __name__ == "__main__":
     import numpy as np
     filenamei = input("Name of the binary restart file written by CaNS [fld.bin]: ") or "fld.bin"
     xp, yp, zp, u, v, w, p, time, istep = read_restart_file(filenamei)
-    np.savetxt('u_profile_180_0.dat', np.column_stack((zp, u[180,0,:])))
 
+    for i in range(0, u.shape[0], 16):
+      for j in range(0, u.shape[1], 16):
+        np.savetxt(f'u_profile_{i}_{j}.dat', np.column_stack((zp, u[i,j,:])))

@@ -117,7 +117,8 @@ module mod_bound
     ! The computational cost of the log-law wall model is negligible.
     !
     if(is_updt_wm) then
-      call updt_wallmodelbc(n,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind,u,v,w,bcu,bcv,bcw,bcu_mag,bcv_mag,bcw_mag)
+      call updt_wallmodelbc(n,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind,u,v,w, &
+                            bcu,bcv,bcw,bcu_mag,bcv_mag,bcw_mag)
     end if
     !
     if(is_bound(0,1).and.lwm(0,1)/=0) then
@@ -210,8 +211,8 @@ module mod_bound
     integer  :: n,dh,n1,n2
     !
     n = size(p,idir) - 2*nh
-    n1= size(bc,1)-2
-    n2= size(bc,2)-2
+    n1= size(bc,1)-2*nh
+    n2= size(bc,2)-2*nh
     allocate(factor(0:n1+1,0:n2+1))
     factor = bc(:,:,ibound)
     if(ctype == 'D'.and.centered) then

@@ -16,7 +16,7 @@ with open(fname, 'w') as file:
     np.savetxt(file, np.c_[zc_cl,yc_cl,data_avg[n2-1,:,2:]], \
                fmt='%17.9e', delimiter='')
 #
-# diagonal statistics, uniform grid in the cross-section
+# diagonal statistics
 #
 zc_diag = np.diag(data_avg[:,:,0])+1.0
 yc_diag = np.diag(data_avg[:,:,1])+1.0

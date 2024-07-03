@@ -21,20 +21,16 @@ module mod_sgs
                       visc,h,ind,u,v,w,dw,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,visct)
     !
     ! compute subgrid viscosity at cell centers
-    ! the current implementation of the dynamcic version is two times the cost of
-    ! the static one. Acceleration can be further achieved by calling only one boundp to do
-    ! the data exchange of multiple variables. Note that it does not save time to simply mask
-    ! wall bc's in boundp
-    ! 
-    ! The dynamic version yields quite good results for Re_tau=395,550,1000,
-    ! with <=5% error in the friction coefficient. Clipping is necessary to avoid negative
-    ! eddy viscosity after averaging.
+    ! the LES with the dynamic model is ~2 times the cost of the LES with the static one.
+    ! Acceleration can be further achieved by calling only one boundp to do the data
+    ! exchange of multiple variables. Note that it does not save time to simply mask
+    ! wall bc's in boundp. The dynamic version yields quite good results for Re_tau=
+    ! 395,550,1000, with <=5% errors in the friction coefficient. Clipping is necessary
+    ! to avoid negative values of averaged eddy viscosity (duct flow).
     !
-    ! 2D filter is used for the first off-wall layer, as done by Bae, Orlandi, LESGO,
-    ! and Balaras (1995), Finite-Difference Computations of High Reynolds Number
-    ! Flows Using the Dynamic Subgrid-Scale Model.
-    ! It is difficult to do 3D filtering of Sij for the first layer, though
-    ! feasible for the velocity.
+    ! 2D filter is used in the first off-wall layer (Bae, Orlandi, LESGO, and Balaras, 1995).
+    ! It is difficult to do 3D filtering of Sij in the first layer, though feasible for
+    ! velocity.
     !
     implicit none
     character(len=*), intent(in) :: sgstype
@@ -82,7 +78,7 @@ module mod_sgs
       call extrapolate(n,is_bound,dzci,v,wk2,iface=2,lwm=lwm)
       call extrapolate(n,is_bound,dzci,w,wk3,iface=3,lwm=lwm)
       call strain_rate(n,dli,dzci,dzfi,wk1,wk2,wk3,s0,sij)
-      call cmpt_dw_plus(cbcvel,n,is_bound,l,dl,zc,dzc,visc,u,v,w,dw,dw_plus) ! need modification on tauw?
+      call cmpt_dw_plus(cbcvel,n,is_bound,l,dl,zc,dzc,visc,u,v,w,dw,dw_plus)
       call sgs_smag(n,dl,dzf,dw_plus,s0,visct)
     case('dsmag')
       if(is_first) then
@@ -198,13 +194,12 @@ module mod_sgs
       call filter2d(v,vf)
       call filter2d(w,wf)
 #endif
-      ! when using no wall model, all bc's are used for computing strain rate.
-      ! When using a wall model, wall bc's for wall-parallel valocity are not used due
-      ! to one-sided finite difference. bcuf, bcvf and bcwf are equal to bcu/v/w=0 for
-      ! no-slip walls. When using a wall model, only the wall bc's for the wall-normal
-      ! velicity are essentially used. Filtered velocity should satisfy the wall bc's,
-      ! evidenced by that each mode satisfies the no-slip/no-penetration bc's
-      ! when a spectral filter is applied.
+      ! when using no wall model, all bc's are used for computing strain rate. bcuf,
+      ! bcvf and bcwf are equal to bcu/v/w=0 for no-slip walls. When using a wall model,
+      ! wall bc's for wall-parallel valocity are not used due to one-sided finite difference,
+      ! but the wall bc's for the wall-normal velicity are used. Filtered velocity should
+      ! satisfy the wall bc's, evidenced by the fact that each mode satisfies the
+      ! no-slip/no-penetration bc's when a spectral filter is applied.
       !
       call bounduvw(cbcvel,n,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf, &
                     visc,h,ind,.true.,.false.,uf,vf,wf)
@@ -245,8 +240,7 @@ module mod_sgs
 #elif defined(_CAVITY)
       !
 #endif
-      visct = visct/s0
-      visct = max(visct,0._rp)
+      visct = max(visct/s0,0._rp)
     case('amd')
       print*, 'ERROR: AMD model not yet implemented'
     case default
