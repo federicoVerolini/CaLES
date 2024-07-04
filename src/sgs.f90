@@ -4,6 +4,7 @@
 ! SPDX-License-Identifier: MIT
 !
 ! -
+#define _CHANNEL
 module mod_sgs
   use mpi
   use mod_common_mpi, only: ierr
