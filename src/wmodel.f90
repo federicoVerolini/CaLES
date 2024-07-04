@@ -18,40 +18,7 @@ module mod_wmodel
   subroutine updt_wallmodelbc(n,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind,u,v,w, &
                               bcu,bcv,bcw,bcu_mag,bcv_mag,bcw_mag)
     !
-    ! bcu,bcv,bcw determined via wall model
-    ! wall-parallel velocity at ghost cells is used only for computing the viscous terms,
-    ! including its left- and right-hand sides. It is not used for computing the convective
-    ! terms, or in the correction procedure. In WMLES, the wall should be considered as a
-    ! no-slip wall with modified (more accurate) wall stress. When the wall stress is required
-    ! for computing the viscous wall stress in the NS equations, it should be regarded as a
-    ! Neumann bc. When the wall velocity is required for computing work in the compressible
-    ! energy equation, it should be regarded as a no-slip wall, implying zero work at the wall.
-    ! When filtering/strain rate is required for computing eddy viscosity in the subgrid model,
-    ! the wall is a slip wall, where the wall velocity is extrapolated from the interior. Hence,
-    ! a single ghost point can have three different values for different purposes.
-    !
-    ! index 0 must be calculated for the right/front/top walls (used in chkdt, etc.),
-    ! but not necessary for the opposite walls. However, index 0 for the left/back/bottom walls
-    ! is necessary when a subgrid model is involved, such as cmpt_dw_plus. Hence,
-    ! the best way is to calculate index 0 for all walls.
-    !
-    ! The singularity at the corner for cavity flow affects the calculation of time step.
-    ! However, the velocity is small at the corner, so it does not impose a limitation on
-    ! the time step. Hence, no special treatment is necessary for the corner.
-    ! The ghost point outside of the singularity is essentially not used for computing
-    ! u and w at the corners, since u and w at the corners are set as zero by the
-    ! no-penetration boundary condition. When eddy viscosity (strain rate) is used,
-    ! its calculation uses the ghost point outside of the singularity. However,
-    ! when wall model is used, one-sided difference is used in the calculation of
-    ! of wall gradients (strain rate), so the ghost point outside of the singularity is
-    ! not used. If van Driest damping is used, the ghost point outside of the singularity
-    ! is used, but the damping is not important at the corner. In summary,
-    ! WMLES: the van Driest damping and time step calculation use the ghost point
-    ! outside of the singularity.
-    ! WRLES: the van Driest damping, time step calculation and strain rate calculation
-    ! use the ghost point outside of the singularity.
-    ! DNS: time step calculation uses the ghost point outside of the singularity.
-    !
+    ! update wall model bc wall by wall
     ! 
     implicit none
     integer , intent(in), dimension(3) :: n
@@ -97,6 +64,41 @@ module mod_wmodel
   !
   subroutine cmpt_wallmodelbc(ibound,idir,nh,mtype,l,dl,zc,zf,dzc,dzf,visc,h,index,var1,var2, &
                               bcvar1,bcvar2,bcvar1_mag,bcvar2_mag)
+    !
+    ! compute wall model bc of a wall
+    !
+    ! wall-parallel velocity at ghost cells is used only for computing the viscous terms,
+    ! including its left- and right-hand sides. It is not used for computing the convective
+    ! terms, or in the correction procedure. In WMLES, a wall should be considered as a
+    ! no-slip wall with corrected wall stress. When wall stress is required
+    ! for computing the viscous wall stress in the NS equations, the wall should be regarded as a
+    ! Neumann bc. When wall velocity is required for computing work in the compressible
+    ! energy equation, it should be regarded as a no-slip wall.
+    ! When filtering/strain rate is required for computing eddy viscosity in the subgrid model,
+    ! the wall is a slip wall, with the wall velocity extrapolated from the interior. Hence,
+    ! a single ghost point can have three different values for different purposes.
+    !
+    ! index 0 must be calculated for the right/front/top walls (used in chkdt, etc.),
+    ! but not necessary for the opposite walls. However, index 0 for the left/back/bottom walls
+    ! is necessary when a subgrid model is involved, such as cmpt_dw_plus. Hence,
+    ! the best way is to calculate index 0 for all walls.
+    !
+    ! The singularity at the corner for cavity flow affects the calculation of time step.
+    ! However, the velocity is small at the corner, so it does not impose a limitation on
+    ! the time step. Hence, no special treatment is necessary for the corner.
+    ! The ghost point outside of the singularity is essentially not used for computing
+    ! u and w at the corners, since u and w at the corners are set as zero by the
+    ! no-penetration boundary condition. When eddy viscosity (strain rate) is used,
+    ! its calculation uses the ghost point outside of the singularity. However,
+    ! when wall model is used, one-sided difference is used in the calculation of
+    ! of wall gradients (strain rate), so the ghost point outside of the singularity is
+    ! not used. If van Driest damping is used, the ghost point outside of the singularity
+    ! is used, but the damping is not important at the corner. In summary,
+    ! WMLES: the van Driest damping and time step calculation use the ghost point
+    ! outside of the singularity.
+    ! WRLES: the van Driest damping, time step calculation and strain rate calculation
+    ! use the ghost point outside of the singularity.
+    ! DNS: time step calculation uses the ghost point outside of the singularity.
     !
     implicit none
     integer , intent(in) :: ibound,idir,nh,mtype
@@ -270,7 +272,7 @@ module mod_wmodel
   !
   function velr(v1,v2,coef,bcv_mag)
     !
-    ! relative vlocity to a wall
+    ! compute relative velocity to a wall
     !
     implicit none
     real(rp), intent(in) :: v1,v2,coef,bcv_mag
@@ -332,65 +334,5 @@ module mod_wmodel
       tauw(1) = tauw_tot*uh/(upar+eps)
       tauw(2) = tauw_tot*vh/(upar+eps)
     end select
-    !
   end subroutine wallmodel
-  !
-  ! subroutine correc_1st_point(n,is_bound,lwm,dl,dzc,dzf,u,v,w)
-  !   !
-  !   ! extrapolate the first off-wall point from the second and third off-wall points
-  !   ! This corrects only the inner points (1:n), ghost points are handled by bounduvw
-  !   ! as normally done. The wall-normal velocity is not corrected, since it does not
-  !   ! contain discontinuities. The correction procedure is done for correct computation
-  !   ! of the viscous terms (and advective terms), so it should be called before computing
-  !   ! them. Also, the wall-normal gradient is represented using the first off-wall and
-  !   ! ghost points, so the correction procedure should be called before bounduvw.
-  !   ! The correction is done for both the prediction and projection steps, because we assume
-  !   ! that the first off-wall point is always incorrect, so should be always replaced by 
-  !   ! the extrapolation. The correction may not be necessary for the intermidiate velocity.
-  !   ! The correction makes the velocity near the first off-wall point is not divergence-free.
-  !   !
-  !   !
-  !   implicit none
-  !   integer , intent(in), dimension(3) :: n
-  !   logical , intent(in), dimension(0:1,3) :: is_bound
-  !   integer , intent(in), dimension(0:1,3) :: lwm
-  !   real(rp), intent(in), dimension(3)  :: dl
-  !   real(rp), intent(in), dimension(0:) :: dzc,dzf
-  !   real(rp), intent(inout), dimension(0:,0:,0:) :: u,v,w
-  !   real(rp), dimension(0:n(3)+1) :: dzci,dzfi
-  !   real(rp) :: d(2:4),dd
-  !   integer  :: i,j,k
-  !   !
-  !   if(is_bound(0,3).and.lwm(0,3)/=0) then
-  !     d(2) = 0.5_rp*dzf(2)
-  !     d(3) = d(2) + dzc(2)
-  !     d(4) = d(3) + dzc(3)
-  !     do j = 1,n(2)
-  !       do i = 1,n(1)
-  !         dd = deriv_1st_ord(u(i,j,2:3),d(2:3),ibound=0)
-  !         ! dd = deriv_2nd_ord(u(i,j,2:4),d(2:4),ibound=0)
-  !         u(i,j,1) = u(i,j,2) - dd*dzc(1)
-  !         dd = deriv_1st_ord(v(i,j,2:3),d(2:3),ibound=0)
-  !         ! dd = deriv_2nd_ord(v(i,j,2:4),d(2:4),ibound=0)
-  !         v(i,j,1) = v(i,j,2) - dd*dzc(1)
-  !       end do
-  !     end do
-  !   end if
-  !   !
-  !   if(is_bound(1,3).and.lwm(1,3)/=0) then
-  !     d(2) = 0.5_rp*dzf(n(3)-1)
-  !     d(3) = d(2) + dzc(n(3)-2)
-  !     d(4) = d(3) + dzc(n(3)-3)
-  !     do j = 1,n(2)
-  !       do i = 1,n(1)
-  !         dd = deriv_1st_ord(u(i,j,n(3)-1:n(3)-2:-1),d(2:3),ibound=1)
-  !         ! dd = deriv_2nd_ord(u(i,j,n(3)-1:n(3)-3:-1),d(2:4),ibound=1)
-  !         u(i,j,n(3)) = u(i,j,n(3)-1) + dd*dzc(n(3)-1)
-  !         dd = deriv_1st_ord(v(i,j,n(3)-1:n(3)-2:-1),d(2:3),ibound=1)
-  !         ! dd = deriv_2nd_ord(v(i,j,n(3)-1:n(3)-3:-1),d(2:4),ibound=1)
-  !         v(i,j,n(3)) = v(i,j,n(3)-1) + dd*dzc(n(3)-1)
-  !       end do
-  !     end do
-  !   end if
-  ! end subroutine correc_1st_point
 end module mod_wmodel

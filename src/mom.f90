@@ -788,17 +788,6 @@ module mod_mom
           dudz_kp = (u_ccp-u_ccc)*dzci(k  )
           dudz_km = (u_ccc-u_ccm)*dzci(k-1)
           !
-          ! dzc = 1._rp/dzci
-          ! dzf = 1._rp/dzfi
-          ! d(2) = 0.5_rp*dzf(2)
-          ! d(3) = d(2) + dzc(2)
-          ! d(4) = d(3) + dzc(3)
-          ! if(k==1) then
-          !   dudz_kp = deriv_1st_ord(u(i,j,2:3),d(2:3),ibound=0)
-          ! else if(k==2) then
-          !   dudz_km = deriv_1st_ord(u(i,j,2:3),d(2:3),ibound=0)
-          ! end if
-          !
           dudx_ip = dudx_ip
           dudx_im = dudx_im
           dvdx_jp = (v_pcc-v_ccc)*dxi
@@ -844,12 +833,6 @@ module mod_mom
           dvdy_jm = (v_ccc-v_cmc)*dyi
           dvdz_kp = (v_ccp-v_ccc)*dzci(k  )
           dvdz_km = (v_ccc-v_ccm)*dzci(k-1)
-          !
-          ! if(k==1) then
-          !   dvdz_kp = deriv_1st_ord(v(i,j,2:3),d(2:3),ibound=0)
-          ! else if(k==2) then
-          !   dvdz_km = deriv_1st_ord(v(i,j,2:3),d(2:3),ibound=0)
-          ! end if
           !
           dudy_ip = (u_cpc-u_ccc)*dyi
           dudy_im = (u_mpc-u_mcc)*dyi
