@@ -200,7 +200,7 @@ module mod_sgs
       ! wall bc's for wall-parallel valocity are not used due to one-sided finite difference,
       ! but the wall bc's for the wall-normal velicity are used. Filtered velocity should
       ! satisfy the wall bc's, evidenced by the fact that each mode satisfies the
-      ! no-slip/no-penetration bc's when a spectral filter is applied.
+      ! no-slip/no-penetration bc's if a spectral filter is applied.
       !
       call bounduvw(cbcvel,n,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf, &
                     visc,h,ind,.true.,.false.,uf,vf,wf)
