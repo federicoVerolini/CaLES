@@ -17,3 +17,5 @@ test/
 build/
 src/.vscode/
 ~*
+run/
+src/.depend.mk
