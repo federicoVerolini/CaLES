@@ -85,7 +85,7 @@ program cans
   use mod_utils          , only: bulk_mean
   !@acc use mod_utils    , only: device_memory_footprint
   use mod_precision
-  use mod_typedef        , only: cond_bound
+  use mod_typedef        , only: bound
   use omp_lib
   implicit none
   integer , dimension(3) :: lo,hi,n,n_x_fft,n_y_fft,lo_z,hi_z,n_z
@@ -99,14 +99,9 @@ program cans
 #endif
   real(rp), allocatable, dimension(:,:) :: lambdaxyp
   real(rp), allocatable, dimension(:) :: ap,bp,cp
-  real(rp) :: normfftp
-  type rhs_bound
-    real(rp), allocatable, dimension(:,:,:) :: x
-    real(rp), allocatable, dimension(:,:,:) :: y
-    real(rp), allocatable, dimension(:,:,:) :: z
-  end type rhs_bound
-  type(rhs_bound) :: rhsbp
-  type(cond_bound) :: bcu,bcv,bcw,bcp,bcs,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag
+  real(rp)    :: normfftp
+  type(bound) :: rhsbp
+  type(bound) :: bcu,bcv,bcw,bcp,bcs,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag
   real(rp) :: alpha
 #if defined(_IMPDIFF)
 #if !defined(_OPENACC)
@@ -116,8 +111,8 @@ program cans
 #endif
   real(rp), allocatable, dimension(:,:) :: lambdaxyu,lambdaxyv,lambdaxyw,lambdaxy
   real(rp), allocatable, dimension(:) :: au,av,aw,bu,bv,bw,cu,cv,cw,aa,bb,cc
-  real(rp) :: normfftu,normfftv,normfftw
-  type(rhs_bound) :: rhsbu,rhsbv,rhsbw ! implicit scheme
+  real(rp)    :: normfftu,normfftv,normfftw
+  type(bound) :: rhsbu,rhsbv,rhsbw ! implicit scheme
   real(rp), allocatable, dimension(:,:,:) :: rhsbx,rhsby,rhsbz
 #endif
   real(rp) :: dt,dti,dtmax,time,dtrk,dtrki,divtot,divmax
@@ -305,20 +300,33 @@ program cans
   if(trim(sgstype)=='smag') then
     call wall_dist(cbcvel,n,is_bound,l,dl,zc,dzc,dw)
   end if
+  !$acc enter data copyin(dw)
   !
   ! initialize boundary condition variables
   !
   call initbc(sgstype,cbcvel,bcvel,bcpre,bcsgs,bcu,bcv,bcw,bcp,bcs,bcu_mag,bcv_mag,bcw_mag, &
               bcuf,bcvf,bcwf,n,is_bound,lwm,l,zc,dl,dzc,hwm,ind_wm)
+  !$acc enter data copyin(bcu,bcu%x,bcu%y,bcu%z) async
+  !$acc enter data copyin(bcv,bcv%x,bcv%y,bcv%z) async
+  !$acc enter data copyin(bcw,bcw%x,bcw%y,bcw%z) async
+  !$acc enter data copyin(bcp,bcp%x,bcp%y,bcp%z) async
+  !$acc enter data copyin(bcs,bcs%x,bcs%y,bcs%z) async
+  !$acc enter data copyin(bcu_mag,bcu_mag%x,bcu_mag%y,bcu_mag%z) async
+  !$acc enter data copyin(bcv_mag,bcv_mag%x,bcv_mag%y,bcv_mag%z) async
+  !$acc enter data copyin(bcw_mag,bcw_mag%x,bcw_mag%y,bcw_mag%z) async
+  !$acc enter data copyin(bcuf,bcuf%x,bcuf%y,bcuf%z) async
+  !$acc enter data copyin(bcvf,bcvf%x,bcvf%y,bcvf%z) async
+  !$acc enter data copyin(bcwf,bcwf%x,bcwf%y,bcwf%z) async
+  !$acc wait
   !
   ! initialize Poisson solver
   !
   call initsolver(ng,n_x_fft,n_y_fft,lo_z,hi_z,dli,dzci_g,dzfi_g,cbcpre, &
                   lambdaxyp,['c','c','c'],ap,bp,cp,arrplanp,normfftp)
-  call cmpt_rhs_b(ng,dli,dzci_g,dzfi_g,cbcpre,bcp,['c','c','c'],rhsbp%x,rhsbp%y,rhsbp%z)
   !$acc enter data copyin(lambdaxyp,ap,bp,cp) async
-  !$acc enter data copyin(rhsbp,rhsbp%x,rhsbp%y,rhsbp%z) async
+  !$acc enter data create(rhsbp,rhsbp%x,rhsbp%y,rhsbp%z) async
   !$acc wait
+  call cmpt_rhs_b(ng,dli,dzci_g,dzfi_g,cbcpre,bcp,['c','c','c'],rhsbp%x,rhsbp%y,rhsbp%z)
 #if defined(_IMPDIFF)
   !
   ! initialize Helmholtz solver, three velocities
@@ -337,9 +345,9 @@ program cans
   deallocate(rhsbu%x,rhsbu%y,rhsbv%x,rhsbv%y,rhsbw%x,rhsbw%y,rhsbx,rhsby)
 #endif
   !$acc enter data copyin(lambdaxyu,au,bu,cu,lambdaxyv,av,bv,cv,lambdaxyw,aw,bw,cw) async
-  !$acc enter data copyin(rhsbu,rhsbu%x,rhsbu%y,rhsbu%z) async
-  !$acc enter data copyin(rhsbv,rhsbv%x,rhsbv%y,rhsbv%z) async
-  !$acc enter data copyin(rhsbw,rhsbw%x,rhsbw%y,rhsbw%z) async
+  !$acc enter data create(rhsbu,rhsbu%x,rhsbu%y,rhsbu%z) async
+  !$acc enter data create(rhsbv,rhsbv%x,rhsbv%y,rhsbv%z) async
+  !$acc enter data create(rhsbw,rhsbw%x,rhsbw%y,rhsbw%z) async
   !$acc enter data create(lambdaxy,aa,bb,cc) async
   !$acc enter data create(rhsbx,rhsby,rhsbz) async
   !$acc wait
@@ -360,8 +368,8 @@ program cans
                   device_memory_footprint(n,n_z)/(1._sp*1024**3), ' ***'
 #endif
   !
-  ! write(ctmp,'(i1)') myid
-  ! open(55,file=trim(datadir)//'debug'//trim(ctmp),status='replace')
+  write(ctmp,'(i1)') myid
+  open(55,file=trim(datadir)//'debug'//trim(ctmp),status='replace',form='binary')
   if(.not.restart) then
     istep = 0
     time = 0.
@@ -372,8 +380,7 @@ program cans
     call load_all('r',trim(datadir)//'fld.bin',MPI_COMM_WORLD,ng,[1,1,1],lo,hi,u,v,w,p,time,istep)
     if(myid == 0) print*, '*** Checkpoint loaded at time = ', time, 'time step = ', istep, '. ***'
   end if
-  !
-  !$acc enter data copyin(u,v,w,p) create(pp)
+  !$acc enter data copyin(u,v,w,p) create(pp,visct)
   call bounduvw(cbcvel,n,bcu,bcv,bcw,bcu_mag,bcv_mag,bcw_mag,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf, &
                 visc,hwm,ind_wm,.true.,.false.,u,v,w)
   call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
@@ -388,12 +395,6 @@ program cans
   include 'out1d.h90'
   include 'out2d.h90'
   include 'out3d.h90'
-  ! call cmpt_spectra(trim(datadir)//'spectra_u_fld_'//fldnum,n,ng,zc_g,.false.,u)
-  ! call cmpt_spectra(trim(datadir)//'spectra_v_fld_'//fldnum,n,ng,zc_g,.false.,v)
-  ! call cmpt_spectra(trim(datadir)//'spectra_w_fld_'//fldnum,n,ng,zf_g,.true. ,w)
-  ! call cmpt_spectra(trim(datadir)//'spectra_p_fld_'//fldnum,n,ng,zc_g,.false.,p)
-  ! call pdfs_sergio(trim(datadir)//'pdfs_fld_'//fldnum,lo,hi,ng,zc_g,u,v,w,p)
-  !
   call chkdt(n,dl,dzci,dzfi,visc,visct,u,v,w,dtmax)
   dt = min(cfl*dtmax,dtmin)
   if(myid == 0) print*, 'dtmax = ', dtmax, 'dt = ', dt
@@ -425,16 +426,16 @@ program cans
       call bulk_forcing(n,is_forced,f,u,v,w)
 #if defined(_IMPDIFF)
       alpha = -.5*visc*dtrk
-      !$OMP PARALLEL WORKSHARE
-      !$acc kernels present(rhsbx,rhsby,rhsbz,rhsbu) async(1)
       call cmpt_rhs_b(ng,dli,dzci_g,dzfi_g,cbcvel(:,:,1),bcu,['f','c','c'],rhsbu%x,rhsbu%y,rhsbu%z)
+      !$acc kernels present(rhsbx,rhsby,rhsbz,rhsbu) async(1)
+      !$OMP PARALLEL WORKSHARE
 #if !defined(_IMPDIFF_1D)
       rhsbx(:,:,0:1) = rhsbu%x(:,:,0:1)*alpha
       rhsby(:,:,0:1) = rhsbu%y(:,:,0:1)*alpha
 #endif
       rhsbz(:,:,0:1) = rhsbu%z(:,:,0:1)*alpha
-      !$acc end kernels
       !$OMP END PARALLEL WORKSHARE
+      !$acc end kernels
       call updt_rhs_b(['f','c','c'],cbcvel(:,:,1),n,is_bound,rhsbx,rhsby,rhsbz,u)   ! additional rhs_b to u
       !$acc kernels default(present) async(1)
       !$OMP PARALLEL WORKSHARE
@@ -451,16 +452,16 @@ program cans
 #else
       call solver_gaussel_z(n                    ,aa,bb,cc,cbcvel(:,3,1),['f','c','c'],u)
 #endif
-      !$OMP PARALLEL WORKSHARE
-      !$acc kernels present(rhsbx,rhsby,rhsbz,rhsbv) async(1)
       call cmpt_rhs_b(ng,dli,dzci_g,dzfi_g,cbcvel(:,:,2),bcv,['c','f','c'],rhsbv%x,rhsbv%y,rhsbv%z)
+      !$acc kernels present(rhsbx,rhsby,rhsbz,rhsbv) async(1)
+      !$OMP PARALLEL WORKSHARE
 #if !defined(_IMPDIFF_1D)
       rhsbx(:,:,0:1) = rhsbv%x(:,:,0:1)*alpha
       rhsby(:,:,0:1) = rhsbv%y(:,:,0:1)*alpha
 #endif
       rhsbz(:,:,0:1) = rhsbv%z(:,:,0:1)*alpha
-      !$acc end kernels
       !$OMP END PARALLEL WORKSHARE
+      !$acc end kernels
       call updt_rhs_b(['c','f','c'],cbcvel(:,:,2),n,is_bound,rhsbx,rhsby,rhsbz,v) ! additional rhs_b to v
       !$acc kernels default(present) async(1)
       !$OMP PARALLEL WORKSHARE
@@ -477,16 +478,16 @@ program cans
 #else
       call solver_gaussel_z(n                    ,aa,bb,cc,cbcvel(:,3,2),['c','f','c'],v)
 #endif
-      !$OMP PARALLEL WORKSHARE
-      !$acc kernels present(rhsbx,rhsby,rhsbz,rhsbw) async(1)
       call cmpt_rhs_b(ng,dli,dzci_g,dzfi_g,cbcvel(:,:,3),bcw,['c','c','f'],rhsbw%x,rhsbw%y,rhsbw%z)
+      !$acc kernels present(rhsbx,rhsby,rhsbz,rhsbw) async(1)
+      !$OMP PARALLEL WORKSHARE
 #if !defined(_IMPDIFF_1D)
       rhsbx(:,:,0:1) = rhsbw%x(:,:,0:1)*alpha
       rhsby(:,:,0:1) = rhsbw%y(:,:,0:1)*alpha
 #endif
       rhsbz(:,:,0:1) = rhsbw%z(:,:,0:1)*alpha
-      !$acc end kernels
       !$OMP END PARALLEL WORKSHARE
+      !$acc end kernels
       call updt_rhs_b(['c','c','f'],cbcvel(:,:,3),n,is_bound,rhsbx,rhsby,rhsbz,w) ! additional rhs_b to w
       !$acc kernels default(present) async(1)
       !$OMP PARALLEL WORKSHARE
@@ -536,7 +537,7 @@ program cans
       if(tw    >= tw_max  ) is_done = is_done.or..true.
     end if
     if(mod(istep,icheck) == 0) then
-      ! set icheck=1 to let restart=.not.restart
+      ! set icheck=1 to verify restart
       if(myid == 0) print*, 'Checking stability and divergence...'
       call chkdt(n,dl,dzci,dzfi,visc,visct,u,v,w,dtmax)
       dt = min(cfl*dtmax,dtmin)
@@ -595,24 +596,7 @@ program cans
     end if
     if(mod(istep,iout2d) == 0) then
       !$acc update self(u,v,w,p)
-      ! call cmpt_spectra(trim(datadir)//'spectra_u_fld_'//fldnum,n,1,ng,zc_g,.false.,u)
-      ! call cmpt_spectra(trim(datadir)//'spectra_v_fld_'//fldnum,n,1,ng,zc_g,.false.,v)
-      ! call cmpt_spectra(trim(datadir)//'spectra_w_fld_'//fldnum,n,1,ng,zf_g,.true. ,w)
-      ! call cmpt_spectra(trim(datadir)//'spectra_p_fld_'//fldnum,n,1,ng,zc_g,.false.,p)
-      ! call pdfs_sergio(trim(datadir)//'pdfs_fld_'//fldnum,lo,hi,ng,zc_g,u,v,w,p)
       include 'out2d.h90'
-      !block
-      !  use mod_common_cudecomp, only: buf => solver_buf_1
-      !  use mod_post, only: vorticity_one_component
-      !  real(rp), pointer, contiguous, dimension(:,:,:) :: vo
-      !  vo(1:n(1),1:n(2),1:n(3)) => buf(1:product(n(:)))
-      !  call vorticity_one_component(1,n,dli,dzci,u,v,w,vo)
-      !  call cmpt_spectra(trim(datadir)//'spectra_vox_fld_'//fldnum,n,0,ng,zf_g,.true. ,vo)
-      !  call vorticity_one_component(2,n,dli,dzci,u,v,w,vo)
-      !  call cmpt_spectra(trim(datadir)//'spectra_voy_fld_'//fldnum,n,0,ng,zf_g,.true. ,vo)
-      !  call vorticity_one_component(3,n,dli,dzci,u,v,w,vo)
-      !  call cmpt_spectra(trim(datadir)//'spectra_voz_fld_'//fldnum,n,0,ng,zc_g,.false.,vo)
-      !end block
     end if
     if(mod(istep,iout3d) == 0) then
       !$acc update self(u,v,w,p)
@@ -637,9 +621,6 @@ program cans
       !$acc update self(u,v,w,p)
       call load_all('w',trim(datadir)//trim(filename),MPI_COMM_WORLD,ng,[1,1,1],lo,hi,u,v,w,p,time,istep)
       if(.not.is_overwrite_save) then
-        !
-        ! fld.bin -> last checkpoint file (symbolic link)
-        !
         call gen_alias(myid,trim(datadir),trim(filename),'fld.bin')
       end if
       if(myid == 0) print*, '*** Checkpoint saved at time = ', time, 'time step = ', istep, '. ***'

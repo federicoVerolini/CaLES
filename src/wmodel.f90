@@ -8,7 +8,7 @@ module mod_wmodel
   use, intrinsic :: ieee_arithmetic, only: is_nan => ieee_is_nan,is_finite => ieee_is_finite
   use mpi
   use mod_precision
-  use mod_typedef, only: cond_bound
+  use mod_typedef, only: bound
   use mod_param, only: kap_log,b_log,eps
   implicit none
   private
@@ -28,8 +28,8 @@ module mod_wmodel
     real(rp), intent(in), dimension(0:) :: zc,zf,dzc,dzf
     real(rp), intent(in) :: visc,h
     real(rp), intent(in), dimension(0:,0:,0:) :: u,v,w
-    type(cond_bound), intent(inout) :: bcu,bcv,bcw
-    type(cond_bound), intent(in) :: bcu_mag,bcv_mag,bcw_mag
+    type(bound), intent(inout) :: bcu,bcv,bcw
+    type(bound), intent(in   ) :: bcu_mag,bcv_mag,bcw_mag
     real(rp) :: wei,coef,uh,vh,wh,u1,u2,v1,v2,w1,w2,u_mag,v_mag,w_mag,tauw(2),visci
     integer  :: nh,i,j,k,i1,i2,j1,j2,k1,k2
     !

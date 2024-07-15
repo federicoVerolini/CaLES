@@ -6,9 +6,9 @@
 ! -
 module mod_typedef
   use mod_precision
-  type cond_bound
+  type bound
   real(rp), allocatable, dimension(:,:,:) :: x
   real(rp), allocatable, dimension(:,:,:) :: y
   real(rp), allocatable, dimension(:,:,:) :: z
-  end type cond_bound
+  end type bound
 end module mod_typedef

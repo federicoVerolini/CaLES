@@ -41,6 +41,7 @@ module mod_chkdt
     dxi = 1._rp/dl(1)
     dyi = 1._rp/dl(2)
     dzi = 1._rp/dl(3)
+    dl2i  = dxi*dxi+dyi*dyi
     !
     dti  = 0._rp
     dtid = 0._rp
@@ -63,11 +64,20 @@ module mod_chkdt
           dtiy = uy*dxi+vy*dyi+wy*dzfi(k)
           dtiz = uz*dxi+vz*dyi+wz*dzci(k)
           dti  = max(dti,dtix,dtiy,dtiz)
-          !
+        end do
+      end do
+    end do
+    !$acc end data
+    !
+    !$acc data copy(dtid) async(2)
+    !$acc parallel loop collapse(3) default(present) private(viscx,viscy,viscz,dtidx,dtidy,dtidz) reduction(max:dtid) async(2)
+    !$OMP PARALLEL DO   COLLAPSE(3) DEFAULT(shared)  PRIVATE(viscx,viscy,viscz,dtidx,dtidy,dtidz) REDUCTION(max:dtid)
+    do k=1,n(3)
+      do j=1,n(2)
+        do i=1,n(1)
           viscx = 0.5_rp*(visct(i,j,k)+visct(i+1,j  ,k  ))
           viscy = 0.5_rp*(visct(i,j,k)+visct(i  ,j+1,k  ))
           viscz = 0.5_rp*(visct(i,j,k)+visct(i  ,j  ,k+1))
-          dl2i  = dxi*dxi+dyi*dyi
           dtidx = viscx*(dl2i+dzfi(k)*dzfi(k))
           dtidy = viscy*(dl2i+dzfi(k)*dzfi(k))
           dtidz = viscz*(dl2i+dzci(k)*dzci(k))
@@ -88,11 +98,11 @@ module mod_chkdt
         end do
       end do
     end do
+    !$acc end data
+    !$acc wait
     if(dti  == 0._rp) dti  = 1._rp
     if(dtid == 0._rp) dtid = eps
     dtmax = min(0.4125_rp/dtid,1.732_rp/dti) ! viscous CFL could be 1.5
-    !$acc end data
-    !$acc wait(1)
     call MPI_ALLREDUCE(MPI_IN_PLACE,dtmax,1,MPI_REAL_RP,MPI_MIN,MPI_COMM_WORLD,ierr)
   end subroutine chkdt
 end module mod_chkdt

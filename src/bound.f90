@@ -8,7 +8,7 @@ module mod_bound
   use mpi
   use mod_common_mpi, only: ierr,halo,ipencil_axis
   use mod_precision
-  use mod_typedef   , only: cond_bound
+  use mod_typedef   , only: bound
   use mod_wmodel    , only: updt_wallmodelbc
   implicit none
   private
@@ -22,8 +22,8 @@ module mod_bound
     implicit none
     character(len=1), intent(in), dimension(0:1,3,3) :: cbc
     integer         , intent(in), dimension(3) :: n
-    type(cond_bound), intent(inout) :: bcu,bcv,bcw
-    type(cond_bound), intent(in) :: bcu_mag,bcv_mag,bcw_mag
+    type(bound)     , intent(inout) :: bcu,bcv,bcw
+    type(bound)     , intent(in) :: bcu_mag,bcv_mag,bcw_mag
     integer , intent(in), dimension(0:1,3) :: nb
     logical , intent(in), dimension(0:1,3) :: is_bound
     integer , intent(in), dimension(0:1,3) :: lwm,ind
@@ -160,7 +160,7 @@ module mod_bound
     implicit none
     character(len=1), intent(in), dimension(0:1,3) :: cbc
     integer         , intent(in), dimension(3) :: n
-    type(cond_bound), intent(in) :: bcp
+    type(bound)     , intent(in) :: bcp
     integer , intent(in), dimension(0:1,3) :: nb
     logical , intent(in), dimension(0:1,3) :: is_bound
     real(rp), intent(in), dimension(3 ) :: dl
@@ -206,28 +206,14 @@ module mod_bound
     real(rp), intent(in), dimension(1-nh:,1-nh:,0:) :: bc ! bc, two faces
     real(rp), intent(in) :: dr
     real(rp), intent(inout), dimension(1-nh:,1-nh:,1-nh:) :: p
-    real(rp), allocatable, dimension(:,:) :: factor
     real(rp) :: sgn
     integer  :: n,dh,n1,n2
     !
     n = size(p,idir) - 2*nh
-    n1= size(bc,1)-2*nh
-    n2= size(bc,2)-2*nh
-    allocate(factor(0:n1+1,0:n2+1))
-    factor = bc(:,:,ibound)
+    sgn = 1._rp
     if(ctype == 'D'.and.centered) then
-      factor = 2.*factor
-      sgn    = -1.
+      sgn = -1._rp
     end if
-    if(ctype == 'N') then
-      if(     ibound == 0) then
-        factor = -dr*factor ! n.b.: only valid for nh /= 1 or factor /= 0
-      else if(ibound == 1) then
-        factor =  dr*factor ! n.b.: only valid for nh /= 1 or factor /= 0
-      end if
-      sgn    = 1.
-    end if
-    !
     do dh=0,nh-1
       select case(ctype)
       case('P')
@@ -265,20 +251,20 @@ module mod_bound
           !$OMP END PARALLEL WORKSHARE
           !$acc end kernels
         end select
-      case('D','N')
+      case('D')
         if(centered) then
           select case(idir)
           case(1)
             if     (ibound == 0) then
               !$acc kernels default(present) async(1)
               !$OMP PARALLEL WORKSHARE
-              p(  0-dh,:,:) = factor+sgn*p(1+dh,:,:)
+              p(  0-dh,:,:) = 2._rp*bc(:,:,ibound)+sgn*p(1+dh,:,:)
               !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             else if(ibound == 1) then
               !$acc kernels default(present) async(1)
               !$OMP PARALLEL WORKSHARE
-              p(n+1+dh,:,:) = factor+sgn*p(n-dh,:,:)
+              p(n+1+dh,:,:) = 2._rp*bc(:,:,ibound)+sgn*p(n-dh,:,:)
               !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             end if
@@ -286,13 +272,13 @@ module mod_bound
             if     (ibound == 0) then
               !$acc kernels default(present) async(1)
               !$OMP PARALLEL WORKSHARE
-              p(:,  0-dh,:) = factor+sgn*p(:,1+dh,:)
+              p(:,  0-dh,:) = 2._rp*bc(:,:,ibound)+sgn*p(:,1+dh,:)
               !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             else if(ibound == 1) then
               !$acc kernels default(present) async(1)
               !$OMP PARALLEL WORKSHARE
-              p(:,n+1+dh,:) = factor+sgn*p(:,n-dh,:)
+              p(:,n+1+dh,:) = 2._rp*bc(:,:,ibound)+sgn*p(:,n-dh,:)
               !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             end if
@@ -300,31 +286,31 @@ module mod_bound
             if     (ibound == 0) then
               !$acc kernels default(present) async(1)
               !$OMP PARALLEL WORKSHARE
-              p(:,:,  0-dh) = factor+sgn*p(:,:,1+dh)
+              p(:,:,  0-dh) = 2._rp*bc(:,:,ibound)+sgn*p(:,:,1+dh)
               !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             else if(ibound == 1) then
               !$acc kernels default(present) async(1)
               !$OMP PARALLEL WORKSHARE
-              p(:,:,n+1+dh) = factor+sgn*p(:,:,n-dh)
+              p(:,:,n+1+dh) = 2._rp*bc(:,:,ibound)+sgn*p(:,:,n-dh)
               !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             end if
           end select
-        else if(.not.centered.and.ctype == 'D') then
+        else if(.not.centered) then
           select case(idir)
           case(1)
             if     (ibound == 0) then
               !$acc kernels default(present) async(1)
               !$OMP PARALLEL WORKSHARE
-              p(0-dh,:,:) = factor
+              p(0-dh,:,:) = bc(:,:,ibound)
               !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             else if(ibound == 1) then
               !$acc kernels default(present) async(1)
               !$OMP PARALLEL WORKSHARE
               p(n+1 ,:,:) = p(n-1,:,:) ! unused
-              p(n+dh,:,:) = factor
+              p(n+dh,:,:) = bc(:,:,ibound)
               !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             end if
@@ -332,14 +318,14 @@ module mod_bound
             if     (ibound == 0) then
               !$acc kernels default(present) async(1)
               !$OMP PARALLEL WORKSHARE
-              p(:,0-dh,:) = factor
+              p(:,0-dh,:) = bc(:,:,ibound)
               !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             else if(ibound == 1) then
               !$acc kernels default(present) async(1)
               !$OMP PARALLEL WORKSHARE
               p(:,n+1 ,:) = p(:,n-1,:) ! unused
-              p(:,n+dh,:) = factor
+              p(:,n+dh,:) = bc(:,:,ibound)
               !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             end if
@@ -347,34 +333,81 @@ module mod_bound
             if     (ibound == 0) then
               !$acc kernels default(present) async(1)
               !$OMP PARALLEL WORKSHARE
-              p(:,:,0-dh) = factor
+              p(:,:,0-dh) = bc(:,:,ibound)
               !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             else if(ibound == 1) then
               !$acc kernels default(present) async(1)
               !$OMP PARALLEL WORKSHARE
               p(:,:,n+1 ) = p(:,:,n-1) ! unused
-              p(:,:,n+dh) = factor
+              p(:,:,n+dh) = bc(:,:,ibound)
               !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             end if
           end select
-        else if(.not.centered.and.ctype == 'N') then
+        end if
+      case('N')
+        if(centered) then
+          select case(idir)
+          case(1)
+            if     (ibound == 0) then
+              !$acc kernels default(present) async(1)
+              !$OMP PARALLEL WORKSHARE
+              p(  0-dh,:,:) = -dr*bc(:,:,ibound)+sgn*p(1+dh,:,:)
+              !$OMP END PARALLEL WORKSHARE
+              !$acc end kernels
+            else if(ibound == 1) then
+              !$acc kernels default(present) async(1)
+              !$OMP PARALLEL WORKSHARE
+              p(n+1+dh,:,:) = dr*bc(:,:,ibound)+sgn*p(n-dh,:,:)
+              !$OMP END PARALLEL WORKSHARE
+              !$acc end kernels
+            end if
+          case(2)
+            if     (ibound == 0) then
+              !$acc kernels default(present) async(1)
+              !$OMP PARALLEL WORKSHARE
+              p(:,  0-dh,:) = -dr*bc(:,:,ibound)+sgn*p(:,1+dh,:)
+              !$OMP END PARALLEL WORKSHARE
+              !$acc end kernels
+            else if(ibound == 1) then
+              !$acc kernels default(present) async(1)
+              !$OMP PARALLEL WORKSHARE
+              p(:,n+1+dh,:) = dr*bc(:,:,ibound)+sgn*p(:,n-dh,:)
+              !$OMP END PARALLEL WORKSHARE
+              !$acc end kernels
+            end if
+          case(3)
+            if     (ibound == 0) then
+              !$acc kernels default(present) async(1)
+              !$OMP PARALLEL WORKSHARE
+              p(:,:,  0-dh) = -dr*bc(:,:,ibound)+sgn*p(:,:,1+dh)
+              !$OMP END PARALLEL WORKSHARE
+              !$acc end kernels
+            else if(ibound == 1) then
+              !$acc kernels default(present) async(1)
+              !$OMP PARALLEL WORKSHARE
+              p(:,:,n+1+dh) = dr*bc(:,:,ibound)+sgn*p(:,:,n-dh)
+              !$OMP END PARALLEL WORKSHARE
+              !$acc end kernels
+            end if
+          end select
+        else if(.not.centered) then
           select case(idir)
           case(1)
             if     (ibound == 0) then
               !$acc kernels default(present) async(1)
               !$OMP PARALLEL WORKSHARE
               !p(0,:,:) = 1./3.*(-2.*factor+4.*p(1  ,:,:)-p(2  ,:,:)) ! second-order approximation of the first derivative at the boundary
-              p(0-dh,:,:) = 1.*factor + p(  1+dh,:,:)
+              p(0-dh,:,:) = -dr*bc(:,:,ibound) + p(  1+dh,:,:)
               !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             else if(ibound == 1) then
               !$acc kernels default(present) async(1)
               !$OMP PARALLEL WORKSHARE
               !p(n,:,:) = 1./3.*(-2.*factor+4.*p(n-1,:,:)-p(n-2,:,:))
-              p(n+1,:,:) = p(n,:,:) ! unused
-              p(n+dh,:,:) = 1.*factor + p(n-1-dh,:,:)
+              p(n+1 ,:,:) = p(n,:,:) ! unused
+              p(n+dh,:,:) = dr*bc(:,:,ibound) + p(n-1-dh,:,:)
               !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             end if
@@ -383,15 +416,15 @@ module mod_bound
               !$acc kernels default(present) async(1)
               !$OMP PARALLEL WORKSHARE
               !p(:,0  ,:) = 1./3.*(-2.*factor+4.*p(:,1,:)-p(:,2  ,:))
-              p(:,0-dh,:) = 1.*factor + p(:,  1+dh,:)
+              p(:,0-dh,:) = -dr*bc(:,:,ibound) + p(:,  1+dh,:)
               !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             else if(ibound == 1) then
               !$acc kernels default(present) async(1)
               !$OMP PARALLEL WORKSHARE
               !p(:,n,:) = 1./3.*(-2.*factor+4.*p(:,n-1,:)-p(:,n-2,:))
-              p(:,n+1,:) = p(:,n,:) ! unused
-              p(:,n+dh,:) = 1.*factor + p(:,n-1-dh,:)
+              p(:,n+1 ,:) = p(:,n,:) ! unused
+              p(:,n+dh,:) = dr*bc(:,:,ibound) + p(:,n-1-dh,:)
               !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             end if
@@ -400,15 +433,15 @@ module mod_bound
               !$acc kernels default(present) async(1)
               !$OMP PARALLEL WORKSHARE
               !p(:,:,0) = 1./3.*(-2.*factor+4.*p(:,:,1  )-p(:,:,2  ))
-              p(:,:,0-dh) = 1.*factor + p(:,:,  1+dh)
+              p(:,:,0-dh) = -dr*bc(:,:,ibound) + p(:,:,  1+dh)
               !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             else if(ibound == 1) then
               !$acc kernels default(present) async(1)
               !$OMP PARALLEL WORKSHARE
               !p(:,:,n) = 1./3.*(-2.*factor+4.*p(:,:,n-1)-p(:,:,n-2))
-              p(:,:,n+1) = p(:,:,n) ! unused
-              p(:,:,n+dh) = 1.*factor + p(:,:,n-1-dh)
+              p(:,:,n+1 ) = p(:,:,n) ! unused
+              p(:,:,n+dh) = dr*bc(:,:,ibound) + p(:,:,n-1-dh)
               !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             end if
@@ -473,7 +506,7 @@ module mod_bound
     real(rp), intent(in), dimension(3 ) :: dli
     real(rp), intent(in), dimension(0:) :: dzci,dzfi
     character(len=1), intent(in), dimension(0:1,3) :: cbc
-    type(cond_bound), intent(in) :: bc
+    type(bound)     , intent(in) :: bc
     character(len=1), intent(in), dimension(3) :: c_or_f
     real(rp), intent(out), dimension(:,:,0:), optional :: rhsbx
     real(rp), intent(out), dimension(:,:,0:), optional :: rhsby
@@ -506,46 +539,66 @@ module mod_bound
     real(rp), intent(in), dimension(0:1) :: dlc,dlf
     real(rp), intent(out), dimension(:,:,0:) :: rhs
     character(len=1), intent(in) :: c_or_f ! c -> cell-centered; f -> face-centered
-    real(rp), allocatable, dimension(:,:,:) :: factor
+    logical, save :: is_first = .true.
     real(rp) :: sgn
-    integer :: ibound,n1,n2
+    integer :: ibound
     !
-    n1 = size(bc,1)-2
-    n2 = size(bc,2)-2
-    allocate(factor(0:n1+1,0:n2+1,0:1))
+    !$acc enter data copyin(dlc,dlf) async(1)
     !
     select case(c_or_f)
     case('c')
       do ibound = 0,1
         select case(cbc(ibound))
         case('P')
-          factor(:,:,ibound) = 0.
+          !$acc kernels default(present) async(1)
+          !$OMP PARALLEL WORKSHARE
+          rhs(:,:,ibound) =  0._rp
+          !$OMP END PARALLEL WORKSHARE
+          !$acc end kernels
         case('D')
-          factor(:,:,ibound) = -2.*bc(:,:,ibound)
+          !$acc kernels default(present) async(1)
+          !$OMP PARALLEL WORKSHARE
+          rhs(:,:,ibound) = -2._rp*bc(:,:,ibound)/dlc(ibound)/dlf(ibound)
+          !$OMP END PARALLEL WORKSHARE
+          !$acc end kernels
         case('N')
-          if(ibound == 0) sgn =  1.
-          if(ibound == 1) sgn = -1.
-          factor(:,:,ibound) = sgn*dlc(ibound)*bc(:,:,ibound)
+          if(ibound == 0) sgn =  1._rp
+          if(ibound == 1) sgn = -1._rp
+          !$acc kernels default(present) async(1)
+          !$OMP PARALLEL WORKSHARE
+          rhs(:,:,ibound) = sgn*bc(:,:,ibound)/dlf(ibound)
+          !$OMP END PARALLEL WORKSHARE
+          !$acc end kernels
         end select
       end do
     case('f')
       do ibound = 0,1
         select case(cbc(ibound))
         case('P')
-          factor(:,:,ibound) = 0.
+          !$acc kernels default(present) async(1)
+          !$OMP PARALLEL WORKSHARE
+          rhs(:,:,ibound) =  0._rp
+          !$OMP END PARALLEL WORKSHARE
+          !$acc end kernels
         case('D')
-          factor(:,:,ibound) = -bc(:,:,ibound)
+          !$acc kernels default(present) async(1)
+          !$OMP PARALLEL WORKSHARE
+          rhs(:,:,ibound) = -bc(:,:,ibound)/dlc(ibound)/dlf(ibound)
+          !$OMP END PARALLEL WORKSHARE
+          !$acc end kernels
         case('N')
-          if(ibound == 0) sgn =  1.
-          if(ibound == 1) sgn = -1.
-          factor(:,:,ibound) = sgn*dlf(ibound)*bc(:,:,ibound)
+          if(ibound == 0) sgn =  1._rp
+          if(ibound == 1) sgn = -1._rp
+          !$acc kernels default(present) async(1)
+          !$OMP PARALLEL WORKSHARE
+          rhs(:,:,ibound) = sgn*bc(:,:,ibound)/dlc(ibound)
+          !$OMP END PARALLEL WORKSHARE
+          !$acc end kernels
         end select
       end do
     end select
-    do concurrent(ibound=0:1)
-      rhs(:,:,ibound) = factor(1:n1,1:n2,ibound)/dlc(ibound)/dlf(ibound)
-      rhs(:,:,ibound) = factor(1:n1,1:n2,ibound)/dlc(ibound)/dlf(ibound)
-    end do
+    !$acc exit data delete(dlc,dlf) async(1)
+    !$acc wait(1)
   end subroutine bc_rhs
   !
   subroutine updt_rhs_b(c_or_f,cbc,n,is_bound,rhsbx,rhsby,rhsbz,p)
@@ -734,9 +787,9 @@ module mod_bound
     implicit none
     character(len=*), intent(in) :: sgstype
     character(len=1), intent(inout), dimension(0:1,3,3) :: cbcvel
-    real(rp), intent(in), dimension(0:1,3,3) :: bcvel
-    real(rp), intent(in), dimension(0:1,3) :: bcpre,bcsgs
-    type(cond_bound), intent(inout) :: bcu,bcv,bcw,bcp,bcs,bcu_mag,bcv_mag,bcw_mag,bcuf,bcvf,bcwf
+    real(rp)   , intent(in), dimension(0:1,3,3) :: bcvel
+    real(rp)   , intent(in), dimension(0:1,3) :: bcpre,bcsgs
+    type(bound), intent(inout) :: bcu,bcv,bcw,bcp,bcs,bcu_mag,bcv_mag,bcw_mag,bcuf,bcvf,bcwf
     integer , intent(in), dimension(3) :: n
     logical , intent(in), dimension(0:1,3) :: is_bound
     integer , intent(in), dimension(0:1,3) :: lwm

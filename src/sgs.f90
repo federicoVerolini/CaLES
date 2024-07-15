@@ -10,7 +10,7 @@ module mod_sgs
   use mod_common_mpi, only: ierr
   use mod_precision
   use mod_param, only: c_smag,big
-  use mod_typedef, only: cond_bound
+  use mod_typedef, only: bound
   use mod_bound, only: boundp,bounduvw
   use mod_post, only: strain_rate
   implicit none
@@ -38,9 +38,9 @@ module mod_sgs
     integer , intent(in ), dimension(3) :: n,ng,lo,hi
     character(len=1), intent(in), dimension(0:1,3,3) :: cbcvel
     character(len=1), intent(in), dimension(0:1,3)   :: cbcpre
-    type(cond_bound), intent(in )                :: bcp
-    type(cond_bound), intent(inout)              :: bcuf,bcvf,bcwf
-    type(cond_bound), intent(in )                :: bcu_mag,bcv_mag,bcw_mag
+    type(bound), intent(in   ) :: bcp
+    type(bound), intent(inout) :: bcuf,bcvf,bcwf
+    type(bound), intent(in   ) :: bcu_mag,bcv_mag,bcw_mag
     integer , intent(in ), dimension(0:1,3)      :: nb,lwm,ind
     logical , intent(in ), dimension(0:1,3)      :: is_bound
     real(rp), intent(in ), dimension(3)          :: l,dl
@@ -74,6 +74,8 @@ module mod_sgs
                  s0     (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
                  dw_plus(0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
                  sij    (0:n(1)+1,0:n(2)+1,0:n(3)+1,6))
+        !$acc enter data create(wk,wk1,wk2,wk3) async(1)
+        !$acc enter data create(s0,dw_plus,sij) async(1)
       end if
       call extrapolate(n,is_bound,dzci,u,wk1,iface=1,lwm=lwm)
       call extrapolate(n,is_bound,dzci,v,wk2,iface=2,lwm=lwm)

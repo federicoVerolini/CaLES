@@ -1,7 +1,6 @@
 module mod_output_pdfs
-! GPU-supported only,so _OPENACC is predefined
-! modifications needed to be CPU-supported
-#if defined(_OPENACC)
+! unused at the moment
+#if defined(_USEPOST)
   use mpi
   use decomp_2d_io
   use cudecomp

@@ -32,14 +32,14 @@ module mod_rk
     implicit none
     real(rp), intent(in), dimension(2) :: rkpar
     integer , intent(in), dimension(3) :: n
+    real(rp), intent(in), dimension(3) :: dli
+    real(rp), intent(in), dimension(0:) :: dzci,dzfi
+    real(rp), intent(in), dimension(0:) :: grid_vol_ratio_c,grid_vol_ratio_f
     real(rp), intent(in) :: visc,dt
-    real(rp), intent(in   ), dimension(3) :: dli
-    real(rp), intent(in   ), dimension(0:) :: dzci,dzfi
-    real(rp), intent(in   ), dimension(0:) :: grid_vol_ratio_c,grid_vol_ratio_f
-    real(rp), intent(in   ), dimension(0:,0:,0:) :: p
-    logical , intent(in   ), dimension(3)        :: is_forced
-    real(rp), intent(in   ), dimension(3)        :: velf,bforce
-    real(rp), intent(in   ), dimension(0:,0:,0:) :: visct
+    real(rp), intent(in), dimension(0:,0:,0:) :: p
+    logical , intent(in), dimension(3)        :: is_forced
+    real(rp), intent(in), dimension(3)        :: velf,bforce
+    real(rp), intent(in), dimension(0:,0:,0:) :: visct
     real(rp), intent(inout), dimension(0:,0:,0:) :: u,v,w
     real(rp), intent(out), dimension(3) :: f
     real(rp), target     , allocatable, dimension(:,:,:), save :: dudtrk_t ,dvdtrk_t ,dwdtrk_t , &
@@ -182,8 +182,8 @@ module mod_rk
     do k=1,n(3)
       do j=1,n(2)
         do i=1,n(1)
-          u(i,j,k) = u(i,j,k) + factor12*(bforce(1) - dli(1)*( p(i+1,j,k)-p(i,j,k)))
-          v(i,j,k) = v(i,j,k) + factor12*(bforce(2) - dli(2)*( p(i,j+1,k)-p(i,j,k)))
+          u(i,j,k) = u(i,j,k) + factor12*(bforce(1) -  dli(1)*(p(i+1,j,k)-p(i,j,k)))
+          v(i,j,k) = v(i,j,k) + factor12*(bforce(2) -  dli(2)*(p(i,j+1,k)-p(i,j,k)))
           w(i,j,k) = w(i,j,k) + factor12*(bforce(3) - dzci(k)*(p(i,j,k+1)-p(i,j,k)))
         end do
       end do

@@ -673,19 +673,22 @@ module mod_mom
                 dvdtd_xy_s,dvdtd_z_s   , &
                 dwdtd_xy_s,dwdtd_z_s
     !
-    ! real(rp), dimension(0:nz+1) :: dzc,dzf
-    ! real(rp) :: d(3)
-    !
     !$acc parallel loop collapse(3) default(present) async(1) &
     !$acc private(u_ccm,u_pcm,u_cpm,u_cmc,u_pmc,u_mcc,u_ccc,u_pcc,u_mpc,u_cpc,u_cmp,u_mcp,u_ccp) &
     !$acc private(v_ccm,v_pcm,v_cpm,v_cmc,v_pmc,v_mcc,v_ccc,v_pcc,v_mpc,v_cpc,v_cmp,v_mcp,v_ccp) &
     !$acc private(w_ccm,w_pcm,w_cpm,w_cmc,w_pmc,w_mcc,w_ccc,w_pcc,w_mpc,w_cpc,w_cmp,w_mcp,w_ccp) &
+    !$acc private(s_ccm,s_pcm,s_cpm,s_cmc,s_pmc,s_mcc,s_ccc,s_pcc,s_mpc,s_cpc,s_cmp,s_mcp,s_ccp) &
+    !$acc private(s_ppc,s_pcp,s_cpp) &
     !$acc private(uu_ip,uu_im,vu_jp,vu_jm,wu_kp,wu_km) &
     !$acc private(uv_ip,uv_im,vv_jp,vv_jm,wv_kp,wv_km) &
     !$acc private(uw_ip,uw_im,vw_jp,vw_jm,ww_kp,ww_km) &
     !$acc private(dudx_ip,dudx_im,dudy_jp,dudy_jm,dudz_kp,dudz_km) &
     !$acc private(dvdx_ip,dvdx_im,dvdy_jp,dvdy_jm,dvdz_kp,dvdz_km) &
     !$acc private(dwdx_ip,dwdx_im,dwdy_jp,dwdy_jm,dwdz_kp,dwdz_km) &
+    !$acc private(                dvdx_jp,dvdx_jm,dwdx_kp,dwdx_km) &
+    !$acc private(dudy_ip,dudy_im,                dwdy_kp,dwdy_km) &
+    !$acc private(dudz_ip,dudz_im,dvdz_jp,dvdz_jm                ) &
+    !$acc private(visc_ip,visc_im,visc_jp,visc_jm,visc_kp,visc_km) &
     !$acc private(dudt_s ,dvdt_s ,dwdt_s ) &
     !$acc private(dudtd_s,dvdtd_s,dwdtd_s) &
     !$acc private(dudtd_xy_s,dudtd_z_s) &
@@ -695,12 +698,18 @@ module mod_mom
     !$OMP PRIVATE(u_ccm,u_pcm,u_cpm,u_cmc,u_pmc,u_mcc,u_ccc,u_pcc,u_mpc,u_cpc,u_cmp,u_mcp,u_ccp) &
     !$OMP PRIVATE(v_ccm,v_pcm,v_cpm,v_cmc,v_pmc,v_mcc,v_ccc,v_pcc,v_mpc,v_cpc,v_cmp,v_mcp,v_ccp) &
     !$OMP PRIVATE(w_ccm,w_pcm,w_cpm,w_cmc,w_pmc,w_mcc,w_ccc,w_pcc,w_mpc,w_cpc,w_cmp,w_mcp,w_ccp) &
+    !$OMP PRIVATE(s_ccm,s_pcm,s_cpm,s_cmc,s_pmc,s_mcc,s_ccc,s_pcc,s_mpc,s_cpc,s_cmp,s_mcp,s_ccp) &
+    !$OMP PRIVATE(s_ppc,s_pcp,s_cpp) &
     !$OMP PRIVATE(uu_ip,uu_im,vu_jp,vu_jm,wu_kp,wu_km) &
     !$OMP PRIVATE(uv_ip,uv_im,vv_jp,vv_jm,wv_kp,wv_km) &
     !$OMP PRIVATE(uw_ip,uw_im,vw_jp,vw_jm,ww_kp,ww_km) &
     !$OMP PRIVATE(dudx_ip,dudx_im,dudy_jp,dudy_jm,dudz_kp,dudz_km) &
     !$OMP PRIVATE(dvdx_ip,dvdx_im,dvdy_jp,dvdy_jm,dvdz_kp,dvdz_km) &
     !$OMP PRIVATE(dwdx_ip,dwdx_im,dwdy_jp,dwdy_jm,dwdz_kp,dwdz_km) &
+    !$OMP PRIVATE(                dvdx_jp,dvdx_jm,dwdx_kp,dwdx_km) &
+    !$OMP PRIVATE(dudy_ip,dudy_im,                dwdy_kp,dwdy_km) &
+    !$OMP PRIVATE(dudz_ip,dudz_im,dvdz_jp,dvdz_jm                ) &
+    !$OMP PRIVATE(visc_ip,visc_im,visc_jp,visc_jm,visc_kp,visc_km) &
     !$OMP PRIVATE(dudt_s ,dvdt_s ,dwdt_s ) &
     !$OMP PRIVATE(dudtd_s,dvdtd_s,dwdtd_s) &
     !$OMP PRIVATE(dudtd_xy_s,dudtd_z_s) &
@@ -813,7 +822,6 @@ module mod_mom
                         -(uu_ip-uu_im)*dxi - &
                          (vu_jp-vu_jm)*dyi - &
                          (wu_kp-wu_km)*dzfi(k) &
-                         !
                         +(visc_ip*(dudx_ip+dudx_ip)-visc_im*(dudx_im+dudx_im))*dxi + & ! d(dudx+dudx)/dx
                          (visc_jp*(dudy_jp+dvdx_jp)-visc_jm*(dudy_jm+dvdx_jm))*dyi + & ! d(dudy+dvdx)/dy
                          (visc_kp*(dudz_kp+dwdx_kp)-visc_km*(dudz_km+dwdx_km))*dzfi(k) ! d(dudz+dwdx)/dz
@@ -859,7 +867,6 @@ module mod_mom
                         -(uv_ip-uv_im)*dxi - &
                          (vv_jp-vv_jm)*dyi - &
                          (wv_kp-wv_km)*dzfi(k) &
-                         !
                         +(visc_ip*(dvdx_ip+dudy_ip)-visc_im*(dvdx_im+dudy_im))*dxi + & ! d(dvdx+dudy)/dx
                          (visc_jp*(dvdy_jp+dvdy_jp)-visc_jm*(dvdy_jm+dvdy_jm))*dyi + & ! d(dvdy+dvdy)/dy
                          (visc_kp*(dvdz_kp+dwdy_kp)-visc_km*(dvdz_km+dwdy_km))*dzfi(k) ! d(dvdz+dwdy)/dz
@@ -905,7 +912,6 @@ module mod_mom
                          -(uw_ip-uw_im)*dxi - &
                           (vw_jp-vw_jm)*dyi - &
                           (ww_kp-ww_km)*dzci(k) &
-                          !
                          +(visc_ip*(dwdx_ip+dudz_ip)-visc_im*(dwdx_im+dudz_im))*dxi + & ! d(dwdx+dudz)/dx
                           (visc_jp*(dwdy_jp+dvdz_jp)-visc_jm*(dwdy_jm+dvdz_jm))*dyi + & ! d(dwdy+dvdz)/dy
                           (visc_kp*(dwdz_kp+dwdz_kp)-visc_km*(dwdz_km+dwdz_km))*dzci(k) ! d(dwdz+dwdz)/dz

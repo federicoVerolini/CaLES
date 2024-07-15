@@ -5,9 +5,8 @@
 !
 ! -
 module mod_spectra
-! GPU-supported only,so _OPENACC is predefined
-! modifications needed to be CPU-supported
-#if defined(_OPENACC)
+! unused at the moment
+#if defined(_USEPOST)
   use mpi
   use cudecomp
   use mod_precision

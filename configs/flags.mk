@@ -7,7 +7,7 @@ endif
 ifeq ($(strip $(FCOMP)),NVIDIA)
 FFLAGS_MOD_DIR := -module
 ifeq ($(strip $(GPU)),1)
-override FFLAGS += -acc -cuda -Minfo=accel -gpu=cc60,cc70,cc80
+override FFLAGS += -acc -cuda -Minfo=accel -gpu=cc89
 endif
 endif
 ifeq ($(strip $(FCOMP)),CRAY)

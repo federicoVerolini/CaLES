@@ -7,7 +7,7 @@ override INCS += -I$(LIBS_DIR)/cuDecomp/build/include
 endif
 
 ifeq ($(strip $(USE_NVTX)),1)
-NVHPC_HOME ?= /opt/nvidia/hpc_sdk/Linux_x86_64/2022
+NVHPC_HOME ?= /opt/nvidia/hpc_sdk/Linux_x86_64/2023
 override LIBS += -L$(NVHPC_HOME)/cuda/lib64 -lnvToolsExt
 endif
 
