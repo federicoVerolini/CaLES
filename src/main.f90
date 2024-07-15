@@ -89,7 +89,7 @@ program cans
   use omp_lib
   implicit none
   integer , dimension(3) :: lo,hi,n,n_x_fft,n_y_fft,lo_z,hi_z,n_z
-  real(rp), allocatable, dimension(:,:,:) :: u,v,w,p,pp,visct,dw
+  real(rp), allocatable, dimension(:,:,:) :: u,v,w,p,pp,visct
   real(rp), dimension(3) :: tauxo,tauyo,tauzo
   real(rp), dimension(3) :: f
 #if !defined(_OPENACC)
@@ -232,7 +232,6 @@ program cans
            rhsby(  n(1),n(3),0:1), &
            rhsbz(  n(1),n(2),0:1))
 #endif
-  allocate(dw(0:n(1)+1,0:n(2)+1,0:n(3)+1))
   !
   if(myid == 0) print*, 'This executable of CaNS was built with compiler: ', compiler_version()
   if(myid == 0) print*, 'Using the options: ', compiler_options()
@@ -294,13 +293,6 @@ program cans
   ! test input files before proceeding with the calculation
   !
   call test_sanity_input(ng,dims,sgstype,stop_type,cbcvel,cbcpre,cbcsgs,bcvel,bcpre,bcsgs,n,is_bound,lwm,l,zc,dl,hwm,is_forced)
-  !
-  ! compute wall distance
-  !
-  if(trim(sgstype)=='smag') then
-    call wall_dist(cbcvel,n,is_bound,l,dl,zc,dzc,dw)
-  end if
-  !$acc enter data copyin(dw)
   !
   ! initialize boundary condition variables
   !
@@ -385,7 +377,7 @@ program cans
                 visc,hwm,ind_wm,.true.,.false.,u,v,w)
   call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
   call cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcpre,bcp,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf, &
-                visc,hwm,ind_wm,u,v,w,dw,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,visct)
+                visc,hwm,ind_wm,u,v,w,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,visct)
   call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,visct) ! corner ghost cells included
   !
   ! post-process and write initial condition
@@ -518,7 +510,7 @@ program cans
       call updatep(n,dli,dzci,dzfi,alpha,pp,p)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
       call cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcpre,bcp,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf, &
-                    visc,hwm,ind_wm,u,v,w,dw,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,visct)
+                    visc,hwm,ind_wm,u,v,w,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,visct)
       call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,visct)
     end do
     dpdl(:) = -dpdl(:)*dti

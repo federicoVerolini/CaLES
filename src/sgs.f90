@@ -19,7 +19,7 @@ module mod_sgs
   contains
   !
   subroutine cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcpre,bcp,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf, &
-                      visc,h,ind,u,v,w,dw,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,visct)
+                      visc,h,ind,u,v,w,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,visct)
     !
     ! compute subgrid viscosity at cell centers
     ! the LES with the dynamic model is ~2 times the cost of the LES with the static one.
@@ -29,7 +29,7 @@ module mod_sgs
     ! 395,550,1000, with <=5% errors in the friction coefficient. Clipping is necessary
     ! to avoid negative values of averaged eddy viscosity (duct flow).
     !
-    ! 2D filter is used in the first off-wall layer (Bae, Orlandi, LESGO, and Balaras, 1995).
+    ! 2D filter is used in the first off-wall layer (Bae, Orlandi, LESGO and Balaras, 1995).
     ! It is difficult to do 3D filtering of Sij in the first layer, though feasible for
     ! velocity.
     !
@@ -46,24 +46,37 @@ module mod_sgs
     real(rp), intent(in ), dimension(3)          :: l,dl
     real(rp), intent(in ), dimension(0:)         :: zc,zf,dzc,dzf
     real(rp), intent(in )                        :: visc,h
-    real(rp), intent(in ), dimension(0:,0:,0:)   :: u,v,w,dw
+    real(rp), intent(in ), dimension(0:,0:,0:)   :: u,v,w
     real(rp), intent(out), dimension(0:,0:,0:)   :: visct
     !
     real(rp), allocatable, dimension(:,:,:)  , save :: dw_plus,s0,uc,vc,wc,uf,vf,wf, &
                                                        wk,wk1,wk2,wk3,alph2
     real(rp), allocatable, dimension(:,:,:,:), save :: sij,lij,mij
-    real(rp), dimension(3)        :: dli
-    real(rp), dimension(0:n(3)+1) :: dzci,dzfi
+    real(rp), allocatable, dimension(:), save :: dli
+    real(rp), allocatable, dimension(:), save :: dzci,dzfi
+    logical, save :: is_first_comm = .true.
     logical, save :: is_first = .true.
     integer :: i,j,k,m
     !
-    dli(:)  = dl( :)**(-1)
-    dzci(:) = dzc(:)**(-1)
-    dzfi(:) = dzf(:)**(-1)
+    if(is_first_comm) then
+      is_first_comm = .false.
+      allocate(dli (3))
+      allocate(dzci(0:n(3)+1),dzfi(0:n(3)+1))
+      !$acc enter data create(dli,dzci,dzfi) async(1)
+      !$acc kernels default(present) async(1)
+      dli (:) = dl (:)**(-1)
+      dzci(:) = dzc(:)**(-1)
+      dzfi(:) = dzf(:)**(-1)
+      !$acc end kernels
+    end if
     !
     select case(trim(sgstype))
     case('none')
+      !$acc kernels default(present) async(1)
+      !$OMP PARALLEL WORKSHARE
       visct(:,:,:) = 0._rp
+      !$OMP END PARALLEL WORKSHARE
+      !$acc end kernels
     case('smag')
       if(is_first) then
         is_first = .false.
@@ -81,7 +94,7 @@ module mod_sgs
       call extrapolate(n,is_bound,dzci,v,wk2,iface=2,lwm=lwm)
       call extrapolate(n,is_bound,dzci,w,wk3,iface=3,lwm=lwm)
       call strain_rate(n,dli,dzci,dzfi,wk1,wk2,wk3,s0,sij)
-      call cmpt_dw_plus(cbcvel,n,is_bound,l,dl,zc,dzc,visc,u,v,w,dw,dw_plus)
+      call cmpt_dw_plus(cbcvel,n,is_bound,l,dl,zc,dzc,visc,u,v,w,dw_plus)
       call sgs_smag(n,dl,dzf,dw_plus,s0,visct)
     case('dsmag')
       if(is_first) then
@@ -249,6 +262,7 @@ module mod_sgs
     case default
       print*, 'ERROR: unknown SGS model'
     end select
+    !$acc wait(1)
   end subroutine cmpt_sgs
   !
   subroutine ave1d_channel(ng,lo,hi,idir,l,dl,dz,p)
@@ -440,32 +454,68 @@ module mod_sgs
     integer , intent(in ) :: iface
     character(len=1), intent(in), dimension(0:1,3,3), optional :: cbc
     integer, intent(in), dimension(0:1,3), optional :: lwm
-    logical, dimension(0:1,3) :: is_ext
-    real(rp) :: dzc(0:n(3)+1),factor(0:1)
+    logical, dimension(0:1,3) :: is_extra
+    real(rp) :: dzc(0:n(3)+1),factor0,factor1
     !
     dzc = 1._rp/dzci
     wk = p
     !
     if(present(cbc)) then
-      factor(0) = 1._rp
-      factor(1) = 1._rp
-      is_ext(:,1) = is_bound(:,1).and.cbc(:,1,1)=='D'.and.iface/=1
-      is_ext(:,2) = is_bound(:,2).and.cbc(:,2,2)=='D'.and.iface/=2
-      is_ext(:,3) = is_bound(:,3).and.cbc(:,3,3)=='D'.and.iface/=3
+      factor0 = 1._rp
+      factor1 = 1._rp
+      is_extra(:,1) = is_bound(:,1).and.cbc(:,1,1)=='D'.and.iface/=1
+      is_extra(:,2) = is_bound(:,2).and.cbc(:,2,2)=='D'.and.iface/=2
+      is_extra(:,3) = is_bound(:,3).and.cbc(:,3,3)=='D'.and.iface/=3
     elseif(present(lwm)) then
-      factor(0) = dzc(0)*dzci(1)
-      factor(1) = dzc(n(3))*dzci(n(3)-1)
-      is_ext(:,1) = is_bound(:,1).and.lwm(:,1)/=0.and.iface/=1
-      is_ext(:,2) = is_bound(:,2).and.lwm(:,2)/=0.and.iface/=2
-      is_ext(:,3) = is_bound(:,3).and.lwm(:,3)/=0.and.iface/=3
+      factor0 = dzc(0)*dzci(1)
+      factor1 = dzc(n(3))*dzci(n(3)-1)
+      is_extra(:,1) = is_bound(:,1).and.lwm(:,1)/=0.and.iface/=1
+      is_extra(:,2) = is_bound(:,2).and.lwm(:,2)/=0.and.iface/=2
+      is_extra(:,3) = is_bound(:,3).and.lwm(:,3)/=0.and.iface/=3
     end if
     !
-    if(is_ext(0,1)) wk(0     ,:     ,:     ) =             2._rp*wk(1   ,:   ,:   ) -           wk(2     ,:     ,:     )
-    if(is_ext(1,1)) wk(n(1)+1,:     ,:     ) =             2._rp*wk(n(1),:   ,:   ) -           wk(n(1)-1,:     ,:     )
-    if(is_ext(0,2)) wk(:     ,0     ,:     ) =             2._rp*wk(:   ,1   ,:   ) -           wk(:     ,2     ,:     )
-    if(is_ext(1,2)) wk(:     ,n(2)+1,:     ) =             2._rp*wk(:   ,n(2),:   ) -           wk(:     ,n(2)-1,:     )
-    if(is_ext(0,3)) wk(:     ,:     ,0     ) = (1._rp+factor(0))*wk(:   ,:   ,1   ) - factor(0)*wk(:     ,:     ,2     )
-    if(is_ext(1,3)) wk(:     ,:     ,n(3)+1) = (1._rp+factor(1))*wk(:   ,:   ,n(3)) - factor(1)*wk(:     ,:     ,n(3)-1)
+    if(is_extra(0,1)) then
+      !$acc kernels default(present) async(1)
+      !$OMP PARALLEL WORKSHARE
+      wk(0,:,:) = 2._rp*wk(1,:,:) - wk(2,:,:)
+      !$OMP END PARALLEL WORKSHARE
+      !$acc end kernels
+    end if
+    if(is_extra(1,1)) then
+      !$acc kernels default(present) async(1)
+      !$OMP PARALLEL WORKSHARE
+      wk(n(1)+1,:,:) = 2._rp*wk(n(1),:,:) - wk(n(1)-1,:,:)
+      !$OMP END PARALLEL WORKSHARE
+      !$acc end kernels
+    end if
+    if(is_extra(0,2)) then
+      !$acc kernels default(present) async(1)
+      !$OMP PARALLEL WORKSHARE
+      wk(:,0,:) = 2._rp*wk(:,1,:) - wk(:,2,:)
+      !$OMP END PARALLEL WORKSHARE
+      !$acc end kernels
+    end if
+    if(is_extra(1,2)) then
+      !$acc kernels default(present) async(1)
+      !$OMP PARALLEL WORKSHARE
+      wk(:,n(2)+1,:) = 2._rp*wk(:,n(2),:) - wk(:,n(2)-1,:)
+      !$OMP END PARALLEL WORKSHARE
+      !$acc end kernels
+    end if
+    if(is_extra(0,3)) then
+      !$acc kernels default(present) async(1)
+      !$OMP PARALLEL WORKSHARE
+      wk(:,:,0) = (1._rp+factor0)*wk(:,:,1) - factor0*wk(:,:,2)
+      !$OMP END PARALLEL WORKSHARE
+      !$acc end kernels
+    end if
+    if(is_extra(1,3)) then
+      !$acc kernels default(present) async(1)
+      !$OMP PARALLEL WORKSHARE
+      wk(:,:,n(3)+1) = (1._rp+factor1)*wk(:,:,n(3)) - factor1*wk(:,:,n(3)-1)
+      !$OMP END PARALLEL WORKSHARE
+      !$acc end kernels
+    end if
   end subroutine extrapolate
   !
   subroutine cmpt_alph2(n,is_bound,cbc,alph2)
@@ -558,8 +608,10 @@ module mod_sgs
     real(rp) :: del,fd
     integer :: i,j,k
     !
+    !$acc parallel loop gang default(present) private(del,fd)
     do k=1,n(3)
-      del = (dl(1)*dl(2)*dzf(k))**(1./3.)
+      del = (dl(1)*dl(2)*dzf(k))**(1._rp/3._rp)
+      !$acc loop vector collapse(2)
       do j=1,n(2)
         do i=1,n(1)
           fd = 1._rp-exp(-dw_plus(i,j,k)/25._rp)
@@ -569,7 +621,7 @@ module mod_sgs
     end do
   end subroutine sgs_smag
   !
-  subroutine cmpt_dw_plus(cbc,n,is_bound,l,dl,zc,dzc,visc,u,v,w,dw,dw_plus)
+  subroutine cmpt_dw_plus(cbc,n,is_bound,l,dl,zc,dzc,visc,u,v,w,dw_plus)
     !
     ! inner-scaled distance to the nearest wall. We assume that a wall only
     ! affects its neighboring block, which requires that block to have enough
@@ -595,25 +647,35 @@ module mod_sgs
     real(rp), intent(in ), dimension(0:)       :: zc,dzc
     real(rp), intent(in )                      :: visc
     real(rp), intent(in ), dimension(0:,0:,0:) :: u,v,w
-    real(rp), intent(in ), dimension(0:,0:,0:) :: dw
     real(rp), intent(out), dimension(0:,0:,0:) :: dw_plus
+    real(rp), allocatable, dimension( :, :, :), save :: dw
+    logical, save :: is_first = .true.
     real(rp) :: tauw(2),tauw_tot,this_dw,visci
     integer :: i,j,k
     !
-    real(rp), dimension(0:n(1)+1,0:n(2)+1,0:n(3)+1) :: dw1
-    !
     visci = 1._rp/visc
     !
+    if(is_first) then
+      is_first = .false.
+      allocate(dw(0:n(1)+1,0:n(2)+1,0:n(3)+1))
+      !$acc enter data create(dw) async(1)
+      !$acc kernels default(present) async(1)
+      dw(:,:,:) = big
+      !$acc end kernels
+    end if
+    !
     if(is_bound(0,1).and.cbc(0,1,1)=='D') then
+      !$acc parallel loop gang collapse(2) default(present) private(tauw,tauw_tot,this_dw) async(1)
       do k=1,n(3)
         do j=1,n(2)
           tauw(1) = visc*0.5_rp*(v(1,j,k)-v(0,j,k)+v(1,j-1,k)-v(0,j-1,k))/dl(1)
           tauw(2) = visc*0.5_rp*(w(1,j,k)-w(0,j,k)+w(1,j,k-1)-w(0,j,k-1))/dl(1)
           tauw_tot= sqrt(tauw(1)*tauw(1) + tauw(2)*tauw(2))
+          !$acc loop vector
           do i = 1,n(1)
             this_dw = dl(1)*(i-0.5)
-            if(this_dw == dw(i,j,k)) then
-              dw1(i,j,k) = this_dw
+            if(this_dw < dw(i,j,k)) then
+              dw(i,j,k) = this_dw
               dw_plus(i,j,k) = this_dw*sqrt(tauw_tot)*visci
             end if
           end do
@@ -621,15 +683,17 @@ module mod_sgs
       end do
     end if
     if(is_bound(1,1).and.cbc(1,1,1)=='D') then
+      !$acc parallel loop gang collapse(2) default(present) private(tauw,tauw_tot,this_dw) async(1)
       do k=1,n(3)
         do j=1,n(2)
           tauw(1) = visc*0.5_rp*(v(n(1),j,k)-v(n(1)+1,j,k)+v(n(1),j-1,k)-v(n(1)+1,j-1,k))/dl(1)
           tauw(2) = visc*0.5_rp*(w(n(1),j,k)-w(n(1)+1,j,k)+w(n(1),j,k-1)-w(n(1)+1,j,k-1))/dl(1)
           tauw_tot= sqrt(tauw(1)*tauw(1) + tauw(2)*tauw(2))
+          !$acc loop vector
           do i = 1,n(1)
             this_dw = dl(1)*(n(1)-i+0.5)
-            if(this_dw == dw(i,j,k)) then
-              dw1(i,j,k) = this_dw
+            if(this_dw < dw(i,j,k)) then
+              dw(i,j,k) = this_dw
               dw_plus(i,j,k) = this_dw*sqrt(tauw_tot)*visci
             end if
           end do
@@ -638,15 +702,17 @@ module mod_sgs
     end if
     !
     if(is_bound(0,2).and.cbc(0,2,2)=='D') then
+      !$acc parallel loop gang collapse(2) default(present) private(tauw,tauw_tot,this_dw) async(1)
       do k=1,n(3)
         do i=1,n(1)
           tauw(1) = visc*0.5_rp*(u(i,1,k)-u(i,0,k)+u(i-1,1,k)-u(i-1,0,k))/dl(2)
           tauw(2) = visc*0.5_rp*(w(i,1,k)-w(i,0,k)+w(i,1,k-1)-w(i,0,k-1))/dl(2)
           tauw_tot= sqrt(tauw(1)*tauw(1) + tauw(2)*tauw(2))
+          !$acc loop vector
           do j = 1,n(2)
             this_dw = dl(2)*(j-0.5)
-            if(this_dw == dw(i,j,k)) then
-              dw1(i,j,k) = this_dw
+            if(this_dw < dw(i,j,k)) then
+              dw(i,j,k) = this_dw
               dw_plus(i,j,k) = this_dw*sqrt(tauw_tot)*visci
             end if
           end do
@@ -655,15 +721,17 @@ module mod_sgs
     end if
     !
     if(is_bound(1,2).and.cbc(1,2,2)=='D') then
+      !$acc parallel loop gang collapse(2) default(present) private(tauw,tauw_tot,this_dw) async(1)
       do k=1,n(3)
         do i=1,n(1)
           tauw(1) = visc*0.5_rp*(u(i,n(2),k)-u(i,n(2)+1,k)+u(i-1,n(2),k)-u(i-1,n(2)+1,k))/dl(2)
           tauw(2) = visc*0.5_rp*(w(i,n(2),k)-w(i,n(2)+1,k)+w(i,n(2),k-1)-w(i,n(2)+1,k-1))/dl(2)
           tauw_tot= sqrt(tauw(1)*tauw(1) + tauw(2)*tauw(2))
+          !$acc loop vector
           do j = 1,n(2)
             this_dw = dl(2)*(n(2)-j+0.5)
-            if(this_dw == dw(i,j,k)) then
-              dw1(i,j,k) = this_dw
+            if(this_dw < dw(i,j,k)) then
+              dw(i,j,k) = this_dw
               dw_plus(i,j,k) = this_dw*sqrt(tauw_tot)*visci
             end if
           end do
@@ -672,15 +740,17 @@ module mod_sgs
     end if
     !
     if(is_bound(0,3).and.cbc(0,3,3)=='D') then
+      !$acc parallel loop gang collapse(2) default(present) private(tauw,tauw_tot,this_dw) async(1)
       do j=1,n(2)
         do i=1,n(1)
           tauw(1) = visc*0.5_rp*(u(i,j,1)-u(i,j,0)+u(i-1,j,1)-u(i-1,j,0))/dzc(0)
           tauw(2) = visc*0.5_rp*(v(i,j,1)-v(i,j,0)+v(i,j-1,1)-v(i,j-1,0))/dzc(0)
           tauw_tot= sqrt(tauw(1)*tauw(1) + tauw(2)*tauw(2))
+          !$acc loop vector
           do k = 1,n(3)
             this_dw = zc(k)
-            if(this_dw == dw(i,j,k)) then
-              dw1(i,j,k) = this_dw
+            if(this_dw < dw(i,j,k)) then
+              dw(i,j,k) = this_dw
               dw_plus(i,j,k) = this_dw*sqrt(tauw_tot)*visci
             end if
           end do
@@ -689,26 +759,22 @@ module mod_sgs
     end if
     !
     if(is_bound(1,3).and.cbc(1,3,3)=='D') then
+      !$acc parallel loop gang collapse(2) default(present) private(tauw,tauw_tot,this_dw) async(1)
       do j=1,n(2)
         do i=1,n(1)
           tauw(1) = visc*0.5_rp*(u(i,j,n(3))-u(i,j,n(3)+1)+u(i-1,j,n(3))-u(i-1,j,n(3)+1))/dzc(n(3))
           tauw(2) = visc*0.5_rp*(v(i,j,n(3))-v(i,j,n(3)+1)+v(i,j-1,n(3))-v(i,j-1,n(3)+1))/dzc(n(3))
           tauw_tot= sqrt(tauw(1)*tauw(1) + tauw(2)*tauw(2))
+          !$acc loop vector
           do k = 1,n(3)
             this_dw = l(3)-zc(k)
-            if(this_dw == dw(i,j,k)) then
-              dw1(i,j,k) = this_dw
+            if(this_dw < dw(i,j,k)) then
+              dw(i,j,k) = this_dw
               dw_plus(i,j,k) = this_dw*sqrt(tauw_tot)*visci
             end if
           end do
         end do
       end do
-    end if
-    ! check if dw and dw1 are the same. Remove this in the future
-    if (.not.all(dw(1:n(1),1:n(2),1:n(3)) == dw1(1:n(1),1:n(2),1:n(3)))) then
-      print*, "dw and dw1 are different"
-      call MPI_FINALIZE(ierr)
-      error stop
     end if
   end subroutine cmpt_dw_plus
 end module mod_sgs
