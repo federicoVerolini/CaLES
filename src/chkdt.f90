@@ -69,8 +69,8 @@ module mod_chkdt
     end do
     !$acc end data
     !
-    !$acc data copy(dtid) async(2)
-    !$acc parallel loop collapse(3) default(present) private(viscx,viscy,viscz,dtidx,dtidy,dtidz) reduction(max:dtid) async(2)
+    !$acc data copy(dtid) async(1)
+    !$acc parallel loop collapse(3) default(present) private(viscx,viscy,viscz,dtidx,dtidy,dtidz) reduction(max:dtid) async(1)
     !$OMP PARALLEL DO   COLLAPSE(3) DEFAULT(shared)  PRIVATE(viscx,viscy,viscz,dtidx,dtidy,dtidz) REDUCTION(max:dtid)
     do k=1,n(3)
       do j=1,n(2)
@@ -99,7 +99,7 @@ module mod_chkdt
       end do
     end do
     !$acc end data
-    !$acc wait
+    !$acc wait(1)
     if(dti  == 0._rp) dti  = 1._rp
     if(dtid == 0._rp) dtid = eps
     dtmax = min(0.4125_rp/dtid,1.732_rp/dti) ! viscous CFL could be 1.5

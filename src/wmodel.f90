@@ -62,8 +62,8 @@ module mod_wmodel
     end if
   end subroutine updt_wallmodelbc
   !
-  subroutine cmpt_wallmodelbc(ibound,idir,nh,mtype,l,dl,zc,zf,dzc,dzf,visc,h,index,var1,var2, &
-                              bcvar1,bcvar2,bcvar1_mag,bcvar2_mag)
+  subroutine cmpt_wallmodelbc(ibound,idir,nh,mtype,l,dl,zc,zf,dzc,dzf,visc,h,index,vel1,vel2, &
+                              bcvel1,bcvel2,bcvel1_mag,bcvel2_mag)
     !
     ! compute wall model bc of a wall
     !
@@ -106,18 +106,18 @@ module mod_wmodel
     real(rp), intent(in), dimension(0:) :: zc,zf,dzc,dzf
     real(rp), intent(in) :: visc,h
     integer , intent(in) :: index
-    real(rp), intent(in), dimension(0:,0:,0:), target :: var1,var2
-    real(rp), intent(inout), dimension(1-nh:,1-nh:,0:), target :: bcvar1,bcvar2
-    real(rp), intent(in), dimension(1-nh:,1-nh:,0:), target :: bcvar1_mag,bcvar2_mag
+    real(rp), intent(in), dimension(0:,0:,0:), target :: vel1,vel2
+    real(rp), intent(inout), dimension(1-nh:,1-nh:,0:), target :: bcvel1,bcvel2
+    real(rp), intent(in), dimension(1-nh:,1-nh:,0:), target :: bcvel1_mag,bcvel2_mag
     real(rp), pointer, dimension(:,:,:) :: u,v,w
     real(rp), pointer, dimension(:,:,:) :: bcu,bcv,bcw
     real(rp), pointer, dimension(:,:,:) :: bcu_mag,bcv_mag,bcw_mag
     real(rp) :: sgn,wei,coef,uh,vh,wh,u1,u2,v1,v2,w1,w2,u_mag,v_mag,w_mag,tauw(2),visci
     integer  :: n(3),i,j,k,i1,i2,j1,j2,k1,k2
     !
-    n(1) = size(var1,1) - 2*nh
-    n(2) = size(var1,2) - 2*nh
-    n(3) = size(var1,3) - 2*nh
+    n(1) = size(vel1,1) - 2*nh
+    n(2) = size(vel1,2) - 2*nh
+    n(3) = size(vel1,3) - 2*nh
     visci = 1._rp/visc
     !
     select case(idir)
@@ -133,12 +133,12 @@ module mod_wmodel
         coef = (h-(n(1)-i1+0.5_rp)*dl(1))/dl(1)
         sgn = -1._rp
       end if
-      v       => var1
-      w       => var2
-      bcv     => bcvar1
-      bcw     => bcvar2
-      bcv_mag => bcvar1_mag
-      bcw_mag => bcvar2_mag
+      v       => vel1
+      w       => vel2
+      bcv     => bcvel1
+      bcw     => bcvel2
+      bcv_mag => bcvel1_mag
+      bcw_mag => bcvel2_mag
       do k = 1,n(3)
         do j = 0,n(2)
           v1    = v(i1,j,k)
@@ -148,8 +148,8 @@ module mod_wmodel
           v_mag = bcv_mag(j,k,ibound)
           w_mag = 0.25_rp*(bcw_mag(j,k  ,ibound) + bcw_mag(j+1,k  ,ibound) + &
                            bcw_mag(j,k-1,ibound) + bcw_mag(j+1,k-1,ibound))
-          vh    = velr(v1,v2,coef,v_mag)
-          wh    = velr(w1,w2,coef,w_mag)
+          vh    = vel_relative(v1,v2,coef,v_mag)
+          wh    = vel_relative(w1,w2,coef,w_mag)
           call wallmodel(mtype,vh,wh,h,l(1),visc,tauw)
           bcv(j,k,ibound) = sgn*visci*tauw(1)
         end do
@@ -164,8 +164,8 @@ module mod_wmodel
           v_mag = 0.5_rp*((1._rp-wei)*(bcv_mag(j-1,k  ,ibound) + bcv_mag(j,k  ,ibound)) + &
                                  wei *(bcv_mag(j-1,k+1,ibound) + bcv_mag(j,k+1,ibound)))
           w_mag = bcw_mag(j,k,ibound)
-          vh    = velr(v1,v2,coef,v_mag)
-          wh    = velr(w1,w2,coef,w_mag)
+          vh    = vel_relative(v1,v2,coef,v_mag)
+          wh    = vel_relative(w1,w2,coef,w_mag)
           call wallmodel(mtype,vh,wh,h,l(1),visc,tauw)
           bcw(j,k,ibound) = sgn*visci*tauw(2)
         end do
@@ -182,12 +182,12 @@ module mod_wmodel
         coef = (h-(n(2)-j1+0.5)*dl(2))/dl(2)
         sgn = -1._rp
       end if
-      u       => var1
-      w       => var2
-      bcu     => bcvar1
-      bcw     => bcvar2
-      bcu_mag => bcvar1_mag
-      bcw_mag => bcvar2_mag
+      u       => vel1
+      w       => vel2
+      bcu     => bcvel1
+      bcw     => bcvel2
+      bcu_mag => bcvel1_mag
+      bcw_mag => bcvel2_mag
       do k = 1,n(3)
         do i = 0,n(1)
           u1    = u(i,j1,k)
@@ -197,8 +197,8 @@ module mod_wmodel
           u_mag = bcu_mag(i,k,ibound)
           w_mag = 0.25_rp*(bcw_mag(i,k  ,ibound) + bcw_mag(i+1,k  ,ibound) + &
                            bcw_mag(i,k-1,ibound) + bcw_mag(i+1,k-1,ibound))
-          uh    = velr(u1,u2,coef,u_mag)
-          wh    = velr(w1,w2,coef,w_mag)
+          uh    = vel_relative(u1,u2,coef,u_mag)
+          wh    = vel_relative(w1,w2,coef,w_mag)
           call wallmodel(mtype,uh,wh,h,l(2),visc,tauw)
           bcu(i,k,ibound) = sgn*visci*tauw(1)
         end do
@@ -213,8 +213,8 @@ module mod_wmodel
           u_mag = 0.5_rp*((1._rp-wei)*(bcu_mag(i-1,k  ,ibound) + bcu_mag(i,k  ,ibound)) + &
                                  wei *(bcu_mag(i-1,k+1,ibound) + bcu_mag(i,k+1,ibound)))
           w_mag = bcw_mag(i,k,ibound)
-          uh    = velr(u1,u2,coef,u_mag)
-          wh    = velr(w1,w2,coef,w_mag)
+          uh    = vel_relative(u1,u2,coef,u_mag)
+          wh    = vel_relative(w1,w2,coef,w_mag)
           call wallmodel(mtype,uh,wh,h,l(2),visc,tauw)
           bcw(i,k,ibound) = sgn*visci*tauw(2)
         end do
@@ -231,12 +231,12 @@ module mod_wmodel
         coef = (h-(l(3)-zc(k1)))/(dzc(k2))
         sgn = -1._rp
       end if
-      u       => var1
-      v       => var2
-      bcu     => bcvar1
-      bcv     => bcvar2
-      bcu_mag => bcvar1_mag
-      bcv_mag => bcvar2_mag
+      u       => vel1
+      v       => vel2
+      bcu     => bcvel1
+      bcv     => bcvel2
+      bcu_mag => bcvel1_mag
+      bcv_mag => bcvel2_mag
       do j = 1,n(2)
         do i = 0,n(1)
           u1    = u(i,j,k1)
@@ -246,8 +246,8 @@ module mod_wmodel
           u_mag = bcu_mag(i,j,ibound)
           v_mag = 0.25_rp*(bcv_mag(i,j  ,ibound) + bcv_mag(i+1,j  ,ibound) + &
                            bcv_mag(i,j-1,ibound) + bcv_mag(i+1,j-1,ibound))
-          uh    = velr(u1,u2,coef,u_mag)
-          vh    = velr(v1,v2,coef,v_mag)
+          uh    = vel_relative(u1,u2,coef,u_mag)
+          vh    = vel_relative(v1,v2,coef,v_mag)
           call wallmodel(mtype,uh,vh,h,l(3),visc,tauw)
           bcu(i,j,ibound) = sgn*visci*tauw(1)
         end do
@@ -261,8 +261,8 @@ module mod_wmodel
           u_mag = 0.25_rp*(bcu_mag(i-1,j  ,ibound) + bcu_mag(i,j  ,ibound) + &
                            bcu_mag(i-1,j+1,ibound) + bcu_mag(i,j+1,ibound))
           v_mag = bcv_mag(i,j,ibound)
-          uh    = velr(u1,u2,coef,u_mag)
-          vh    = velr(v1,v2,coef,v_mag)
+          uh    = vel_relative(u1,u2,coef,u_mag)
+          vh    = vel_relative(v1,v2,coef,v_mag)
           call wallmodel(mtype,uh,vh,h,l(3),visc,tauw)
           bcv(i,j,ibound) = sgn*visci*tauw(2)
         end do
@@ -270,16 +270,16 @@ module mod_wmodel
     end select
   end subroutine cmpt_wallmodelbc
   !
-  function velr(v1,v2,coef,bcv_mag)
+  function vel_relative(v1,v2,coef,bcv_mag)
     !
     ! compute relative velocity to a wall
     !
     implicit none
     real(rp), intent(in) :: v1,v2,coef,bcv_mag
-    real(rp) :: velr
-    velr = (1._rp-coef)*v1 + coef*v2
-    velr = velr - bcv_mag
-  end function velr
+    real(rp) :: vel_relative
+    vel_relative = (1._rp-coef)*v1 + coef*v2
+    vel_relative = vel_relative - bcv_mag
+  end function vel_relative
   !
   subroutine wallmodel(mtype,uh,vh,h,l1d,visc,tauw)
     !

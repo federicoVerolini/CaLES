@@ -57,73 +57,51 @@ module mod_post
     !$acc wait
   end subroutine vorticity
   !
-  subroutine strain_rate(n,dli,dzci,dzfi,ux,uy,uz,s0,sij)
-    !
-    ! computes the strain rate field
-    !
-    ! Sij is first computed at (or averaged to) cell center, then s0=sqrt(2SijSij)
-    ! at cell center (Bae and Orlandi's codes). The implementation is efficient, since
-    ! it avoids repetitive computation of derivatives. Costa first averages SijSij to
-    ! cell center, then computes s0, which leads to larger s0, especially when Sij
-    ! at the cell edges have opposite signs. The second and third loops cannot combine.
-    ! please modify this back to Costa's version for memory saving
-    !
+  subroutine strain_rate(n,dli,dzci,dzfi,ux,uy,uz,str)
     implicit none
     integer , intent(in ), dimension(3)        :: n
     real(rp), intent(in ), dimension(3)        :: dli
     real(rp), intent(in ), dimension(0:)       :: dzci,dzfi
     real(rp), intent(in ), dimension(0:,0:,0:) :: ux,uy,uz
-    real(rp), intent(out), dimension(0:,0:,0:) :: s0
-    real(rp), intent(out), dimension(0:,0:,0:,1:) :: sij
+    real(rp), intent(out), dimension(1:,1:,1:) :: str
+    real(rp) :: s11,s22,s33,s12,s13,s23
     real(rp) :: dxi,dyi
     integer :: i,j,k
-    !
     dxi = dli(1)
     dyi = dli(2)
     !
-    !$acc parallel loop collapse(3) default(present)
-    !$OMP PARALLEL DO   COLLAPSE(3) DEFAULT(shared)
-    do k = 0,n(3)
-      do j = 0,n(2)
-        do i = 0,n(1)
-          ! compute at cell edge
-          sij(i,j,k,1) = 0.5_rp*((ux(i,j+1,k)-ux(i,j,k))*dyi     + (uy(i+1,j,k)-uy(i,j,k))*dxi)
-          sij(i,j,k,2) = 0.5_rp*((ux(i,j,k+1)-ux(i,j,k))*dzci(k) + (uz(i+1,j,k)-uz(i,j,k))*dxi)
-          sij(i,j,k,3) = 0.5_rp*((uy(i,j,k+1)-uy(i,j,k))*dzci(k) + (uz(i,j+1,k)-uz(i,j,k))*dyi)
+    ! compute sijsij, where sij = (1/2)(du_i/dx_j + du_j/dx_i)
+    !
+    !$acc parallel loop collapse(3) default(present) private(s11,s12,s13,s22,s23,s33)
+    !$OMP PARALLEL DO   COLLAPSE(3) DEFAULT(shared)  PRIVATE(s11,s12,s13,s22,s23,s33)
+    do k=1,n(3)
+      do j=1,n(2)
+        do i=1,n(1)
+          s11 = ((ux(i,j,k)-ux(i-1,j,k))*dxi    )**2
+          s22 = ((uy(i,j,k)-uy(i,j-1,k))*dyi    )**2
+          s33 = ((uz(i,j,k)-uz(i,j,k-1))*dzfi(k))**2
+          s12 = .25_rp*( &
+                        ((ux(i  ,j+1,k)-ux(i  ,j  ,k))*dyi + (uy(i+1,j  ,k)-uy(i  ,j  ,k))*dxi)**2 + &
+                        ((ux(i  ,j  ,k)-ux(i  ,j-1,k))*dyi + (uy(i+1,j-1,k)-uy(i  ,j-1,k))*dxi)**2 + &
+                        ((ux(i-1,j+1,k)-ux(i-1,j  ,k))*dyi + (uy(i  ,j  ,k)-uy(i-1,j  ,k))*dxi)**2 + &
+                        ((ux(i-1,j  ,k)-ux(i-1,j-1,k))*dyi + (uy(i  ,j-1,k)-uy(i-1,j-1,k))*dxi)**2 &
+                       )*.25_rp
+          s13 = .25_rp*( &
+                         ((ux(i  ,j,k+1)-ux(i  ,j,k  ))*dzci(k  ) + (uz(i+1,j,k  )-uz(i  ,j,k  ))*dxi)**2 + &
+                         ((ux(i  ,j,k  )-ux(i  ,j,k-1))*dzci(k-1) + (uz(i+1,j,k-1)-uz(i  ,j,k-1))*dxi)**2 + &
+                         ((ux(i-1,j,k+1)-ux(i-1,j,k  ))*dzci(k  ) + (uz(i  ,j,k  )-uz(i-1,j,k  ))*dxi)**2 + &
+                         ((ux(i-1,j,k  )-ux(i-1,j,k-1))*dzci(k-1) + (uz(i  ,j,k-1)-uz(i-1,j,k-1))*dxi)**2 &
+                       )*.25_rp
+          s23 = .25_rp*( &
+                        ((uy(i,j  ,k+1)-uy(i,j  ,k  ))*dzci(k  ) + (uz(i,j+1,k  )-uz(i,j  ,k  ))*dyi)**2 + &
+                        ((uy(i,j  ,k  )-uy(i,j  ,k-1))*dzci(k-1) + (uz(i,j+1,k-1)-uz(i,j  ,k-1))*dyi)**2 + &
+                        ((uy(i,j-1,k+1)-uy(i,j-1,k  ))*dzci(k  ) + (uz(i,j  ,k  )-uz(i,j-1,k  ))*dyi)**2 + &
+                        ((uy(i,j-1,k  )-uy(i,j-1,k-1))*dzci(k-1) + (uz(i,j  ,k-1)-uz(i,j-1,k-1))*dyi)**2 &
+                       )*.25_rp
+          str(i,j,k) = s11+s22+s33 + 2*(s12+s13+s23)
         end do
       end do
     end do
-    !$acc parallel loop collapse(3) default(present)
-    !$OMP PARALLEL DO   COLLAPSE(3) DEFAULT(shared)
-    do k = 1,n(3)
-      do j = 1,n(2)
-        do i = 1,n(1)
-          ! average to cell center
-          sij(i,j,k,4) = 0.25_rp*(sij(i,j,k,1)+sij(i-1,j,k,1)+sij(i,j-1,k,1)+sij(i-1,j-1,k,1))
-          sij(i,j,k,5) = 0.25_rp*(sij(i,j,k,2)+sij(i-1,j,k,2)+sij(i,j,k-1,2)+sij(i-1,j,k-1,2))
-          sij(i,j,k,6) = 0.25_rp*(sij(i,j,k,3)+sij(i,j-1,k,3)+sij(i,j,k-1,3)+sij(i,j-1,k-1,3))
-        end do
-      end do
-    end do
-    !$acc parallel loop collapse(3) default(present)
-    !$OMP PARALLEL DO   COLLAPSE(3) DEFAULT(shared)
-    do k = 1,n(3)
-      do j = 1,n(2)
-        do i = 1,n(1)
-          ! compute at cell center
-          sij(i,j,k,1) = (ux(i,j,k)-ux(i-1,j,k))*dxi
-          sij(i,j,k,2) = (uy(i,j,k)-uy(i,j-1,k))*dyi
-          sij(i,j,k,3) = (uz(i,j,k)-uz(i,j,k-1))*dzfi(k)
-        end do
-      end do
-    end do
-    !$acc kernels default(present)
-    !$OMP PARALLEL WORKSHARE
-    s0 = sij(:,:,:,1)**2 + sij(:,:,:,2)**2 + sij(:,:,:,3)**2 + &
-        (sij(:,:,:,4)**2 + sij(:,:,:,5)**2 + sij(:,:,:,6)**2)*2._rp
-    s0 = sqrt(2._rp*s0)
-    !$OMP END PARALLEL WORKSHARE
-    !$acc end kernels
   end subroutine strain_rate
   !
   subroutine vorticity_one_component(idir,n,dli,dzci,ux,uy,uz,vo)

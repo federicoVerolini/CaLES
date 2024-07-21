@@ -779,9 +779,7 @@ module mod_bound
   subroutine initbc(sgstype,cbcvel,bcvel,bcpre,bcsgs,bcu,bcv,bcw,bcp,bcs,bcu_mag,bcv_mag,bcw_mag, &
                     bcuf,bcvf,bcwf,n,is_bound,lwm,l,zc,dl,dzc,h,ind)
     !
-    ! initialize bcu,bcv,bcw,bcp,bcs, and
-    ! bcu_mag,bcv_mag,bcw_mag, and
-    ! bcuf,bcvf,bcwf
+    ! initialize bcu,bcv,bcw,bcp,bcs,bcu_mag,bcv_mag,bcw_mag,bcuf,bcvf,bcwf
     !
     implicit none
     character(len=*), intent(in) :: sgstype
