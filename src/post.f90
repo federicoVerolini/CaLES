@@ -24,7 +24,6 @@ module mod_post
     integer :: i,j,k
     dxi = dli(1)
     dyi = dli(2)
-    !$acc wait
     !$acc parallel loop collapse(3) default(present)
     !$OMP PARALLEL DO   COLLAPSE(3) DEFAULT(shared)
     do k=1,n(3)
@@ -54,7 +53,6 @@ module mod_post
         end do
       end do
     end do
-    !$acc wait
   end subroutine vorticity
   !
   subroutine strain_rate(n,dli,dzci,dzfi,ux,uy,uz,str)
@@ -119,7 +117,6 @@ module mod_post
     integer :: i,j,k
     dxi = dli(1)
     dyi = dli(2)
-    !$acc wait
     select case(idir)
     case(1)
       !$acc parallel loop collapse(3) default(present)
@@ -155,7 +152,6 @@ module mod_post
         end do
       end do
     end select
-    !$acc wait
   end subroutine vorticity_one_component
   !
   subroutine rotation_rate(n,dli,dzci,ux,uy,uz,ens)

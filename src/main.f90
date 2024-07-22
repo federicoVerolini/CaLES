@@ -384,7 +384,8 @@ program cans
   ! post-process and write initial condition
   !
   write(fldnum,'(i7.7)') istep
-  !$acc update self(u,v,w,p)
+  !$acc update self(u,v,w,p) async(1)
+  !$acc wait(1)
   include 'out1d.h90'
   include 'out2d.h90'
   include 'out3d.h90'
@@ -596,15 +597,18 @@ program cans
     end if
     write(fldnum,'(i7.7)') istep
     if(mod(istep,iout1d) == 0) then
-      !$acc update self(u,v,w,p)
+      !$acc update self(u,v,w,p) async(1)
+      !$acc wait(1)
       include 'out1d.h90'
     end if
     if(mod(istep,iout2d) == 0) then
-      !$acc update self(u,v,w,p)
+      !$acc update self(u,v,w,p) async(1)
+      !$acc wait(1)
       include 'out2d.h90'
     end if
     if(mod(istep,iout3d) == 0) then
-      !$acc update self(u,v,w,p)
+      !$acc update self(u,v,w,p) async(1)
+      !$acc wait(1)
       include 'out3d.h90'
     end if
     if(mod(istep,isave ) == 0.or.(is_done.and..not.kill)) then
@@ -623,7 +627,8 @@ program cans
           call out0d(trim(datadir)//'log_checkpoints.out',3,var)
         end if
       end if
-      !$acc update self(u,v,w,p)
+      !$acc update self(u,v,w,p) async(1)
+      !$acc wait(1)
       call load_all('w',trim(datadir)//trim(filename),MPI_COMM_WORLD,ng,[1,1,1],lo,hi,u,v,w,p,time,istep)
       if(.not.is_overwrite_save) then
         call gen_alias(myid,trim(datadir),trim(filename),'fld.bin')

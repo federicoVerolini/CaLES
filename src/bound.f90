@@ -543,7 +543,6 @@ module mod_bound
     integer :: ibound
     !
     !$acc enter data copyin(dlc,dlf) async(1)
-    !
     select case(c_or_f)
     case('c')
       do ibound = 0,1
@@ -597,7 +596,7 @@ module mod_bound
       end do
     end select
     !$acc exit data delete(dlc,dlf) async(1)
-    !$acc wait(1)
+    !$acc wait(1)    !!!!should be be removed?
   end subroutine bc_rhs
   !
   subroutine updt_rhs_b(c_or_f,cbc,n,is_bound,rhsbx,rhsby,rhsbz,p)
