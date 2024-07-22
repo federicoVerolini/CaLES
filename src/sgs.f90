@@ -56,9 +56,7 @@ module mod_sgs
     select case(trim(sgstype))
     case('none')
       !$acc kernels default(present) async(1)
-      !$OMP PARALLEL WORKSHARE
       visct(:,:,:) = 0._rp
-      !$OMP END PARALLEL WORKSHARE
       !$acc end kernels
     case('smag')
       if(is_first) then
@@ -110,9 +108,7 @@ module mod_sgs
       call strain_rate(n,dli,dzci,dzfi,wk1,wk2,wk3,s0,sij)
       !
       !$acc kernels default(present) async(1)
-      !$OMP PARALLEL WORKSHARE
       visct = s0
-      !$OMP END PARALLEL WORKSHARE
       !$acc end kernels
       !
       ! Lij
@@ -125,11 +121,9 @@ module mod_sgs
       call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,wc)
 #if !defined(_FILTER_2D)
       !$acc kernels default(present) async(1)
-      !$OMP PARALLEL WORKSHARE
       lij(:,:,:,1) = uc*uc
       lij(:,:,:,2) = vc*vc
       lij(:,:,:,3) = wc*wc
-      !$OMP END PARALLEL WORKSHARE
       !$acc end kernels
       call extrapolate(n,is_bound,dzci,lij(:,:,:,1),wk1,iface=0,cbc=cbcvel)
       call extrapolate(n,is_bound,dzci,lij(:,:,:,2),wk2,iface=0,cbc=cbcvel)
@@ -138,11 +132,9 @@ module mod_sgs
       call filter3d(n,wk2,lij(:,:,:,2))
       call filter3d(n,wk3,lij(:,:,:,3))
       !$acc kernels default(present) async(1)
-      !$OMP PARALLEL WORKSHARE
       lij(:,:,:,4) = uc*vc
       lij(:,:,:,5) = uc*wc
       lij(:,:,:,6) = vc*wc
-      !$OMP END PARALLEL WORKSHARE
       !$acc end kernels
       call extrapolate(n,is_bound,dzci,lij(:,:,:,4),wk1,iface=0,cbc=cbcvel)
       call extrapolate(n,is_bound,dzci,lij(:,:,:,5),wk2,iface=0,cbc=cbcvel)
@@ -158,21 +150,17 @@ module mod_sgs
       call filter3d(n,wk3,wf)
 #else
       !$acc kernels default(present) async(1)
-      !$OMP PARALLEL WORKSHARE
       wk1 = uc*uc
       wk2 = vc*vc
       wk3 = wc*wc
-      !$OMP END PARALLEL WORKSHARE
       !$acc end kernels
       call filter2d(n,wk1,lij(:,:,:,1))
       call filter2d(n,wk2,lij(:,:,:,2))
       call filter2d(n,wk3,lij(:,:,:,3))
       !$acc kernels default(present) async(1)
-      !$OMP PARALLEL WORKSHARE
       wk1 = uc*vc
       wk2 = uc*wc
       wk3 = vc*wc
-      !$OMP END PARALLEL WORKSHARE
       !$acc end kernels
       call filter2d(n,wk1,lij(:,:,:,4))
       call filter2d(n,wk2,lij(:,:,:,5))
@@ -182,14 +170,12 @@ module mod_sgs
       call filter2d(n,wc,wf)
 #endif
       !$acc kernels default(present) async(1)
-      !$OMP PARALLEL WORKSHARE
       lij(:,:,:,1) = lij(:,:,:,1) - uf*uf
       lij(:,:,:,2) = lij(:,:,:,2) - vf*vf
       lij(:,:,:,3) = lij(:,:,:,3) - wf*wf
       lij(:,:,:,4) = lij(:,:,:,4) - uf*vf
       lij(:,:,:,5) = lij(:,:,:,5) - uf*wf
       lij(:,:,:,6) = lij(:,:,:,6) - vf*wf
-      !$OMP END PARALLEL WORKSHARE
       !$acc end kernels
       !
       ! Mij
@@ -205,11 +191,9 @@ module mod_sgs
       call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,sij(:,:,:,6))
 #if !defined(_FILTER_2D)
       !$acc kernels default(present) async(1)
-      !$OMP PARALLEL WORKSHARE
       mij(:,:,:,1) = s0*sij(:,:,:,1)
       mij(:,:,:,2) = s0*sij(:,:,:,2)
       mij(:,:,:,3) = s0*sij(:,:,:,3)
-      !$OMP END PARALLEL WORKSHARE
       !$acc end kernels
       call extrapolate(n,is_bound,dzci,mij(:,:,:,1),wk1,iface=0,cbc=cbcvel)
       call extrapolate(n,is_bound,dzci,mij(:,:,:,2),wk2,iface=0,cbc=cbcvel)
@@ -218,11 +202,9 @@ module mod_sgs
       call filter3d(n,wk2,mij(:,:,:,2))
       call filter3d(n,wk3,mij(:,:,:,3))
       !$acc kernels default(present) async(1)
-      !$OMP PARALLEL WORKSHARE
       mij(:,:,:,4) = s0*sij(:,:,:,4)
       mij(:,:,:,5) = s0*sij(:,:,:,5)
       mij(:,:,:,6) = s0*sij(:,:,:,6)
-      !$OMP END PARALLEL WORKSHARE
       !$acc end kernels
       call extrapolate(n,is_bound,dzci,mij(:,:,:,4),wk1,iface=0,cbc=cbcvel)
       call extrapolate(n,is_bound,dzci,mij(:,:,:,5),wk2,iface=0,cbc=cbcvel)
@@ -238,21 +220,17 @@ module mod_sgs
       call filter3d(n,wk3,wf)
 #else
       !$acc kernels default(present) async(1)
-      !$OMP PARALLEL WORKSHARE
       wk1 = s0*sij(:,:,:,1)
       wk2 = s0*sij(:,:,:,2)
       wk3 = s0*sij(:,:,:,3)
-      !$OMP END PARALLEL WORKSHARE
       !$acc end kernels
       call filter2d(n,wk1,mij(:,:,:,1))
       call filter2d(n,wk2,mij(:,:,:,2))
       call filter2d(n,wk3,mij(:,:,:,3))
       !$acc kernels default(present) async(1)
-      !$OMP PARALLEL WORKSHARE
       wk1 = s0*sij(:,:,:,4)
       wk2 = s0*sij(:,:,:,5)
       wk3 = s0*sij(:,:,:,6)
-      !$OMP END PARALLEL WORKSHARE
       !$acc end kernels
       call filter2d(n,wk1,mij(:,:,:,4))
       call filter2d(n,wk2,mij(:,:,:,5))
@@ -276,24 +254,20 @@ module mod_sgs
       call extrapolate(n,is_bound,dzci,wf,wk3,iface=3,lwm=lwm)
       call strain_rate(n,dli,dzci,dzfi,wk1,wk2,wk3,s0,sij)
       !$acc kernels default(present) async(1)
-      !$OMP PARALLEL WORKSHARE
       do m = 1,6
         mij(:,:,:,m) = 2._rp*(mij(:,:,:,m)-alph2*s0*sij(:,:,:,m))
       end do
-      !$OMP END PARALLEL WORKSHARE
       !$acc end kernels
       !
       ! cs = c_smag^2*del**2
       !
       !$acc kernels default(present) async(1)
-      !$OMP PARALLEL WORKSHARE
       s0(:,:,:) = mij(:,:,:,1)*lij(:,:,:,1) + &
                   mij(:,:,:,2)*lij(:,:,:,2) + &
                   mij(:,:,:,3)*lij(:,:,:,3) + &
                  (mij(:,:,:,4)*lij(:,:,:,4) + &
                   mij(:,:,:,5)*lij(:,:,:,5) + &
                   mij(:,:,:,6)*lij(:,:,:,6))*2._rp
-      !$OMP END PARALLEL WORKSHARE
       !$acc end kernels
 #if defined(_CHANNEL)
       call ave1d_channel(ng,lo,hi,3,l,dl,dzf,s0)
@@ -303,20 +277,16 @@ module mod_sgs
       !
 #endif
       !$acc kernels default(present) async(1)
-      !$OMP PARALLEL WORKSHARE
       visct = visct*s0
-      !$OMP END PARALLEL WORKSHARE
       !$acc end kernels
       !
       !$acc kernels default(present) async(1)
-      !$OMP PARALLEL WORKSHARE
       s0(:,:,:) = mij(:,:,:,1)*mij(:,:,:,1) + &
                   mij(:,:,:,2)*mij(:,:,:,2) + &
                   mij(:,:,:,3)*mij(:,:,:,3) + &
                  (mij(:,:,:,4)*mij(:,:,:,4) + &
                   mij(:,:,:,5)*mij(:,:,:,5) + &
                   mij(:,:,:,6)*mij(:,:,:,6))*2._rp
-      !$OMP END PARALLEL WORKSHARE
       !$acc end kernels
 #if defined(_CHANNEL)
       call ave1d_channel(ng,lo,hi,3,l,dl,dzf,s0)
@@ -326,9 +296,7 @@ module mod_sgs
       !
 #endif
       !$acc kernels default(present) async(1)
-      !$OMP PARALLEL WORKSHARE
       visct = max(visct/s0,0._rp)
-      !$OMP END PARALLEL WORKSHARE
       !$acc end kernels
     case('amd')
       print*, 'ERROR: AMD model not yet implemented'
@@ -574,9 +542,7 @@ module mod_sgs
       is_extra(:,3) = (is_bound(:,3).and.lwm(:,3)/=0.and.iface/=3)
     end if
     !$acc kernels default(present) async(1)
-    !$OMP PARALLEL WORKSHARE
     wk(:,:,:) = p(:,:,:)
-    !$OMP END PARALLEL WORKSHARE
     !$acc end kernels
     if(is_extra(0,1)) then
       !$acc parallel loop collapse(2) default(present) async(1)
@@ -644,57 +610,41 @@ module mod_sgs
     !
 #if !defined(_FILTER_2D)
     !$acc kernels default(present) async(1)
-    !$OMP PARALLEL WORKSHARE
     alph2 = 4.00_rp
-    !$OMP END PARALLEL WORKSHARE
     !$acc end kernels
     if(is_bound(0,1).and.cbc(0,1,1)=='D') then
       !$acc kernels default(present) async(1)
-      !$OMP PARALLEL WORKSHARE
       alph2(1,:,:) = 2.52_rp
-      !$OMP END PARALLEL WORKSHARE
       !$acc end kernels
     end if
     if(is_bound(1,1).and.cbc(1,1,1)=='D') then
       !$acc kernels default(present) async(1)
-      !$OMP PARALLEL WORKSHARE
       alph2(n(1),:,:) = 2.52_rp
-      !$OMP END PARALLEL WORKSHARE
       !$acc end kernels
     end if
     if(is_bound(0,2).and.cbc(0,2,2)=='D') then
       !$acc kernels default(present) async(1)
-      !$OMP PARALLEL WORKSHARE
       alph2(:,1,:) = 2.52_rp
-      !$OMP END PARALLEL WORKSHARE
       !$acc end kernels
     end if
     if(is_bound(1,2).and.cbc(1,2,2)=='D') then
       !$acc kernels default(present) async(1)
-      !$OMP PARALLEL WORKSHARE
       alph2(:,n(2),:) = 2.52_rp
-      !$OMP END PARALLEL WORKSHARE
       !$acc end kernels
     end if
     if(is_bound(0,3).and.cbc(0,3,3)=='D') then
       !$acc kernels default(present) async(1)
-      !$OMP PARALLEL WORKSHARE
       alph2(:,:,1) = 2.52_rp
-      !$OMP END PARALLEL WORKSHARE
       !$acc end kernels
     end if
     if(is_bound(1,3).and.cbc(1,3,3)=='D') then
       !$acc kernels default(present) async(1)
-      !$OMP PARALLEL WORKSHARE
       alph2(:,:,n(3)) = 2.52_rp
-      !$OMP END PARALLEL WORKSHARE
       !$acc end kernels
     end if
 #else
     !$acc kernels default(present) async(1)
-    !$OMP PARALLEL WORKSHARE
     alph2 = 2.52_rp
-    !$OMP END PARALLEL WORKSHARE
     !$acc end kernels
 #endif
   end subroutine cmpt_alph2
@@ -955,7 +905,6 @@ module mod_sgs
     dyi = dli(2)
     !
     !$acc parallel loop collapse(3) default(present) async(1)
-    !$OMP PARALLEL DO   COLLAPSE(3) DEFAULT(shared)
     do k = 0,n(3)
       do j = 0,n(2)
         do i = 0,n(1)
@@ -967,7 +916,6 @@ module mod_sgs
       end do
     end do
     !$acc parallel loop collapse(3) default(present) async(1)
-    !$OMP PARALLEL DO   COLLAPSE(3) DEFAULT(shared)
     do k = 1,n(3)
       do j = 1,n(2)
         do i = 1,n(1)
@@ -979,7 +927,6 @@ module mod_sgs
       end do
     end do
     !$acc parallel loop collapse(3) default(present) async(1)
-    !$OMP PARALLEL DO   COLLAPSE(3) DEFAULT(shared)
     do k = 1,n(3)
       do j = 1,n(2)
         do i = 1,n(1)
@@ -991,11 +938,9 @@ module mod_sgs
       end do
     end do
     !$acc kernels default(present) async(1)
-    !$OMP PARALLEL WORKSHARE
     s0 = sij(:,:,:,1)**2 + sij(:,:,:,2)**2 + sij(:,:,:,3)**2 + &
         (sij(:,:,:,4)**2 + sij(:,:,:,5)**2 + sij(:,:,:,6)**2)*2._rp
     s0 = sqrt(2._rp*s0)
-    !$OMP END PARALLEL WORKSHARE
     !$acc end kernels
   end subroutine strain_rate
 end module mod_sgs

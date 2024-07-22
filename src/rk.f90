@@ -84,11 +84,9 @@ module mod_rk
     call mom_xyz_ad(n(1),n(2),n(3),dli(1),dli(2),dzci,dzfi,visc,u,v,w,visct,dudtrk,dvdtrk,dwdtrk,dudtrkd,dvdtrkd,dwdtrkd)
 #else
     !$acc kernels default(present) async(1)
-    !$OMP PARALLEL WORKSHARE
     dudtrk(:,:,:) = 0._rp
     dvdtrk(:,:,:) = 0._rp
     dwdtrk(:,:,:) = 0._rp
-    !$OMP END PARALLEL WORKSHARE
     !$acc end kernels
 #if !defined(_IMPDIFF)
     call momx_d(n(1),n(2),n(3),dli(1),dli(2),dzci,dzfi,visc,u,dudtrk)
@@ -96,11 +94,9 @@ module mod_rk
     call momz_d(n(1),n(2),n(3),dli(1),dli(2),dzci,dzfi,visc,w,dwdtrk)
 #else
     !$acc kernels default(present) async(1)
-    !$OMP PARALLEL WORKSHARE
     dudtrkd(:,:,:) = 0._rp
     dvdtrkd(:,:,:) = 0._rp
     dwdtrkd(:,:,:) = 0._rp
-    !$OMP END PARALLEL WORKSHARE
     !$acc end kernels
 #if !defined(_IMPDIFF_1D)
     call momx_d(n(1),n(2),n(3),dli(1),dli(2),dzci,dzfi,visc,u,dudtrkd)
@@ -121,7 +117,6 @@ module mod_rk
 #endif
     !
     !$acc parallel loop collapse(3) default(present) async(1)
-    !$OMP PARALLEL DO   COLLAPSE(3) DEFAULT(shared)
     do k=1,n(3)
       do j=1,n(2)
         do i=1,n(1)
@@ -155,17 +150,14 @@ module mod_rk
     call swap(dwdtrk,dwdtrko)
 !#if 0 /*pressure gradient term treated explicitly later */
 !    !$acc kernels
-!    !$OMP PARALLEL WORKSHARE
 !    dudtrk(:,:,:) = 0._rp
 !    dvdtrk(:,:,:) = 0._rp
 !    dwdtrk(:,:,:) = 0._rp
-!    !$OMP END PARALLEL WORKSHARE
 !    !$acc end kernels
 !    call momx_p(n(1),n(2),n(3),dli(1),bforce(1),p,dudtrk)
 !    call momy_p(n(1),n(2),n(3),dli(2),bforce(2),p,dvdtrk)
 !    call momz_p(n(1),n(2),n(3),dzci  ,bforce(3),p,dwdtrk)
 !    !$acc parallel loop collapse(3)
-!    !$OMP PARALLEL DO   COLLAPSE(3) DEFAULT(shared)
 !    do k=1,n(3)
 !      do j=1,n(2)
 !        do i=1,n(1)
@@ -178,7 +170,6 @@ module mod_rk
 !#endif
 #if !defined(_FAST_MOM_KERNELS)
     !$acc parallel loop collapse(3) default(present) async(1)
-    !$OMP PARALLEL DO   COLLAPSE(3) DEFAULT(shared)
     do k=1,n(3)
       do j=1,n(2)
         do i=1,n(1)
@@ -199,7 +190,6 @@ module mod_rk
     ! compute rhs of Helmholtz equation
     !
     !$acc parallel loop collapse(3) default(present) async(1)
-    !$OMP PARALLEL DO   COLLAPSE(3) DEFAULT(shared)
     do k=1,n(3)
       do j=1,n(2)
         do i=1,n(1)
@@ -266,7 +256,6 @@ module mod_rk
     end if
     call scal(n(1),n(2),n(3),dli(1),dli(2),dli(3),dzci,dzfi,alpha,u,v,w,s,dsdtrk)
     !$acc parallel loop collapse(3) default(present) async(1)
-    !$OMP PARALLEL DO   COLLAPSE(3) DEFAULT(shared)
     do k=1,n(3)
       do j=1,n(2)
         do i=1,n(1)

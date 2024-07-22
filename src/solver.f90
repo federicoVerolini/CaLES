@@ -34,18 +34,12 @@ module mod_solver
     !
     n_z(:) = zsize(:)
 #if !defined(_DECOMP_Y) && !defined(_DECOMP_Z)
-    !$OMP PARALLEL WORKSHARE
     px(:,:,:) = p(1:n(1),1:n(2),1:n(3))
-    !$OMP END PARALLEL WORKSHARE
 #elif defined(_DECOMP_Y)
-    !$OMP PARALLEL WORKSHARE
     py(:,:,:) = p(1:n(1),1:n(2),1:n(3))
-    !$OMP END PARALLEL WORKSHARE
     call transpose_y_to_x(py,px)
 #elif defined(_DECOMP_Z)
-    !$OMP PARALLEL WORKSHARE
     pz(:,:,:) = p(1:n(1),1:n(2),1:n(3))
-    !$OMP END PARALLEL WORKSHARE
     !call transpose_z_to_x(pz,px)
     call transpose_z_to_y(pz,py)
     call transpose_y_to_x(py,px)
@@ -72,21 +66,15 @@ module mod_solver
     call fft(arrplan(2,1),px) ! bwd transform in x
     !
 #if !defined(_DECOMP_Y) && !defined(_DECOMP_Z)
-    !$OMP PARALLEL WORKSHARE
     p(1:n(1),1:n(2),1:n(3)) = px(:,:,:)*normfft
-    !$OMP END PARALLEL WORKSHARE
 #elif defined(_DECOMP_Y)
     call transpose_x_to_y(px,py)
-    !$OMP PARALLEL WORKSHARE
     p(1:n(1),1:n(2),1:n(3)) = py(:,:,:)*normfft
-    !$OMP END PARALLEL WORKSHARE
 #elif defined(_DECOMP_Z)
     !call transpose_x_to_z(px,pz)
     call transpose_x_to_y(px,py)
     call transpose_y_to_z(py,pz)
-    !$OMP PARALLEL WORKSHARE
     p(1:n(1),1:n(2),1:n(3)) = pz(:,:,:)*normfft
-    !$OMP END PARALLEL WORKSHARE
 #endif
   end subroutine solver
   !
@@ -102,24 +90,18 @@ module mod_solver
     ! solve tridiagonal system
     !
     if(present(lambdaxy)) then
-      !$OMP PARALLEL DEFAULT(shared) PRIVATE(bb)
-      !$OMP DO COLLAPSE(2)
       do j=1,ny
         do i=1,nx
           bb(:) = b(1:n) + lambdaxy(i,j)
           call dgtsv_homebrewed(n,a,bb,c,p(i,j,1:n))
         end do
       end do
-      !$OMP END PARALLEL
     else
-      !$OMP PARALLEL DEFAULT(shared)
-      !$OMP DO COLLAPSE(2)
       do j=1,ny
         do i=1,nx
           call dgtsv_homebrewed(n,a,b,c,p(i,j,1:n))
         end do
       end do
-      !$OMP END PARALLEL
     end if
   end subroutine gaussel
   !
@@ -136,8 +118,6 @@ module mod_solver
     ! solve tridiagonal system
     !
     if(present(lambdaxy)) then
-      !$OMP PARALLEL DEFAULT(shared) PRIVATE(bb,p1,p2)
-      !$OMP DO COLLAPSE(2)
       do j=1,ny
         do i=1,nx
           bb(:)  = b(:) + lambdaxy(i,j)
@@ -152,10 +132,7 @@ module mod_solver
           p(i,j,1:n-1) = p1(1:n-1) + p2(1:n-1)*p(i,j,n)
         end do
       end do
-      !$OMP END PARALLEL
     else
-      !$OMP PARALLEL DEFAULT(shared) PRIVATE(p1,p2)
-      !$OMP DO COLLAPSE(2)
       do j=1,ny
         do i=1,nx
           p1(1:n-1) = p(i,j,1:n-1)
@@ -169,7 +146,6 @@ module mod_solver
           p(i,j,1:n-1) = p1(1:n-1) + p2(1:n-1)*p(i,j,n)
         end do
       end do
-      !$OMP END PARALLEL
     end if
   end subroutine gaussel_periodic
   !
@@ -220,16 +196,12 @@ module mod_solver
     !
     n_z(:) = zsize(:)
 #if !defined(_DECOMP_Y) && !defined(_DECOMP_Z)
-    !$OMP PARALLEL WORKSHARE
     px(:,:,:) = p(1:n(1),1:n(2),1:n(3))
-    !$OMP END PARALLEL WORKSHARE
     !call transpose_x_to_z(px,pz)
     call transpose_x_to_y(px,py)
     call transpose_y_to_z(py,pz)
 #elif defined(_DECOMP_Y)
-    !$OMP PARALLEL WORKSHARE
     py(:,:,:) = p(1:n(1),1:n(2),1:n(3))
-    !$OMP END PARALLEL WORKSHARE
     call transpose_y_to_z(py,pz)
 #endif
     q = 0
@@ -252,14 +224,10 @@ module mod_solver
     !call transpose_z_to_x(pz,px)
     call transpose_z_to_y(pz,py)
     call transpose_y_to_x(py,px)
-    !$OMP PARALLEL WORKSHARE
     p(1:n(1),1:n(2),1:n(3)) = px(:,:,:)
-    !$OMP END PARALLEL WORKSHARE
 #elif defined(_DECOMP_Y)
     call transpose_z_to_y(pz,py)
-    !$OMP PARALLEL WORKSHARE
     p(1:n(1),1:n(2),1:n(3)) = py(:,:,:)
-    !$OMP END PARALLEL WORKSHARE
 #endif
   end subroutine solver_gaussel_z
   !

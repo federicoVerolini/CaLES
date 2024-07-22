@@ -86,7 +86,6 @@ program cans
   !@acc use mod_utils    , only: device_memory_footprint
   use mod_precision
   use mod_typedef        , only: bound
-  use omp_lib
   implicit none
   integer , dimension(3) :: lo,hi,n,n_x_fft,n_y_fft,lo_z,hi_z,n_z
   real(rp), allocatable, dimension(:,:,:) :: u,v,w,p,pp,visct
@@ -142,9 +141,8 @@ program cans
   !
   call read_input(myid)
   !
-  ! initialize MPI/OpenMP
+  ! initialize MPI
   !
-  !$ call omp_set_num_threads(omp_get_max_threads())
   call initmpi(ng,dims,sgstype,cbcvel,cbcpre,lo,hi,n,n_x_fft,n_y_fft,lo_z,hi_z,n_z,nb,is_bound)
   twi = MPI_WTIME()
   savecounter = 0
@@ -384,7 +382,7 @@ program cans
   ! post-process and write initial condition
   !
   write(fldnum,'(i7.7)') istep
-  !$acc update self(u,v,w,p) async(1)
+  !$acc update self(u,v,w,p,visct) async(1)
   !$acc wait(1)
   include 'out1d.h90'
   include 'out2d.h90'
@@ -422,24 +420,20 @@ program cans
       alpha = -.5*visc*dtrk
       call cmpt_rhs_b(ng,dli,dzci_g,dzfi_g,cbcvel(:,:,1),bcu,['f','c','c'],rhsbu%x,rhsbu%y,rhsbu%z)
       !$acc kernels present(rhsbx,rhsby,rhsbz,rhsbu) async(1)
-      !$OMP PARALLEL WORKSHARE
 #if !defined(_IMPDIFF_1D)
       rhsbx(:,:,0:1) = rhsbu%x(:,:,0:1)*alpha
       rhsby(:,:,0:1) = rhsbu%y(:,:,0:1)*alpha
 #endif
       rhsbz(:,:,0:1) = rhsbu%z(:,:,0:1)*alpha
-      !$OMP END PARALLEL WORKSHARE
       !$acc end kernels
       call updt_rhs_b(['f','c','c'],cbcvel(:,:,1),n,is_bound,rhsbx,rhsby,rhsbz,u)   ! additional rhs_b to u
       !$acc kernels default(present) async(1)
-      !$OMP PARALLEL WORKSHARE
       aa(:) = au(:)*alpha
       bb(:) = bu(:)*alpha + 1.
       cc(:) = cu(:)*alpha
 #if !defined(_IMPDIFF_1D)
       lambdaxy(:,:) = lambdaxyu(:,:)*alpha
 #endif
-      !$OMP END PARALLEL WORKSHARE
       !$acc end kernels
 #if !defined(_IMPDIFF_1D)
       call solver(n,ng,arrplanu,normfftu,lambdaxy,aa,bb,cc,cbcvel(:,:,1),['f','c','c'],u)
@@ -448,24 +442,20 @@ program cans
 #endif
       call cmpt_rhs_b(ng,dli,dzci_g,dzfi_g,cbcvel(:,:,2),bcv,['c','f','c'],rhsbv%x,rhsbv%y,rhsbv%z)
       !$acc kernels present(rhsbx,rhsby,rhsbz,rhsbv) async(1)
-      !$OMP PARALLEL WORKSHARE
 #if !defined(_IMPDIFF_1D)
       rhsbx(:,:,0:1) = rhsbv%x(:,:,0:1)*alpha
       rhsby(:,:,0:1) = rhsbv%y(:,:,0:1)*alpha
 #endif
       rhsbz(:,:,0:1) = rhsbv%z(:,:,0:1)*alpha
-      !$OMP END PARALLEL WORKSHARE
       !$acc end kernels
       call updt_rhs_b(['c','f','c'],cbcvel(:,:,2),n,is_bound,rhsbx,rhsby,rhsbz,v) ! additional rhs_b to v
       !$acc kernels default(present) async(1)
-      !$OMP PARALLEL WORKSHARE
       aa(:) = av(:)*alpha
       bb(:) = bv(:)*alpha + 1.
       cc(:) = cv(:)*alpha
 #if !defined(_IMPDIFF_1D)
       lambdaxy(:,:) = lambdaxyv(:,:)*alpha
 #endif
-      !$OMP END PARALLEL WORKSHARE
       !$acc end kernels
 #if !defined(_IMPDIFF_1D)
       call solver(n,ng,arrplanv,normfftv,lambdaxy,aa,bb,cc,cbcvel(:,:,2),['c','f','c'],v)
@@ -474,24 +464,20 @@ program cans
 #endif
       call cmpt_rhs_b(ng,dli,dzci_g,dzfi_g,cbcvel(:,:,3),bcw,['c','c','f'],rhsbw%x,rhsbw%y,rhsbw%z)
       !$acc kernels present(rhsbx,rhsby,rhsbz,rhsbw) async(1)
-      !$OMP PARALLEL WORKSHARE
 #if !defined(_IMPDIFF_1D)
       rhsbx(:,:,0:1) = rhsbw%x(:,:,0:1)*alpha
       rhsby(:,:,0:1) = rhsbw%y(:,:,0:1)*alpha
 #endif
       rhsbz(:,:,0:1) = rhsbw%z(:,:,0:1)*alpha
-      !$OMP END PARALLEL WORKSHARE
       !$acc end kernels
       call updt_rhs_b(['c','c','f'],cbcvel(:,:,3),n,is_bound,rhsbx,rhsby,rhsbz,w) ! additional rhs_b to w
       !$acc kernels default(present) async(1)
-      !$OMP PARALLEL WORKSHARE
       aa(:) = aw(:)*alpha
       bb(:) = bw(:)*alpha + 1.
       cc(:) = cw(:)*alpha
 #if !defined(_IMPDIFF_1D)
       lambdaxy(:,:) = lambdaxyw(:,:)*alpha
 #endif
-      !$OMP END PARALLEL WORKSHARE
       !$acc end kernels
 #if !defined(_IMPDIFF_1D)
       call solver(n,ng,arrplanw,normfftw,lambdaxy,aa,bb,cc,cbcvel(:,:,3),['c','c','f'],w)
@@ -515,18 +501,6 @@ program cans
                     dzci,dzfi,visc,hwm,ind_wm,u,v,w,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,visct)
       call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,visct)
     end do
-    ! !$acc update self(u,v,w,p,visct) async(1)
-    ! !$acc wait(1)
-    ! do k = 1,n(3)
-    !   do j = 1,n(2)
-    !     do i = 1,n(1)
-    !       write(55,'(3i,f)') i,j,k,u(i,j,k)
-    !     end do
-    !   end do
-    ! end do
-    ! call MPI_FINALIZE(ierr)
-    ! stop
-    ! !!!!!!!!!!!!
     dpdl(:) = -dpdl(:)*dti
     ! dt not multiplied, exactly equal to the wall shear stress
     !
@@ -597,17 +571,17 @@ program cans
     end if
     write(fldnum,'(i7.7)') istep
     if(mod(istep,iout1d) == 0) then
-      !$acc update self(u,v,w,p) async(1)
+      !$acc update self(u,v,w,p,visct) async(1)
       !$acc wait(1)
       include 'out1d.h90'
     end if
     if(mod(istep,iout2d) == 0) then
-      !$acc update self(u,v,w,p) async(1)
+      !$acc update self(u,v,w,p,visct) async(1)
       !$acc wait(1)
       include 'out2d.h90'
     end if
     if(mod(istep,iout3d) == 0) then
-      !$acc update self(u,v,w,p) async(1)
+      !$acc update self(u,v,w,p,visct) async(1)
       !$acc wait(1)
       include 'out3d.h90'
     end if
@@ -627,7 +601,7 @@ program cans
           call out0d(trim(datadir)//'log_checkpoints.out',3,var)
         end if
       end if
-      !$acc update self(u,v,w,p) async(1)
+      !$acc update self(u,v,w,p,visct) async(1)
       !$acc wait(1)
       call load_all('w',trim(datadir)//trim(filename),MPI_COMM_WORLD,ng,[1,1,1],lo,hi,u,v,w,p,time,istep)
       if(.not.is_overwrite_save) then

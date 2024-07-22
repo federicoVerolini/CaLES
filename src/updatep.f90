@@ -27,7 +27,6 @@ module mod_updatep
 #if defined(_IMPDIFF)
     dxi = dli(1); dyi = dli(2)
     !$acc parallel loop collapse(3) default(present) async(1)
-    !$OMP PARALLEL DO   COLLAPSE(3) DEFAULT(shared)
     do k=1,n(3)
       do j=1,n(2)
         do i=1,n(1)
@@ -43,9 +42,7 @@ module mod_updatep
     end do
 #else
     !$acc kernels default(present) async(1)
-    !$OMP PARALLEL WORKSHARE
     p(1:n(1),1:n(2),1:n(3)) = p(1:n(1),1:n(2),1:n(3)) + pp(1:n(1),1:n(2),1:n(3))
-    !$OMP END PARALLEL WORKSHARE
     !$acc end kernels
 #endif
   end subroutine updatep

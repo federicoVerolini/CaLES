@@ -231,24 +231,18 @@ module mod_bound
         select case(idir)
         case(1)
           !$acc kernels default(present) async(1)
-          !$OMP PARALLEL WORKSHARE
           p(  0-dh,:,:) = p(n-dh,:,:)
           p(n+1+dh,:,:) = p(1+dh,:,:)
-          !$OMP END PARALLEL WORKSHARE
           !$acc end kernels
         case(2)
           !$acc kernels default(present) async(1)
-          !$OMP PARALLEL WORKSHARE
           p(:,  0-dh,:) = p(:,n-dh,:)
           p(:,n+1+dh,:) = p(:,1+dh,:)
-          !$OMP END PARALLEL WORKSHARE
           !$acc end kernels
         case(3)
           !$acc kernels default(present) async(1)
-          !$OMP PARALLEL WORKSHARE
           p(:,:,  0-dh) = p(:,:,n-dh)
           p(:,:,n+1+dh) = p(:,:,1+dh)
-          !$OMP END PARALLEL WORKSHARE
           !$acc end kernels
         end select
       case('D')
@@ -257,43 +251,31 @@ module mod_bound
           case(1)
             if     (ibound == 0) then
               !$acc kernels default(present) async(1)
-              !$OMP PARALLEL WORKSHARE
               p(  0-dh,:,:) = 2._rp*bc(:,:,ibound)+sgn*p(1+dh,:,:)
-              !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             else if(ibound == 1) then
               !$acc kernels default(present) async(1)
-              !$OMP PARALLEL WORKSHARE
               p(n+1+dh,:,:) = 2._rp*bc(:,:,ibound)+sgn*p(n-dh,:,:)
-              !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             end if
           case(2)
             if     (ibound == 0) then
               !$acc kernels default(present) async(1)
-              !$OMP PARALLEL WORKSHARE
               p(:,  0-dh,:) = 2._rp*bc(:,:,ibound)+sgn*p(:,1+dh,:)
-              !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             else if(ibound == 1) then
               !$acc kernels default(present) async(1)
-              !$OMP PARALLEL WORKSHARE
               p(:,n+1+dh,:) = 2._rp*bc(:,:,ibound)+sgn*p(:,n-dh,:)
-              !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             end if
           case(3)
             if     (ibound == 0) then
               !$acc kernels default(present) async(1)
-              !$OMP PARALLEL WORKSHARE
               p(:,:,  0-dh) = 2._rp*bc(:,:,ibound)+sgn*p(:,:,1+dh)
-              !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             else if(ibound == 1) then
               !$acc kernels default(present) async(1)
-              !$OMP PARALLEL WORKSHARE
               p(:,:,n+1+dh) = 2._rp*bc(:,:,ibound)+sgn*p(:,:,n-dh)
-              !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             end if
           end select
@@ -302,46 +284,34 @@ module mod_bound
           case(1)
             if     (ibound == 0) then
               !$acc kernels default(present) async(1)
-              !$OMP PARALLEL WORKSHARE
               p(0-dh,:,:) = bc(:,:,ibound)
-              !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             else if(ibound == 1) then
               !$acc kernels default(present) async(1)
-              !$OMP PARALLEL WORKSHARE
               p(n+1 ,:,:) = p(n-1,:,:) ! unused
               p(n+dh,:,:) = bc(:,:,ibound)
-              !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             end if
           case(2)
             if     (ibound == 0) then
               !$acc kernels default(present) async(1)
-              !$OMP PARALLEL WORKSHARE
               p(:,0-dh,:) = bc(:,:,ibound)
-              !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             else if(ibound == 1) then
               !$acc kernels default(present) async(1)
-              !$OMP PARALLEL WORKSHARE
               p(:,n+1 ,:) = p(:,n-1,:) ! unused
               p(:,n+dh,:) = bc(:,:,ibound)
-              !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             end if
           case(3)
             if     (ibound == 0) then
               !$acc kernels default(present) async(1)
-              !$OMP PARALLEL WORKSHARE
               p(:,:,0-dh) = bc(:,:,ibound)
-              !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             else if(ibound == 1) then
               !$acc kernels default(present) async(1)
-              !$OMP PARALLEL WORKSHARE
               p(:,:,n+1 ) = p(:,:,n-1) ! unused
               p(:,:,n+dh) = bc(:,:,ibound)
-              !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             end if
           end select
@@ -352,43 +322,31 @@ module mod_bound
           case(1)
             if     (ibound == 0) then
               !$acc kernels default(present) async(1)
-              !$OMP PARALLEL WORKSHARE
               p(  0-dh,:,:) = -dr*bc(:,:,ibound)+sgn*p(1+dh,:,:)
-              !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             else if(ibound == 1) then
               !$acc kernels default(present) async(1)
-              !$OMP PARALLEL WORKSHARE
               p(n+1+dh,:,:) = dr*bc(:,:,ibound)+sgn*p(n-dh,:,:)
-              !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             end if
           case(2)
             if     (ibound == 0) then
               !$acc kernels default(present) async(1)
-              !$OMP PARALLEL WORKSHARE
               p(:,  0-dh,:) = -dr*bc(:,:,ibound)+sgn*p(:,1+dh,:)
-              !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             else if(ibound == 1) then
               !$acc kernels default(present) async(1)
-              !$OMP PARALLEL WORKSHARE
               p(:,n+1+dh,:) = dr*bc(:,:,ibound)+sgn*p(:,n-dh,:)
-              !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             end if
           case(3)
             if     (ibound == 0) then
               !$acc kernels default(present) async(1)
-              !$OMP PARALLEL WORKSHARE
               p(:,:,  0-dh) = -dr*bc(:,:,ibound)+sgn*p(:,:,1+dh)
-              !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             else if(ibound == 1) then
               !$acc kernels default(present) async(1)
-              !$OMP PARALLEL WORKSHARE
               p(:,:,n+1+dh) = dr*bc(:,:,ibound)+sgn*p(:,:,n-dh)
-              !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             end if
           end select
@@ -397,52 +355,40 @@ module mod_bound
           case(1)
             if     (ibound == 0) then
               !$acc kernels default(present) async(1)
-              !$OMP PARALLEL WORKSHARE
               !p(0,:,:) = 1./3.*(-2.*factor+4.*p(1  ,:,:)-p(2  ,:,:)) ! second-order approximation of the first derivative at the boundary
               p(0-dh,:,:) = -dr*bc(:,:,ibound) + p(  1+dh,:,:)
-              !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             else if(ibound == 1) then
               !$acc kernels default(present) async(1)
-              !$OMP PARALLEL WORKSHARE
               !p(n,:,:) = 1./3.*(-2.*factor+4.*p(n-1,:,:)-p(n-2,:,:))
               p(n+1 ,:,:) = p(n,:,:) ! unused
               p(n+dh,:,:) = dr*bc(:,:,ibound) + p(n-1-dh,:,:)
-              !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             end if
           case(2)
             if     (ibound == 0) then
               !$acc kernels default(present) async(1)
-              !$OMP PARALLEL WORKSHARE
               !p(:,0  ,:) = 1./3.*(-2.*factor+4.*p(:,1,:)-p(:,2  ,:))
               p(:,0-dh,:) = -dr*bc(:,:,ibound) + p(:,  1+dh,:)
-              !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             else if(ibound == 1) then
               !$acc kernels default(present) async(1)
-              !$OMP PARALLEL WORKSHARE
               !p(:,n,:) = 1./3.*(-2.*factor+4.*p(:,n-1,:)-p(:,n-2,:))
               p(:,n+1 ,:) = p(:,n,:) ! unused
               p(:,n+dh,:) = dr*bc(:,:,ibound) + p(:,n-1-dh,:)
-              !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             end if
           case(3)
             if     (ibound == 0) then
               !$acc kernels default(present) async(1)
-              !$OMP PARALLEL WORKSHARE
               !p(:,:,0) = 1./3.*(-2.*factor+4.*p(:,:,1  )-p(:,:,2  ))
               p(:,:,0-dh) = -dr*bc(:,:,ibound) + p(:,:,  1+dh)
-              !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             else if(ibound == 1) then
               !$acc kernels default(present) async(1)
-              !$OMP PARALLEL WORKSHARE
               !p(:,:,n) = 1./3.*(-2.*factor+4.*p(:,:,n-1)-p(:,:,n-2))
               p(:,:,n+1 ) = p(:,:,n) ! unused
               p(:,:,n+dh) = dr*bc(:,:,ibound) + p(:,:,n-1-dh)
-              !$OMP END PARALLEL WORKSHARE
               !$acc end kernels
             end if
           end select
@@ -549,23 +495,17 @@ module mod_bound
         select case(cbc(ibound))
         case('P')
           !$acc kernels default(present) async(1)
-          !$OMP PARALLEL WORKSHARE
           rhs(:,:,ibound) =  0._rp
-          !$OMP END PARALLEL WORKSHARE
           !$acc end kernels
         case('D')
           !$acc kernels default(present) async(1)
-          !$OMP PARALLEL WORKSHARE
           rhs(:,:,ibound) = -2._rp*bc(:,:,ibound)/dlc(ibound)/dlf(ibound)
-          !$OMP END PARALLEL WORKSHARE
           !$acc end kernels
         case('N')
           if(ibound == 0) sgn =  1._rp
           if(ibound == 1) sgn = -1._rp
           !$acc kernels default(present) async(1)
-          !$OMP PARALLEL WORKSHARE
           rhs(:,:,ibound) = sgn*bc(:,:,ibound)/dlf(ibound)
-          !$OMP END PARALLEL WORKSHARE
           !$acc end kernels
         end select
       end do
@@ -574,23 +514,17 @@ module mod_bound
         select case(cbc(ibound))
         case('P')
           !$acc kernels default(present) async(1)
-          !$OMP PARALLEL WORKSHARE
           rhs(:,:,ibound) =  0._rp
-          !$OMP END PARALLEL WORKSHARE
           !$acc end kernels
         case('D')
           !$acc kernels default(present) async(1)
-          !$OMP PARALLEL WORKSHARE
           rhs(:,:,ibound) = -bc(:,:,ibound)/dlc(ibound)/dlf(ibound)
-          !$OMP END PARALLEL WORKSHARE
           !$acc end kernels
         case('N')
           if(ibound == 0) sgn =  1._rp
           if(ibound == 1) sgn = -1._rp
           !$acc kernels default(present) async(1)
-          !$OMP PARALLEL WORKSHARE
           rhs(:,:,ibound) = sgn*bc(:,:,ibound)/dlc(ibound)
-          !$OMP END PARALLEL WORKSHARE
           !$acc end kernels
         end select
       end do
@@ -618,51 +552,39 @@ module mod_bound
     if(present(rhsbx)) then
       if(is_bound(0,1)) then
         !$acc kernels default(present) async(1)
-        !$OMP PARALLEL WORKSHARE
         p(1 ,1:n(2),1:n(3)) = p(1 ,1:n(2),1:n(3)) + rhsbx(:,:,0)
-        !$OMP END PARALLEL WORKSHARE
         !$acc end kernels
       end if
       if(is_bound(1,1)) then
         nn = n(1)-q(1)
         !$acc kernels default(present) async(1)
-        !$OMP PARALLEL WORKSHARE
         p(nn,1:n(2),1:n(3)) = p(nn,1:n(2),1:n(3)) + rhsbx(:,:,1)
-        !$OMP END PARALLEL WORKSHARE
         !$acc end kernels
       end if
     end if
     if(present(rhsby)) then
       if(is_bound(0,2)) then
         !$acc kernels default(present) async(1)
-        !$OMP PARALLEL WORKSHARE
         p(1:n(1),1 ,1:n(3)) = p(1:n(1),1 ,1:n(3)) + rhsby(:,:,0)
-        !$OMP END PARALLEL WORKSHARE
         !$acc end kernels
       end if
       if(is_bound(1,2)) then
         nn = n(2)-q(2)
         !$acc kernels default(present) async(1)
-        !$OMP PARALLEL WORKSHARE
         p(1:n(1),nn,1:n(3)) = p(1:n(1),nn,1:n(3)) + rhsby(:,:,1)
-        !$OMP END PARALLEL WORKSHARE
         !$acc end kernels
       end if
     end if
     if(present(rhsbz)) then
       if(is_bound(0,3)) then
         !$acc kernels default(present) async(1)
-        !$OMP PARALLEL WORKSHARE
         p(1:n(1),1:n(2),1 ) = p(1:n(1),1:n(2),1 ) + rhsbz(:,:,0)
-        !$OMP END PARALLEL WORKSHARE
         !$acc end kernels
       end if
       if(is_bound(1,3)) then
         nn = n(3)-q(3)
         !$acc kernels default(present) async(1)
-        !$OMP PARALLEL WORKSHARE
         p(1:n(1),1:n(2),nn) = p(1:n(1),1:n(2),nn) + rhsbz(:,:,1)
-        !$OMP END PARALLEL WORKSHARE
         !$acc end kernels
       end if
     end if

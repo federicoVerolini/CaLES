@@ -31,7 +31,6 @@ contains
     mean = 0.
     !$acc data copy(mean) async(1)
     !$acc parallel loop collapse(3) default(present) reduction(+:mean) async(1)
-    !$OMP PARALLEL DO   COLLAPSE(3) DEFAULT(shared)  REDUCTION(+:mean)
     do k=1,n(3)
       do j=1,n(2)
         do i=1,n(1)

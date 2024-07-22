@@ -47,7 +47,6 @@ module mod_chkdt
     dtid = 0._rp
     !$acc data copy(dti) async(1)
     !$acc parallel loop collapse(3) default(present) private(ux,uy,uz,vx,vy,vz,wx,wy,wz,dtix,dtiy,dtiz) reduction(max:dti) async(1)
-    !$OMP PARALLEL DO   COLLAPSE(3) DEFAULT(shared)  PRIVATE(ux,uy,uz,vx,vy,vz,wx,wy,wz,dtix,dtiy,dtiz) REDUCTION(max:dti)
     do k=1,n(3)
       do j=1,n(2)
         do i=1,n(1)
@@ -71,7 +70,6 @@ module mod_chkdt
     !
     !$acc data copy(dtid) async(1)
     !$acc parallel loop collapse(3) default(present) private(viscx,viscy,viscz,dtidx,dtidy,dtidz) reduction(max:dtid) async(1)
-    !$OMP PARALLEL DO   COLLAPSE(3) DEFAULT(shared)  PRIVATE(viscx,viscy,viscz,dtidx,dtidy,dtidz) REDUCTION(max:dtid)
     do k=1,n(3)
       do j=1,n(2)
         do i=1,n(1)
