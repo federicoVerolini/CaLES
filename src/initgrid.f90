@@ -157,12 +157,9 @@ module mod_initgrid
     real(rp), intent(in) :: alpha,z0
     real(rp), intent(out) :: z
     real(rp) :: dzc
-    if(alpha /= 0.) then
-      dzc = 0.1*32./nzg ! dzc = 0.1 for nzg = 32
-      z = z0 - (dzc*nzg/2.-1.)/(2.*pi)*sin(2.*pi*z0)
-    else
-      z = z0
-    end if
+    !
+    dzc = 0.1*32./nzg ! dzc = 0.1 for nzg = 32
+    z = z0 - (dzc*nzg/2.-1.)/(2.*pi)*sin(2.*pi*z0)
   end subroutine gridpoint_cluster_wall_model
   subroutine gridpoint_cluster_natural(kg,nzg,dummy,z0,z)
     !
@@ -181,22 +178,19 @@ module mod_initgrid
     real(rp), intent(out) :: z
     real(rp) :: kb,alpha,c_eta,dyp
     real(rp) :: retau,n,k
-    if(dummy /= 0.) then
-      ! handle input parameters
-      kb    = kb_p
-      alpha = alpha_p
-      c_eta = c_eta_p
-      dyp   = dyp_p
-      ! determine retau
-      n = nzg/2._rp
-      retau = 1._rp/(1._rp+(n/kb)**2)*(dyp*n+(3._rp/4._rp*alpha*c_eta*n)**(4._rp/3._rp)*(n/kb)**2)
-      if(kg==1) print*,'Grid targeting Retau = ',retau
-      k = 1._rp*min(kg,(nzg-kg))
-      ! dermine z/(2h)
-      z = 1._rp/(1._rp+(k/kb)**2)*(dyp*k+(3._rp/4._rp*alpha*c_eta*k)**(4._rp/3._rp)*(k/kb)**2)/(2._rp*retau)
-      if( kg > nzg-kg ) z = 1._rp-z
-    else
-      z = z0
-    end if
+    !
+    ! handle input parameters
+    kb    = kb_p
+    alpha = alpha_p
+    c_eta = c_eta_p
+    dyp   = dyp_p
+    ! determine retau
+    n = nzg/2._rp
+    retau = 1._rp/(1._rp+(n/kb)**2)*(dyp*n+(3._rp/4._rp*alpha*c_eta*n)**(4._rp/3._rp)*(n/kb)**2)
+    if(kg==1) print*,'Grid targeting Retau = ',retau
+    k = 1._rp*min(kg,(nzg-kg))
+    ! dermine z/(2h)
+    z = 1._rp/(1._rp+(k/kb)**2)*(dyp*k+(3._rp/4._rp*alpha*c_eta*k)**(4._rp/3._rp)*(k/kb)**2)/(2._rp*retau)
+    if( kg > nzg-kg ) z = 1._rp-z
   end subroutine gridpoint_cluster_natural
 end module mod_initgrid

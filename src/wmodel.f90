@@ -30,39 +30,38 @@ module mod_wmodel
     real(rp), intent(in), dimension(0:,0:,0:) :: u,v,w
     type(bound), intent(inout) :: bcu,bcv,bcw
     type(bound), intent(in   ) :: bcu_mag,bcv_mag,bcw_mag
-    real(rp) :: wei,coef,uh,vh,wh,u1,u2,v1,v2,w1,w2,u_mag,v_mag,w_mag,tauw(2),visci
+    real(rp) :: wei,coef,uh,vh,wh,u1,u2,v1,v2,w1,w2,u_mag,v_mag,w_mag,tauw(2)
     integer  :: nh,i,j,k,i1,i2,j1,j2,k1,k2
     !
     nh = 1
-    visci = 1._rp/visc
     !
     if(is_bound(0,1).and.lwm(0,1)/=0) then
-      call cmpt_wallmodelbc(0,1,nh,lwm(0,1),l,dl,zc,zf,dzc,dzf,visc,h,ind(0,1),v,w, &
+      call cmpt_wallmodelbc(n,0,1,nh,lwm(0,1),l,dl,zc,zf,dzc,dzf,visc,h,ind(0,1),v,w, &
                             bcv%x,bcw%x,bcv_mag%x,bcw_mag%x)
     end if
     if(is_bound(1,1).and.lwm(1,1)/=0) then
-      call cmpt_wallmodelbc(1,1,nh,lwm(1,1),l,dl,zc,zf,dzc,dzf,visc,h,ind(1,1),v,w, &
+      call cmpt_wallmodelbc(n,1,1,nh,lwm(1,1),l,dl,zc,zf,dzc,dzf,visc,h,ind(1,1),v,w, &
                             bcv%x,bcw%x,bcv_mag%x,bcw_mag%x)
     end if
     if(is_bound(0,2).and.lwm(0,2)/=0) then
-      call cmpt_wallmodelbc(0,2,nh,lwm(0,2),l,dl,zc,zf,dzc,dzf,visc,h,ind(0,2),u,w, &
+      call cmpt_wallmodelbc(n,0,2,nh,lwm(0,2),l,dl,zc,zf,dzc,dzf,visc,h,ind(0,2),u,w, &
                             bcu%y,bcw%y,bcu_mag%y,bcw_mag%y)
     end if
     if(is_bound(1,2).and.lwm(1,2)/=0) then
-      call cmpt_wallmodelbc(1,2,nh,lwm(1,2),l,dl,zc,zf,dzc,dzf,visc,h,ind(1,2),u,w, &
+      call cmpt_wallmodelbc(n,1,2,nh,lwm(1,2),l,dl,zc,zf,dzc,dzf,visc,h,ind(1,2),u,w, &
                             bcu%y,bcw%y,bcu_mag%y,bcw_mag%y)
     end if
     if(is_bound(0,3).and.lwm(0,3)/=0) then
-      call cmpt_wallmodelbc(0,3,nh,lwm(0,3),l,dl,zc,zf,dzc,dzf,visc,h,ind(0,3),u,v, &
+      call cmpt_wallmodelbc(n,0,3,nh,lwm(0,3),l,dl,zc,zf,dzc,dzf,visc,h,ind(0,3),u,v, &
                             bcu%z,bcv%z,bcu_mag%z,bcv_mag%z)
     end if
     if(is_bound(1,3).and.lwm(1,3)/=0) then
-      call cmpt_wallmodelbc(1,3,nh,lwm(1,3),l,dl,zc,zf,dzc,dzf,visc,h,ind(1,3),u,v, &
+      call cmpt_wallmodelbc(n,1,3,nh,lwm(1,3),l,dl,zc,zf,dzc,dzf,visc,h,ind(1,3),u,v, &
                             bcu%z,bcv%z,bcu_mag%z,bcv_mag%z)
     end if
   end subroutine updt_wallmodelbc
   !
-  subroutine cmpt_wallmodelbc(ibound,idir,nh,mtype,l,dl,zc,zf,dzc,dzf,visc,h,index,vel1,vel2, &
+  subroutine cmpt_wallmodelbc(n,ibound,idir,nh,mtype,l,dl,zc,zf,dzc,dzf,visc,h,index,vel1,vel2, &
                               bcvel1,bcvel2,bcvel1_mag,bcvel2_mag)
     !
     ! compute wall model bc of a wall
@@ -101,6 +100,7 @@ module mod_wmodel
     ! DNS: time step calculation uses the ghost point outside of the singularity.
     !
     implicit none
+    integer , intent(in), dimension(3) :: n
     integer , intent(in) :: ibound,idir,nh,mtype
     real(rp), intent(in), dimension(3) :: l,dl
     real(rp), intent(in), dimension(0:) :: zc,zf,dzc,dzf
@@ -113,11 +113,8 @@ module mod_wmodel
     real(rp), pointer, dimension(:,:,:) :: bcu,bcv,bcw
     real(rp), pointer, dimension(:,:,:) :: bcu_mag,bcv_mag,bcw_mag
     real(rp) :: sgn,wei,coef,uh,vh,wh,u1,u2,v1,v2,w1,w2,u_mag,v_mag,w_mag,tauw(2),visci
-    integer  :: n(3),i,j,k,i1,i2,j1,j2,k1,k2
+    integer  :: i,j,k,i1,i2,j1,j2,k1,k2
     !
-    n(1) = size(vel1,1) - 2*nh
-    n(2) = size(vel1,2) - 2*nh
-    n(3) = size(vel1,3) - 2*nh
     visci = 1._rp/visc
     !
     select case(idir)
@@ -139,6 +136,7 @@ module mod_wmodel
       bcw     => bcvel2
       bcv_mag => bcvel1_mag
       bcw_mag => bcvel2_mag
+      !$acc parallel loop collapse(2) default(present)  private(v1,v2,w1,w2,v_mag,w_mag,vh,wh,tauw) async(1)
       do k = 1,n(3)
         do j = 0,n(2)
           v1    = v(i1,j,k)
@@ -154,6 +152,7 @@ module mod_wmodel
           bcv(j,k,ibound) = sgn*visci*tauw(1)
         end do
       end do
+      !$acc parallel loop collapse(2) default(present)  private(v1,v2,w1,w2,v_mag,w_mag,vh,wh,tauw) async(1)
       do k = 0,n(3)
         do j = 1,n(2)
           wei   = (zf(k)-zc(k))/dzc(k)
@@ -188,6 +187,7 @@ module mod_wmodel
       bcw     => bcvel2
       bcu_mag => bcvel1_mag
       bcw_mag => bcvel2_mag
+      !$acc parallel loop collapse(2) default(present)  private(u1,u2,w1,w2,u_mag,w_mag,uh,wh,tauw) async(1)
       do k = 1,n(3)
         do i = 0,n(1)
           u1    = u(i,j1,k)
@@ -203,6 +203,7 @@ module mod_wmodel
           bcu(i,k,ibound) = sgn*visci*tauw(1)
         end do
       end do
+      !$acc parallel loop collapse(2) default(present)  private(u1,u2,w1,w2,u_mag,w_mag,uh,wh,tauw) async(1)
       do k = 0,n(3)
         do i = 1,n(1)
           wei   = (zf(k)-zc(k))/dzc(k)
@@ -237,6 +238,7 @@ module mod_wmodel
       bcv     => bcvel2
       bcu_mag => bcvel1_mag
       bcv_mag => bcvel2_mag
+      !$acc parallel loop collapse(2) default(present)  private(u1,u2,v1,v2,u_mag,v_mag,uh,vh,tauw) async(1)
       do j = 1,n(2)
         do i = 0,n(1)
           u1    = u(i,j,k1)
@@ -252,6 +254,7 @@ module mod_wmodel
           bcu(i,j,ibound) = sgn*visci*tauw(1)
         end do
       end do
+      !$acc parallel loop collapse(2) default(present)  private(u1,u2,v1,v2,u_mag,v_mag,uh,vh,tauw) async(1)
       do j = 0,n(2)
         do i = 1,n(1)
           u1    = 0.25_rp*(u(i-1,j,k1) + u(i,j,k1) + u(i-1,j+1,k1) + u(i,j+1,k1))
@@ -277,6 +280,8 @@ module mod_wmodel
     implicit none
     real(rp), intent(in) :: v1,v2,coef,bcv_mag
     real(rp) :: vel_relative
+    !
+    !$acc routine seq
     vel_relative = (1._rp-coef)*v1 + coef*v2
     vel_relative = vel_relative - bcv_mag
   end function vel_relative
@@ -311,6 +316,7 @@ module mod_wmodel
     real(rp) :: upar,utau,f,fp,conv,utau_old,tauw_tot
     real(rp) :: umax,del
     !
+    !$acc routine seq
     select case(mtype)
     case(WM_LOG)
       conv = 1._rp

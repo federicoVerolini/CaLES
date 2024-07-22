@@ -377,7 +377,7 @@ program cans
   call bounduvw(cbcvel,n,bcu,bcv,bcw,bcu_mag,bcv_mag,bcw_mag,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf, &
                 visc,hwm,ind_wm,.true.,.false.,u,v,w)
   call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
-  call cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcpre,bcp,nb,is_bound,lwm,l,dl,dli,zc,zf,dzc,dzf, &
+  call cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcsgs,bcs,nb,is_bound,lwm,l,dl,dli,zc,zf,dzc,dzf, &
                 dzci,dzfi,visc,hwm,ind_wm,u,v,w,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,visct)
   call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,visct) ! corner ghost cells included
   !
@@ -510,22 +510,22 @@ program cans
                     visc,hwm,ind_wm,.true.,.true.,u,v,w)
       call updatep(n,dli,dzci,dzfi,alpha,pp,p)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
-      call cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcpre,bcp,nb,is_bound,lwm,l,dl,dli,zc,zf,dzc,dzf, &
+      call cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcsgs,bcs,nb,is_bound,lwm,l,dl,dli,zc,zf,dzc,dzf, &
                     dzci,dzfi,visc,hwm,ind_wm,u,v,w,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,visct)
       call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,visct)
     end do
-    ! !$acc update self(visct) async(1)
+    ! !$acc update self(u,v,w,p,visct) async(1)
     ! !$acc wait(1)
     ! do k = 1,n(3)
     !   do j = 1,n(2)
     !     do i = 1,n(1)
-    !       write(55,'(3i,f)') i,j,k,visct(i,j,k)
+    !       write(55,'(3i,f)') i,j,k,u(i,j,k)
     !     end do
     !   end do
     ! end do
     ! call MPI_FINALIZE(ierr)
     ! stop
-    ! !!!!!!!!!
+    ! !!!!!!!!!!!!
     dpdl(:) = -dpdl(:)*dti
     ! dt not multiplied, exactly equal to the wall shear stress
     !

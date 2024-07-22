@@ -17,7 +17,7 @@ module mod_sgs
   public cmpt_sgs
   contains
   !
-  subroutine cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcpre,bcp,nb,is_bound,lwm,l,dl,dli,zc,zf,dzc,dzf, &
+  subroutine cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcsgs,bcs,nb,is_bound,lwm,l,dl,dli,zc,zf,dzc,dzf, &
                       dzci,dzfi,visc,h,ind,u,v,w,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,visct)
     !
     ! compute subgrid viscosity at cell centers
@@ -36,8 +36,8 @@ module mod_sgs
     character(len=*), intent(in) :: sgstype
     integer , intent(in ), dimension(3) :: n,ng,lo,hi
     character(len=1), intent(in), dimension(0:1,3,3) :: cbcvel
-    character(len=1), intent(in), dimension(0:1,3)   :: cbcpre  !!!use cbcpre instead
-    type(bound), intent(in   ) :: bcp    !!!use bcs instead
+    character(len=1), intent(in), dimension(0:1,3)   :: cbcsgs
+    type(bound), intent(in   ) :: bcs
     type(bound), intent(inout) :: bcuf,bcvf,bcwf
     type(bound), intent(in   ) :: bcu_mag,bcv_mag,bcw_mag
     integer , intent(in ), dimension(0:1,3)      :: nb,lwm,ind
@@ -120,9 +120,9 @@ module mod_sgs
       call interpolate(n,u,v,w,uc,vc,wc)
       ! periodic/patched bc's are handled, wall bc ghost points are set
       ! by extrapolation from the interior.
-      call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,uc)
-      call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,vc)
-      call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,wc)
+      call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,uc)
+      call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,vc)
+      call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,wc)
 #if !defined(_FILTER_2D)
       !$acc kernels default(present) async(1)
       !$OMP PARALLEL WORKSHARE
@@ -196,13 +196,13 @@ module mod_sgs
       !
       ! periodic/patched bc's are handled, wall bc ghost points are set
       ! by extrapolation from the interior.
-      call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,s0)
-      call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,1))
-      call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,2))
-      call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,3))
-      call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,4))
-      call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,5))
-      call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,sij(:,:,:,6))
+      call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,s0)
+      call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,sij(:,:,:,1))
+      call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,sij(:,:,:,2))
+      call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,sij(:,:,:,3))
+      call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,sij(:,:,:,4))
+      call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,sij(:,:,:,5))
+      call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,sij(:,:,:,6))
 #if !defined(_FILTER_2D)
       !$acc kernels default(present) async(1)
       !$OMP PARALLEL WORKSHARE
