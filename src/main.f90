@@ -65,7 +65,7 @@ program cans
                                  rkcoeff,small, &
                                  datadir, &
                                  read_input, &
-                                 sgstype,lwm,hwm,ind_wm
+                                 sgstype,lwm,hwm,index_wm
   use mod_sanity         , only: test_sanity_input
 #if !defined(_OPENACC)
   use mod_solver         , only: solver
@@ -122,9 +122,7 @@ program cans
   real(rp) :: meanvelu,meanvelv,meanvelw
   real(rp), dimension(3) :: dpdl
   real(rp), dimension(42) :: var
-#if defined(_TIMING)
   real(rp) :: dt12,dt12av,dt12min,dt12max,dtt(20),dttav(20),dttmin(20),dttmax(20)
-#endif
   real(rp) :: twi,tw
   integer  :: savecounter
   character(len=7  ) :: fldnum
@@ -290,12 +288,13 @@ program cans
   !
   ! test input files before proceeding with the calculation
   !
-  call test_sanity_input(ng,dims,sgstype,stop_type,cbcvel,cbcpre,cbcsgs,bcvel,bcpre,bcsgs,n,is_bound,lwm,l,zc,dl,hwm,is_forced)
+  call test_sanity_input(ng,dims,sgstype,stop_type,cbcvel,cbcpre,cbcsgs,bcvel,bcpre,bcsgs, &
+                         n,is_bound,lwm,l,zc,dl,hwm,is_forced)
   !
   ! initialize boundary condition variables
   !
   call initbc(sgstype,cbcvel,bcvel,bcpre,bcsgs,bcu,bcv,bcw,bcp,bcs,bcu_mag,bcv_mag,bcw_mag, &
-              bcuf,bcvf,bcwf,n,is_bound,lwm,l,zc,dl,dzc,hwm,ind_wm)
+              bcuf,bcvf,bcwf,n,is_bound,lwm,l,zc,dl,dzc,hwm,index_wm)
   !$acc enter data copyin(bcu,bcu%x,bcu%y,bcu%z) async
   !$acc enter data copyin(bcv,bcv%x,bcv%y,bcv%z) async
   !$acc enter data copyin(bcw,bcw%x,bcw%y,bcw%z) async
@@ -373,10 +372,10 @@ program cans
   !$acc enter data copyin(u,v,w,p) create(pp,visct) async
   !$acc wait
   call bounduvw(cbcvel,n,bcu,bcv,bcw,bcu_mag,bcv_mag,bcw_mag,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf, &
-                visc,hwm,ind_wm,.true.,.false.,u,v,w)
+                visc,hwm,index_wm,.true.,.false.,u,v,w)
   call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
   call cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcsgs,bcs,nb,is_bound,lwm,l,dl,dli,zc,zf,dzc,dzf, &
-                dzci,dzfi,visc,hwm,ind_wm,u,v,w,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,visct)
+                dzci,dzfi,visc,hwm,index_wm,u,v,w,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,visct)
   call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,visct) ! corner ghost cells included
   !
   ! post-process and write initial condition
@@ -398,10 +397,9 @@ program cans
   if(myid == 0) print*, '*** Calculation loop starts now ***'
   is_done = .false.
   do while(.not.is_done)
-#if defined(_TIMING)
     !$acc wait(1)
     dt12 = MPI_WTIME()
-#endif
+    !
     istep = istep + 1
     time = time + dt
     if(myid == 0) print*, 'Time step #', istep, 'Time = ', time
@@ -487,18 +485,18 @@ program cans
 #endif
       dpdl(:) = dpdl(:) + f(:) ! dt multiplied
       call bounduvw(cbcvel,n,bcu,bcv,bcw,bcu_mag,bcv_mag,bcw_mag,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf, &
-                    visc,hwm,ind_wm,.true.,.false.,u,v,w)
+                    visc,hwm,index_wm,.true.,.false.,u,v,w)
       call fillps(n,dli,dzfi,dtrki,u,v,w,pp)
       call updt_rhs_b(['c','c','c'],cbcpre,n,is_bound,rhsbp%x,rhsbp%y,rhsbp%z,pp)
       call solver(n,ng,arrplanp,normfftp,lambdaxyp,ap,bp,cp,cbcpre,['c','c','c'],pp)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,pp)
       call correc(n,dli,dzci,dtrk,pp,u,v,w)
       call bounduvw(cbcvel,n,bcu,bcv,bcw,bcu_mag,bcv_mag,bcw_mag,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf, &
-                    visc,hwm,ind_wm,.true.,.true.,u,v,w)
+                    visc,hwm,index_wm,.true.,.true.,u,v,w)
       call updatep(n,dli,dzci,dzfi,alpha,pp,p)
       call boundp(cbcpre,n,bcp,nb,is_bound,dl,dzc,p)
       call cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcsgs,bcs,nb,is_bound,lwm,l,dl,dli,zc,zf,dzc,dzf, &
-                    dzci,dzfi,visc,hwm,ind_wm,u,v,w,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,visct)
+                    dzci,dzfi,visc,hwm,index_wm,u,v,w,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,visct)
       call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,visct)
     end do
     dpdl(:) = -dpdl(:)*dti
@@ -531,14 +529,12 @@ program cans
       dti = 1./dt
       call chkdiv(lo,hi,dli,dzfi,u,v,w,divtot,divmax)
       if(myid == 0) print*, 'Total divergence = ', divtot, '| Maximum divergence = ', divmax
-#if !defined(_MASK_DIVERGENCE_CHECK)
       if(divmax > small.or.is_nan(divtot)) then
         if(myid == 0) print*, 'ERROR: maximum divergence is too large.'
         if(myid == 0) print*, 'Aborting...'
         is_done = .true.
         kill = .true.
       end if
-#endif
     end if
     !
     ! output routines below
@@ -609,15 +605,13 @@ program cans
       end if
       if(myid == 0) print*, '*** Checkpoint saved at time = ', time, 'time step = ', istep, '. ***'
     end if
-#if defined(_TIMING)
-      !$acc wait(1)
-      dt12 = MPI_WTIME()-dt12
-      call MPI_ALLREDUCE(dt12,dt12av ,1,MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(dt12,dt12min,1,MPI_REAL_RP,MPI_MIN,MPI_COMM_WORLD,ierr)
-      call MPI_ALLREDUCE(dt12,dt12max,1,MPI_REAL_RP,MPI_MAX,MPI_COMM_WORLD,ierr)
-      if(myid == 0) print*, 'Avrg, min & max elapsed time: '
-      if(myid == 0) print*, dt12av/(1.*product(dims)),dt12min,dt12max
-#endif
+    !$acc wait(1)
+    dt12 = MPI_WTIME()-dt12
+    call MPI_ALLREDUCE(dt12,dt12av ,1,MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
+    call MPI_ALLREDUCE(dt12,dt12min,1,MPI_REAL_RP,MPI_MIN,MPI_COMM_WORLD,ierr)
+    call MPI_ALLREDUCE(dt12,dt12max,1,MPI_REAL_RP,MPI_MAX,MPI_COMM_WORLD,ierr)
+    if(myid == 0) print*, 'Avrg, min & max elapsed time: '
+    if(myid == 0) print*, dt12av/(1.*product(dims)),dt12min,dt12max
   end do
   !
   ! clear ffts

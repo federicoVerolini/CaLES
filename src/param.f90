@@ -72,7 +72,7 @@ real(rp), protected :: dx,dy
 character(len=100), protected :: sgstype
 integer, protected, dimension(0:1,3) :: lwm
 real(rp), protected :: hwm
-integer, dimension(0:1,3) :: ind_wm
+integer, dimension(0:1,3) :: index_wm
 #if defined(_OPENACC)
 !
 ! cuDecomp input parameters

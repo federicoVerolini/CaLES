@@ -29,7 +29,8 @@ module mod_sanity
   private
   public test_sanity_input
   contains
-  subroutine test_sanity_input(ng,dims,sgstype,stop_type,cbcvel,cbcpre,cbcsgs,bcvel,bcpre,bcsgs,n,is_bound,lwm,l,zc,dl,h,is_forced)
+  subroutine test_sanity_input(ng,dims,sgstype,stop_type,cbcvel,cbcpre,cbcsgs,bcvel,bcpre,bcsgs, &
+                               n,is_bound,lwm,l,zc,dl,h,is_forced)
     !
     ! performs some a priori checks of the input files before the calculation starts
     !

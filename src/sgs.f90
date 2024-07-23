@@ -18,7 +18,7 @@ module mod_sgs
   contains
   !
   subroutine cmpt_sgs(sgstype,n,ng,lo,hi,cbcvel,cbcsgs,bcs,nb,is_bound,lwm,l,dl,dli,zc,zf,dzc,dzf, &
-                      dzci,dzfi,visc,h,ind,u,v,w,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,visct)
+                      dzci,dzfi,visc,h,index_wm,u,v,w,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,visct)
     !
     ! compute subgrid viscosity at cell centers
     ! the LES with the dynamic model is ~2 times the cost of the LES with the static one.
@@ -40,7 +40,7 @@ module mod_sgs
     type(bound), intent(in   ) :: bcs
     type(bound), intent(inout) :: bcuf,bcvf,bcwf
     type(bound), intent(in   ) :: bcu_mag,bcv_mag,bcw_mag
-    integer , intent(in ), dimension(0:1,3)      :: nb,lwm,ind
+    integer , intent(in ), dimension(0:1,3)      :: nb,lwm,index_wm
     logical , intent(in ), dimension(0:1,3)      :: is_bound
     real(rp), intent(in ), dimension(3)          :: l,dl,dli
     real(rp), intent(in ), dimension(0:)         :: zc,zf,dzc,dzf,dzci,dzfi
@@ -248,7 +248,7 @@ module mod_sgs
       ! should satisfy the wall bc's, evidenced by the fact that each mode satisfies
       ! the no-slip/no-penetration bc's if a spectral filter is applied.
       call bounduvw(cbcvel,n,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,nb,is_bound,lwm, &
-                    l,dl,zc,zf,dzc,dzf,visc,h,ind,.false.,.false.,uf,vf,wf)
+                    l,dl,zc,zf,dzc,dzf,visc,h,index_wm,.false.,.false.,uf,vf,wf)
       call extrapolate(n,is_bound,dzci,uf,wk1,iface=1,lwm=lwm)
       call extrapolate(n,is_bound,dzci,vf,wk2,iface=2,lwm=lwm)
       call extrapolate(n,is_bound,dzci,wf,wk3,iface=3,lwm=lwm)

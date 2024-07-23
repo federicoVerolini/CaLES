@@ -15,7 +15,7 @@ module mod_bound
   public boundp,bounduvw,cmpt_rhs_b,updt_rhs_b,initbc
   contains
   subroutine bounduvw(cbc,n,bcu,bcv,bcw,bcu_mag,bcv_mag,bcw_mag,nb,is_bound,lwm,l,dl,zc,zf,dzc,dzf, &
-                      visc,h,ind,is_updt_wm,is_correc,u,v,w)
+                      visc,h,index_wm,is_updt_wm,is_correc,u,v,w)
     !
     ! imposes velocity boundary conditions
     !
@@ -26,7 +26,7 @@ module mod_bound
     type(bound)     , intent(in) :: bcu_mag,bcv_mag,bcw_mag
     integer , intent(in), dimension(0:1,3) :: nb
     logical , intent(in), dimension(0:1,3) :: is_bound
-    integer , intent(in), dimension(0:1,3) :: lwm,ind
+    integer , intent(in), dimension(0:1,3) :: lwm,index_wm
     real(rp), intent(in), dimension(3) :: l,dl
     real(rp), intent(in), dimension(0:) :: zc,zf,dzc,dzf
     real(rp), intent(in) :: visc,h
@@ -117,7 +117,7 @@ module mod_bound
     ! The computational cost of the log-law wall model is negligible.
     !
     if(is_updt_wm) then
-      call updt_wallmodelbc(n,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,ind,u,v,w, &
+      call updt_wallmodelbc(n,is_bound,lwm,l,dl,zc,zf,dzc,dzf,visc,h,index_wm,u,v,w, &
                             bcu,bcv,bcw,bcu_mag,bcv_mag,bcw_mag)
     end if
     !
@@ -488,23 +488,22 @@ module mod_bound
     real(rp) :: sgn
     integer :: ibound
     !
-    !$acc enter data copyin(dlc,dlf) async(1)
     select case(c_or_f)
     case('c')
       do ibound = 0,1
         select case(cbc(ibound))
         case('P')
-          !$acc kernels default(present) async(1)
+          !$acc kernels present(rhs,bc) async(1)
           rhs(:,:,ibound) =  0._rp
           !$acc end kernels
         case('D')
-          !$acc kernels default(present) async(1)
+          !$acc kernels present(rhs,bc) async(1)
           rhs(:,:,ibound) = -2._rp*bc(:,:,ibound)/dlc(ibound)/dlf(ibound)
           !$acc end kernels
         case('N')
           if(ibound == 0) sgn =  1._rp
           if(ibound == 1) sgn = -1._rp
-          !$acc kernels default(present) async(1)
+          !$acc kernels present(rhs,bc) async(1)
           rhs(:,:,ibound) = sgn*bc(:,:,ibound)/dlf(ibound)
           !$acc end kernels
         end select
@@ -513,24 +512,22 @@ module mod_bound
       do ibound = 0,1
         select case(cbc(ibound))
         case('P')
-          !$acc kernels default(present) async(1)
+          !$acc kernels present(rhs,bc) async(1)
           rhs(:,:,ibound) =  0._rp
           !$acc end kernels
         case('D')
-          !$acc kernels default(present) async(1)
+          !$acc kernels present(rhs,bc) async(1)
           rhs(:,:,ibound) = -bc(:,:,ibound)/dlc(ibound)/dlf(ibound)
           !$acc end kernels
         case('N')
           if(ibound == 0) sgn =  1._rp
           if(ibound == 1) sgn = -1._rp
-          !$acc kernels default(present) async(1)
+          !$acc kernels present(rhs,bc) async(1)
           rhs(:,:,ibound) = sgn*bc(:,:,ibound)/dlc(ibound)
           !$acc end kernels
         end select
       end do
     end select
-    !$acc exit data delete(dlc,dlf) async(1)
-    !$acc wait(1)    !!!!should be be removed?
   end subroutine bc_rhs
   !
   subroutine updt_rhs_b(c_or_f,cbc,n,is_bound,rhsbx,rhsby,rhsbz,p)
@@ -698,7 +695,7 @@ module mod_bound
 #endif
   !
   subroutine initbc(sgstype,cbcvel,bcvel,bcpre,bcsgs,bcu,bcv,bcw,bcp,bcs,bcu_mag,bcv_mag,bcw_mag, &
-                    bcuf,bcvf,bcwf,n,is_bound,lwm,l,zc,dl,dzc,h,ind)
+                    bcuf,bcvf,bcwf,n,is_bound,lwm,l,zc,dl,dzc,h,index_wm)
     !
     ! initialize bcu,bcv,bcw,bcp,bcs,bcu_mag,bcv_mag,bcw_mag,bcuf,bcvf,bcwf
     !
@@ -714,7 +711,7 @@ module mod_bound
     real(rp), intent(in), dimension(3) :: l,dl
     real(rp), intent(in), dimension(0:) :: zc,dzc
     real(rp), intent(in) :: h
-    integer,  intent(out), dimension(0:1,3) :: ind
+    integer,  intent(out), dimension(0:1,3) :: index_wm
     integer :: i,j,k,i1,i2,j1,j2,k1,k2,ivel,idir
     !
     do idir = 1,3
@@ -790,7 +787,7 @@ module mod_bound
       end do
       i2 = i
       i1 = i - 1
-      ind(0,1) = i2
+      index_wm(0,1) = i2
     end if
     if(is_bound(1,1).and.lwm(1,1)/=0) then
       i = n(1)
@@ -799,7 +796,7 @@ module mod_bound
       end do
       i2 = i
       i1 = i + 1
-      ind(1,1) = i2
+      index_wm(1,1) = i2
     end if
     if(is_bound(0,2).and.lwm(0,2)/=0) then
       j = 1
@@ -808,7 +805,7 @@ module mod_bound
       end do
       j2 = j
       j1 = j - 1
-      ind(0,2) = j2
+      index_wm(0,2) = j2
     end if
     if(is_bound(1,2).and.lwm(1,2)/=0) then
       j = n(2)
@@ -817,7 +814,7 @@ module mod_bound
       end do
       j2 = j
       j1 = j + 1
-      ind(1,2) = j2
+      index_wm(1,2) = j2
     end if
     if(is_bound(0,3).and.lwm(0,3)/=0) then
       k = 1
@@ -826,7 +823,7 @@ module mod_bound
       end do
       k2 = k
       k1 = k - 1
-      ind(0,3) = k2
+      index_wm(0,3) = k2
     end if
     if(is_bound(1,3).and.lwm(1,3)/=0) then
       k = n(3)
@@ -835,7 +832,7 @@ module mod_bound
       end do
       k2 = k
       k1 = k + 1
-      ind(1,3) = k2
+      index_wm(1,3) = k2
     end if
     !
   end subroutine initbc
