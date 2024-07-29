@@ -293,7 +293,7 @@ module mod_wmodel
     ! utau=visc/h*exp(-kap_log*b_log). It is necessary to use abs to avoid negative values
     ! of utau. Note that arrays (u/v/w) are initialized as zero (ghost points), which
     ! makes a reasonable guess at end points. The convergence criterion is
-    ! |tauw/taw_old-1.0|<1.0e-4, corresponding to |utau/utau_old-1.0|<0.5e-4.
+    ! |tauw/tauw_old-1.0|<1.0e-4, corresponding to |utau/utau_old-1.0|<0.5e-4.
     ! For a channel, it is efficient to use the computed utau available at the nearest
     ! grid point, which helps reduce ~50% of the iterations. However, "if" statements
     ! must be introduced at special points in square duct/cavity.

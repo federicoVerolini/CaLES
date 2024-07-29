@@ -114,7 +114,7 @@ module mod_sgs
       ! Lij
       !
       call interpolate(n,u,v,w,uc,vc,wc)
-      ! periodic/patched bc's are handled, wall bc ghost points are set
+      ! periodic/patched bc's are updated, wall bc ghost points are set
       ! by extrapolation from the interior.
       call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,uc)
       call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,vc)
@@ -180,7 +180,7 @@ module mod_sgs
       !
       ! Mij
       !
-      ! periodic/patched bc's are handled, wall bc ghost points are set
+      ! periodic/patched bc's are updated, wall bc ghost points are set
       ! by extrapolation from the interior.
       call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,s0)
       call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,sij(:,:,:,1))
