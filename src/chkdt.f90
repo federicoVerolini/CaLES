@@ -45,8 +45,10 @@ module mod_chkdt
     !
     dti  = 0._rp
     dtid = 0._rp
-    !$acc data copy(dti) async(1)
-    !$acc parallel loop collapse(3) default(present) private(ux,uy,uz,vx,vy,vz,wx,wy,wz,dtix,dtiy,dtiz) reduction(max:dti) async(1)
+    !$acc data copy(dti,dtid) async(1)
+    !$acc parallel loop collapse(3) default(present) reduction(max:dti,dtid) async(1) &
+    !$acc private(ux,uy,uz,vx,vy,vz,wx,wy,wz,dtix,dtiy,dtiz) &
+    !$acc private(viscx,viscy,viscz,dtidx,dtidy,dtidz)
     do k=1,n(3)
       do j=1,n(2)
         do i=1,n(1)
@@ -63,16 +65,7 @@ module mod_chkdt
           dtiy = uy*dxi+vy*dyi+wy*dzfi(k)
           dtiz = uz*dxi+vz*dyi+wz*dzci(k)
           dti  = max(dti,dtix,dtiy,dtiz)
-        end do
-      end do
-    end do
-    !$acc end data
-    !
-    !$acc data copy(dtid) async(1)
-    !$acc parallel loop collapse(3) default(present) private(viscx,viscy,viscz,dtidx,dtidy,dtidz) reduction(max:dtid) async(1)
-    do k=1,n(3)
-      do j=1,n(2)
-        do i=1,n(1)
+          !
           viscx = 0.5_rp*(visct(i,j,k)+visct(i+1,j  ,k  ))
           viscy = 0.5_rp*(visct(i,j,k)+visct(i  ,j+1,k  ))
           viscz = 0.5_rp*(visct(i,j,k)+visct(i  ,j  ,k+1))

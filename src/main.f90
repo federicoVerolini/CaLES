@@ -48,8 +48,6 @@ program cans
   use mod_rk             , only: rk
   use mod_output         , only: out0d,gen_alias,out1d,out1d_chan,out1d_single_point_chan,out2d,out3d,write_log_output, &
                                  write_visu_2d,write_visu_3d,out2d_duct
-  ! use mod_output_pdfs    , only: pdfs_sergio
-  ! use mod_spectra        , only: init_spectra,cmpt_spectra
   use mod_param          , only: ng,l,dl,dli, &
                                  gtype,gr, &
                                  cfl,dtmin, &
@@ -80,7 +78,6 @@ program cans
   use mod_workspaces     , only: init_wspace_arrays,set_cufft_wspace
   use mod_common_cudecomp, only: istream_acc_queue_1
 #endif
-  use mod_timer          , only: timer_tic,timer_toc,timer_print
   use mod_updatep        , only: updatep
   use mod_utils          , only: bulk_mean
   !@acc use mod_utils    , only: device_memory_footprint
@@ -345,7 +342,6 @@ program cans
   !
   ! determine workspace sizes and allocate the memory
   !
-  ! call init_spectra(ng)
   call init_wspace_arrays()
   call set_cufft_wspace(pack(arrplanp,.true.),istream_acc_queue_1)
 #if defined(_IMPDIFF) && !defined(_IMPDIFF_1D)

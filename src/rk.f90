@@ -148,26 +148,7 @@ module mod_rk
     call swap(dudtrk,dudtrko)
     call swap(dvdtrk,dvdtrko)
     call swap(dwdtrk,dwdtrko)
-!#if 0 /*pressure gradient term treated explicitly later */
-!    !$acc kernels
-!    dudtrk(:,:,:) = 0._rp
-!    dvdtrk(:,:,:) = 0._rp
-!    dwdtrk(:,:,:) = 0._rp
-!    !$acc end kernels
-!    call momx_p(n(1),n(2),n(3),dli(1),bforce(1),p,dudtrk)
-!    call momy_p(n(1),n(2),n(3),dli(2),bforce(2),p,dvdtrk)
-!    call momz_p(n(1),n(2),n(3),dzci  ,bforce(3),p,dwdtrk)
-!    !$acc parallel loop collapse(3)
-!    do k=1,n(3)
-!      do j=1,n(2)
-!        do i=1,n(1)
-!          u(i,j,k) = u(i,j,k) + factor12*dudtrk(i,j,k)
-!          v(i,j,k) = v(i,j,k) + factor12*dvdtrk(i,j,k)
-!          w(i,j,k) = w(i,j,k) + factor12*dwdtrk(i,j,k)
-!        end do
-!      end do
-!    end do
-!#endif
+    !
 #if !defined(_FAST_MOM_KERNELS)
     !$acc parallel loop collapse(3) default(present) async(1)
     do k=1,n(3)
