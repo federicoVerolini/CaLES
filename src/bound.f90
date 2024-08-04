@@ -457,19 +457,43 @@ module mod_bound
     real(rp), intent(out), dimension(:,:,0:), optional :: rhsbx
     real(rp), intent(out), dimension(:,:,0:), optional :: rhsby
     real(rp), intent(out), dimension(:,:,0:), optional :: rhsbz
+    real(rp), allocatable, dimension(:)     , save     :: dxc01,dxf01,dyc01,dyf01, &
+                                                          dzc01_c,dzf01_c,dzc01_f,dzf01_f
+    logical, save :: is_first = .true.
+    !
+    if(is_first) then
+      is_first = .false.
+      allocate(dxc01  (0:1), &
+               dxf01  (0:1), &
+               dyc01  (0:1), &
+               dyf01  (0:1), &
+               dzc01_c(0:1), &
+               dzf01_c(0:1), &
+               dzc01_f(0:1), &
+               dzf01_f(0:1))
+      dxc01 = [dl(1) ,dl(1)]
+      dxf01 = [dl(1) ,dl(1)]
+      dyc01 = [dl(2) ,dl(2)]
+      dyf01 = [dl(2) ,dl(2)]
+      dzc01_c = [dzc(0),dzc(ng(3)  )]
+      dzf01_c = [dzf(1),dzf(ng(3)  )]
+      dzc01_f = [dzc(1),dzc(ng(3)-1)]
+      dzf01_f = [dzf(1),dzf(ng(3)  )]
+      !$acc enter data copyin(dxc01,dxf01,dyc01,dyf01,dzc01_c,dzf01_c,dzc01_f,dzf01_f) async(1)
+    end if
     !
     if(present(rhsbx)) then
-      call bc_rhs(cbc(:,1),bc%x,[dl(1) ,dl(1)      ],[dl(1) ,dl(1)    ],c_or_f(1),rhsbx) ! x-direction
+      call bc_rhs(cbc(:,1),bc%x,dxc01  ,dxf01,c_or_f(1),rhsbx) ! x-direction
     end if
     if(present(rhsby)) then
-      call bc_rhs(cbc(:,2),bc%y,[dl(2) ,dl(2)      ],[dl(2) ,dl(2)    ],c_or_f(2),rhsby) ! y-direction
+      call bc_rhs(cbc(:,2),bc%y,dyc01  ,dyf01,c_or_f(2),rhsby) ! y-direction
     end if
     if(     c_or_f(3) == 'c') then
       if(present(rhsbz)) &
-      call bc_rhs(cbc(:,3),bc%z,[dzc(0),dzc(ng(3)  )],[dzf(1),dzf(ng(3))],c_or_f(3),rhsbz) ! z-direction
+      call bc_rhs(cbc(:,3),bc%z,dzc01_c,dzf01_c,c_or_f(3),rhsbz) ! z-direction
     else if(c_or_f(3) == 'f') then
       if(present(rhsbz)) &
-      call bc_rhs(cbc(:,3),bc%z,[dzc(1),dzc(ng(3)-1)],[dzf(1),dzf(ng(3))],c_or_f(3),rhsbz) ! z-direction
+      call bc_rhs(cbc(:,3),bc%z,dzc01_f,dzf01_f,c_or_f(3),rhsbz) ! z-direction
     end if
   end subroutine cmpt_rhs_b
   !
@@ -488,17 +512,20 @@ module mod_bound
       do ibound = 0,1
         select case(cbc(ibound))
         case('P')
-          !$acc kernels present(rhs,bc) async(1)
+          !$acc kernels default(present) async(1)
           rhs(:,:,ibound) =  0._rp
           !$acc end kernels
         case('D')
-          !$acc kernels present(rhs,bc) async(1)
+          !$acc kernels default(present) async(1)
           rhs(:,:,ibound) = -2._rp*bc(:,:,ibound)/dlc(ibound)/dlf(ibound)
           !$acc end kernels
         case('N')
-          if(ibound == 0) sgn =  1._rp
-          if(ibound == 1) sgn = -1._rp
-          !$acc kernels present(rhs,bc) async(1)
+          if(ibound == 0) then
+            sgn =  1._rp
+          else
+            sgn = -1._rp
+          end if
+          !$acc kernels default(present) async(1)
           rhs(:,:,ibound) = sgn*bc(:,:,ibound)/dlf(ibound)
           !$acc end kernels
         end select
@@ -507,17 +534,20 @@ module mod_bound
       do ibound = 0,1
         select case(cbc(ibound))
         case('P')
-          !$acc kernels present(rhs,bc) async(1)
+          !$acc kernels default(present) async(1)
           rhs(:,:,ibound) =  0._rp
           !$acc end kernels
         case('D')
-          !$acc kernels present(rhs,bc) async(1)
+          !$acc kernels default(present) async(1)
           rhs(:,:,ibound) = -bc(:,:,ibound)/dlc(ibound)/dlf(ibound)
           !$acc end kernels
         case('N')
-          if(ibound == 0) sgn =  1._rp
-          if(ibound == 1) sgn = -1._rp
-          !$acc kernels present(rhs,bc) async(1)
+          if(ibound == 0) then
+            sgn =  1._rp
+          else
+            sgn = -1._rp
+          end if
+          !$acc kernels default(present) async(1)
           rhs(:,:,ibound) = sgn*bc(:,:,ibound)/dlc(ibound)
           !$acc end kernels
         end select

@@ -255,7 +255,7 @@ program cans
       write(99,*) l(1),l(2),l(3)
     close(99)
   end if
-  !$acc enter data copyin(lo,hi,n) async
+  !$acc enter data copyin(lo,hi,n,ng) async
   !$acc enter data copyin(bforce,dl,dli,l) async
   !$acc enter data copyin(zc_g,zf_g,dzc_g,dzf_g) async
   !$acc enter data create(zc,zf,dzc,dzf,dzci,dzfi,dzci_g,dzfi_g) async
