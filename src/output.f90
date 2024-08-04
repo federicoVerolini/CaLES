@@ -75,25 +75,23 @@ module mod_output
     real(dp) :: grid_area_ratio,p1d_s
     !
     allocate(p1d(ng(idir)))
-    !$acc enter data create(p1d)
-    !$acc kernels default(present)
-    p1d(:) = 0._rp
-    !$acc end kernels
     select case(idir)
     case(3)
       grid_area_ratio = dl(1)*dl(2)/(l(1)*l(2))
-      !$acc parallel loop gang default(present) private(p1d_s)
+      !$acc data copyout(p1d) async(1)
+      !$acc parallel loop gang default(present) private(p1d_s) async(1)
       do k=lo(3),hi(3)
         p1d_s = 0._rp
-        !$acc loop collapse(2) reduction(+:p1d_s)
+        !$acc loop vector collapse(2) reduction(+:p1d_s)
         do j=lo(2),hi(2)
           do i=lo(1),hi(1)
-            p1d_s = p1d_s + p(i,j,k)*grid_area_ratio
+            p1d_s = p1d_s + p(i,j,k)
           end do
         end do
-        p1d(k) = p1d_s
+        p1d(k) = p1d_s*grid_area_ratio
       end do
-      !$acc exit data copyout(p1d)
+      !$acc end data
+      !$acc wait(1)
       call MPI_ALLREDUCE(MPI_IN_PLACE,p1d(1),ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
       if(myid == 0) then
         open(newunit=iunit,file=fname)
@@ -104,18 +102,20 @@ module mod_output
       end if
     case(2)
       grid_area_ratio = dl(1)/(l(1)*l(3))
-      !$acc parallel loop gang default(present) private(p1d_s)
+      !$acc data copyout(p1d) async(1)
+      !$acc parallel loop gang default(present) private(p1d_s) async(1)
       do j=lo(2),hi(2)
         p1d_s = 0._rp
-        !$acc loop collapse(2) reduction(+:p1d_s)
+        !$acc loop vector collapse(2) reduction(+:p1d_s)
         do k=lo(3),hi(3)
           do i=lo(1),hi(1)
-            p1d_s = p1d_s + p(i,j,k)*dz(k)*grid_area_ratio
+            p1d_s = p1d_s + p(i,j,k)*dz(k)
           end do
         end do
-        p1d(j) = p1d_s
+        p1d(j) = p1d_s*grid_area_ratio
       end do
-      !$acc exit data copyout(p1d)
+      !$acc end data
+      !$acc wait(1)
       call MPI_ALLREDUCE(MPI_IN_PLACE,p1d(1),ng(2),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
       if(myid == 0) then
         open(newunit=iunit,file=fname)
@@ -126,18 +126,20 @@ module mod_output
       end if
     case(1)
       grid_area_ratio = dl(2)/(l(2)*l(3))
-      !$acc parallel loop gang default(present) private(p1d_s)
+      !$acc data copyout(p1d) async(1)
+      !$acc parallel loop gang default(present) private(p1d_s) async(1)
       do i=lo(1),hi(1)
         p1d_s = 0._rp
-        !$acc loop collapse(2) reduction(+:p1d_s)
+        !$acc loop vector collapse(2) reduction(+:p1d_s)
         do k=lo(3),hi(3)
           do j=lo(2),hi(2)
-            p1d_s = p1d_s + p(i,j,k)*dz(k)*grid_area_ratio
+            p1d_s = p1d_s + p(i,j,k)*dz(k)
           end do
         end do
-        p1d(i) = p1d_s
+        p1d(i) = p1d_s*grid_area_ratio
       end do
-      !$acc exit data copyout(p1d)
+      !$acc end data
+      !$acc wait(1)
       call MPI_ALLREDUCE(MPI_IN_PLACE,p1d(1),ng(1),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
       if(myid == 0) then
         open(newunit=iunit,file=fname)
@@ -314,6 +316,7 @@ module mod_output
     real(rp), intent(in), dimension(0:) :: z_g
     real(rp), intent(in), dimension(lo(1)-1:,lo(2)-1:,lo(3)-1:) :: u,v,w
     real(dp), allocatable, dimension(:) :: um,vm,wm,u2,v2,w2,uw
+    real(dp) :: buf01,buf02,buf03,buf04,buf05,buf06,buf07
     integer :: i,j,k
     integer :: iunit
     integer :: q
@@ -324,14 +327,19 @@ module mod_output
     case(3)
       grid_area_ratio = dl(1)*dl(2)/(l(1)*l(2))
       allocate(um(q),vm(q),wm(q),u2(q),v2(q),w2(q),uw(q))
-      um(:) = 0.
-      vm(:) = 0.
-      wm(:) = 0.
-      u2(:) = 0.
-      v2(:) = 0.
-      w2(:) = 0.
-      uw(:) = 0.
+      !$acc data copyout(um,vm,wm,u2,v2,w2,uw) async(1)
+      !$acc parallel loop gang default(present) async(1) &
+      !$acc private(buf01,buf02,buf03,buf04,buf05,buf06,buf07)
       do k=lo(3),hi(3)
+        buf01 = 0._rp
+        buf02 = 0._rp
+        buf03 = 0._rp
+        buf04 = 0._rp
+        buf05 = 0._rp
+        buf06 = 0._rp
+        buf07 = 0._rp
+        !$acc loop vector collapse(2) &
+        !$acc reduction(+:buf01,buf02,buf03,buf04,buf05,buf06,buf07)
         do j=lo(2),hi(2)
           do i=lo(1),hi(1)
             ! located at zc
@@ -345,7 +353,16 @@ module mod_output
                                  (w(i,j,k-1) + w(i,j,k))
           end do
         end do
+        um(k) = um(k)*grid_area_ratio
+        vm(k) = vm(k)*grid_area_ratio
+        wm(k) = wm(k)*grid_area_ratio
+        u2(k) = u2(k)*grid_area_ratio
+        v2(k) = v2(k)*grid_area_ratio
+        w2(k) = w2(k)*grid_area_ratio
+        uw(k) = uw(k)*grid_area_ratio
       end do
+      !$acc end data
+      !$acc wait(1)
       call MPI_ALLREDUCE(MPI_IN_PLACE,um(1),ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
       call MPI_ALLREDUCE(MPI_IN_PLACE,vm(1),ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
       call MPI_ALLREDUCE(MPI_IN_PLACE,wm(1),ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
@@ -353,13 +370,6 @@ module mod_output
       call MPI_ALLREDUCE(MPI_IN_PLACE,v2(1),ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
       call MPI_ALLREDUCE(MPI_IN_PLACE,w2(1),ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
       call MPI_ALLREDUCE(MPI_IN_PLACE,uw(1),ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-      um(:) = um(:)*grid_area_ratio
-      vm(:) = vm(:)*grid_area_ratio
-      wm(:) = wm(:)*grid_area_ratio
-      u2(:) = u2(:)*grid_area_ratio
-      v2(:) = v2(:)*grid_area_ratio
-      w2(:) = w2(:)*grid_area_ratio
-      uw(:) = uw(:)*grid_area_ratio
       if(myid == 0) then
         open(newunit=iunit,file=fname)
         do k=1,ng(3)
@@ -386,6 +396,7 @@ module mod_output
     real(rp), intent(in), dimension(0:) :: z_g
     real(rp), intent(in), dimension(lo(1)-1:,lo(2)-1:,lo(3)-1:) :: u,v,w
     real(dp), allocatable, dimension(:,:) :: um,vm,wm,u2,v2,w2,uv,uw,vw
+    real(dp) :: buf01,buf02,buf03,buf04,buf05,buf06,buf07,buf08,buf09
     integer :: i,j,k
     integer :: iunit
     integer :: p,q
@@ -399,34 +410,48 @@ module mod_output
       p = ng(2)
       q = ng(3)
       allocate(um(p,q),vm(p,q),wm(p,q),u2(p,q),v2(p,q),w2(p,q),uv(p,q),uw(p,q),vw(p,q))
-      !
-      um(:,:) = 0.
-      vm(:,:) = 0.
-      wm(:,:) = 0.
-      u2(:,:) = 0.
-      v2(:,:) = 0.
-      w2(:,:) = 0.
-      uv(:,:) = 0.
-      uw(:,:) = 0.
-      vw(:,:) = 0.
+      !$acc data copyout(um,vm,wm,u2,v2,w2,uv,uw,vw) async(1)
+      !$acc parallel loop gang collapse(2) default(present) async(1) &
+      !$acc private(buf01,buf02,buf03,buf04,buf05,buf06,buf07,buf08,buf09)
       do k=lo(3),hi(3)
         do j=lo(2),hi(2)
+          buf01 = 0._rp
+          buf02 = 0._rp
+          buf03 = 0._rp
+          buf04 = 0._rp
+          buf05 = 0._rp
+          buf06 = 0._rp
+          buf07 = 0._rp
+          buf08 = 0._rp
+          buf09 = 0._rp
+          !$acc loop vector reduction(+:buf01,buf02,buf03,buf04,buf05,buf06,buf07,buf08,buf09)
           do i=lo(1),hi(1)
-            um(j,k) = um(j,k) + u(i,j,k)
-            vm(j,k) = vm(j,k) + 0.5*(v(i,j-1,k)+v(i,j,k))
-            wm(j,k) = wm(j,k) + 0.5*(w(i,j,k-1)+w(i,j,k))
-            u2(j,k) = u2(j,k) + u(i,j,k)**2
-            v2(j,k) = v2(j,k) + 0.5*(v(i,j-1,k)**2+v(i,j,k)**2)
-            w2(j,k) = w2(j,k) + 0.5*(w(i,j,k-1)**2+w(i,j,k)**2)
-            uv(j,k) = uv(j,k) + 0.25*(u(i-1,j,k) + u(i,j,k))* &
-                                     (v(i,j-1,k) + v(i,j,k))
-            uw(j,k) = uw(j,k) + 0.25*(u(i-1,j,k) + u(i,j,k))* &
-                                     (w(i,j,k-1) + w(i,j,k))
-            vw(j,k) = vw(j,k) + 0.25*(v(i,j-1,k) + v(i,j,k))* &
-                                     (w(i,j,k-1) + w(i,j,k))
+            buf01 = buf01 + u(i,j,k)
+            buf02 = buf02 + 0.5*(v(i,j-1,k)+v(i,j,k))
+            buf03 = buf03 + 0.5*(w(i,j,k-1)+w(i,j,k))
+            buf04 = buf04 + u(i,j,k)**2
+            buf05 = buf05 + 0.5*(v(i,j-1,k)**2+v(i,j,k)**2)
+            buf06 = buf06 + 0.5*(w(i,j,k-1)**2+w(i,j,k)**2)
+            buf07 = buf07 + 0.25*(u(i-1,j,k) + u(i,j,k))* &
+                                 (v(i,j-1,k) + v(i,j,k))
+            buf08 = buf08 + 0.25*(u(i-1,j,k) + u(i,j,k))* &
+                                  (w(i,j,k-1) + w(i,j,k))
+            buf09 = buf09 + 0.25*(v(i,j-1,k) + v(i,j,k))* &
+                                  (w(i,j,k-1) + w(i,j,k))
           end do
+          um(j,k) = buf01*grid_area_ratio
+          vm(j,k) = buf02*grid_area_ratio
+          wm(j,k) = buf03*grid_area_ratio
+          u2(j,k) = buf04*grid_area_ratio
+          v2(j,k) = buf05*grid_area_ratio
+          w2(j,k) = buf06*grid_area_ratio
+          uv(j,k) = buf07*grid_area_ratio
+          uw(j,k) = buf08*grid_area_ratio
+          vw(j,k) = buf09*grid_area_ratio
         end do
       end do
+      !$acc end data
+      !$acc wait(1)
       call MPI_ALLREDUCE(MPI_IN_PLACE,um(1,1),ng(2)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
       call MPI_ALLREDUCE(MPI_IN_PLACE,vm(1,1),ng(2)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
       call MPI_ALLREDUCE(MPI_IN_PLACE,wm(1,1),ng(2)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
@@ -436,15 +461,6 @@ module mod_output
       call MPI_ALLREDUCE(MPI_IN_PLACE,uv(1,1),ng(2)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
       call MPI_ALLREDUCE(MPI_IN_PLACE,uw(1,1),ng(2)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
       call MPI_ALLREDUCE(MPI_IN_PLACE,vw(1,1),ng(2)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-      um(:,:) = um(:,:)*grid_area_ratio
-      vm(:,:) = vm(:,:)*grid_area_ratio
-      wm(:,:) = wm(:,:)*grid_area_ratio
-      u2(:,:) = u2(:,:)*grid_area_ratio
-      v2(:,:) = v2(:,:)*grid_area_ratio
-      w2(:,:) = w2(:,:)*grid_area_ratio
-      uv(:,:) = uv(:,:)*grid_area_ratio
-      uw(:,:) = uw(:,:)*grid_area_ratio
-      vw(:,:) = vw(:,:)*grid_area_ratio
       if(myid == 0) then
         open(newunit=iunit,file=fname)
         do k=1,ng(3)
@@ -473,7 +489,7 @@ module mod_output
     integer :: i,j,k,q
     integer :: iunit
     integer :: nn,nvars
-    character(len=30) cfmt
+    character(len=30) :: cfmt
     real(dp) :: grid_area_ratio
     real(dp) :: buf01,buf02,buf03,buf04,buf05,buf06,buf07,buf08,buf09,buf10, &
                 buf11,buf12,buf13,buf14,buf15,buf16,buf17,buf18,buf19,buf20, &
@@ -489,11 +505,15 @@ module mod_output
     case(3)
       grid_area_ratio = dl(1)*dl(2)/(l(1)*l(2))
       allocate(buf(nvars,nn))
-      !$acc enter data create(buf)
-      !$acc kernels
-      buf(:,:) = 0._rp
-      !$acc end kernels
-      !$acc parallel loop gang
+      !$acc enter data create(buf) async(1)
+      !$acc parallel loop gang default(present) async(1) &
+      !$acc private(buf01,buf02,buf03,buf04,buf05,buf06,buf07,buf08,buf09,buf10) &
+      !$acc private(buf11,buf12,buf13,buf14,buf15,buf16,buf17,buf18,buf19,buf20) &
+      !$acc private(buf21,buf22,buf23,buf24,buf25,buf26,buf27,buf28,buf29,buf30) &
+      !$acc private(buf31,buf32,buf33,buf34,buf35,buf36,buf37,buf38) &
+      !$acc private(tmp_x,tmp_y,tmp_z) &
+      !$acc private(s_ccc,s_pcc,s_cpc,s_ccp,s_pcp) &
+      !$acc private(dudx_ip,dudx_im,dvdy_jp,dvdy_jm,dwdz_kp,dwdz_km,dudz,dwdx)
       do k=lo(3),hi(3)
         buf01 = 0._rp
         buf02 = 0._rp
@@ -522,7 +542,10 @@ module mod_output
         buf25 = 0._rp
         buf26 = 0._rp
         buf27 = 0._rp
-        !$acc loop vector collapse(2)
+        !$acc loop vector collapse(2) &
+        !$acc reduction(+:buf01,buf02,buf03,buf04,buf05,buf06,buf07,buf08,buf09,buf10) &
+        !$acc reduction(+:buf11,buf12,buf13,buf14,buf15,buf16,buf17,buf18,buf19,buf20) &
+        !$acc reduction(+:buf21,buf22,buf23,buf24,buf25,buf26,buf27)
         do j=lo(2),hi(2)
           do i=lo(1),hi(1)
             !
@@ -626,7 +649,8 @@ module mod_output
         buf(26,k) = buf26*grid_area_ratio
         buf(27,k) = buf27*grid_area_ratio
       end do
-      !$acc update self(buf)
+      !$acc update self(buf) async(1)
+      !$acc wait(1)
       call mpi_allreduce(MPI_IN_PLACE,buf(1,1),size(buf),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
       if(myid == 0) then
         nvars = 27
@@ -643,10 +667,11 @@ module mod_output
       !
       ! MKE and Reynolds shear stresses budgets
       !
-      !$acc kernels
-      buf(:,:) = 0._rp
-      !$acc end kernels
-      !$acc parallel loop gang
+      !$acc parallel loop gang default(present) async(1) &
+      !$acc private(buf01,buf02,buf03,buf04,buf05,buf06,buf07,buf08,buf09,buf10) &
+      !$acc private(buf11,buf12,buf13,buf14,buf15,buf16,buf17,buf18,buf19,buf20) &
+      !$acc private(buf21,buf22,buf23,buf24,buf25,buf26,buf27,buf28,buf29,buf30) &
+      !$acc private(buf31,buf32,buf33,buf34,buf35,buf36,buf37,buf38)
       do k=lo(3),hi(3)
         buf01 = 0._rp
         buf02 = 0._rp
@@ -686,7 +711,11 @@ module mod_output
         buf36 = 0._rp
         buf37 = 0._rp
         buf38 = 0._rp
-        !$acc loop vector collapse(2)
+        !$acc loop vector collapse(2) &
+        !$acc reduction(+:buf01,buf02,buf03,buf04,buf05,buf06,buf07,buf08,buf09,buf10) &
+        !$acc reduction(+:buf11,buf12,buf13,buf14,buf15,buf16,buf17,buf18,buf19,buf20) &
+        !$acc reduction(+:buf21,buf22,buf23,buf24,buf25,buf26,buf27,buf28,buf29,buf30) &
+        !$acc reduction(+:buf31,buf32,buf33,buf34,buf35,buf36,buf37,buf38)
         do j=lo(2),hi(2)
           do i=lo(1),hi(1)
             !
@@ -925,7 +954,8 @@ module mod_output
         buf(37,k) = buf37*grid_area_ratio
         buf(38,k) = buf38*grid_area_ratio
       end do
-      !$acc update self(buf)
+      !$acc update self(buf) async(1)
+      !$acc wait(1)
       call mpi_allreduce(MPI_IN_PLACE,buf(1,1),size(buf),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
       if(myid == 0) then
         nvars = 38
@@ -941,7 +971,9 @@ module mod_output
       end if
       block
       use mod_param, only:dx,dy
-      !$acc parallel loop gang
+      !$acc parallel loop gang default(present) async(1) &
+      !$acc private(buf01,buf02,buf03,buf04,buf05,buf06) &
+      !$acc private(div)
       do k=lo(3),hi(3)
         buf01 = 0._rp
         buf02 = 0._rp
@@ -973,7 +1005,8 @@ module mod_output
         buf(5,k) = buf05*grid_area_ratio
         buf(6,k) = buf06*grid_area_ratio
       end do
-      !$acc update self(buf)
+      !$acc update self(buf) async(1)
+      !$acc wait(1)
       call mpi_allreduce(MPI_IN_PLACE,buf(1,1),size(buf),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
       if(myid == 0) then
         nvars = 6
@@ -991,7 +1024,6 @@ module mod_output
     case(2)
     case(1)
     end select
-    !$acc exit data delete(buf)
-    !$acc wait
+    !$acc exit data delete(buf) async(1)
   end subroutine out1d_single_point_chan
 end module mod_output

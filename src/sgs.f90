@@ -428,7 +428,7 @@ module mod_sgs
       do k=lo(3),hi(3)
         do i=lo(1),hi(1)
           p2d_s = 0._rp
-          !$acc loop reduction(+:p2d_s)
+          !$acc loop vector reduction(+:p2d_s)
           do j=lo(2),hi(2)
             p2d_s = p2d_s + p(i,j,k)
           end do
@@ -453,7 +453,7 @@ module mod_sgs
       do k=lo(3),hi(3)
         do j=lo(2),hi(2)
           p2d_s = 0._rp
-          !$acc loop reduction(+:p2d_s)
+          !$acc loop vector reduction(+:p2d_s)
           do i=lo(1),hi(1)
             p2d_s = p2d_s + p(i,j,k)
           end do

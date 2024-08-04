@@ -443,26 +443,21 @@ module mod_bound
     end select
   end subroutine inflow
   !
-  subroutine cmpt_rhs_b(ng,dli,dzci,dzfi,cbc,bc,c_or_f,rhsbx,rhsby,rhsbz)
+  subroutine cmpt_rhs_b(ng,dl,dzc,dzf,cbc,bc,c_or_f,rhsbx,rhsby,rhsbz)
     !
     ! compute values added to the right hand side
     !
     implicit none
     integer , intent(in), dimension(3) :: ng
-    real(rp), intent(in), dimension(3 ) :: dli
-    real(rp), intent(in), dimension(0:) :: dzci,dzfi
+    real(rp), intent(in), dimension(3 ) :: dl
+    real(rp), intent(in), dimension(0:) :: dzc,dzf
     character(len=1), intent(in), dimension(0:1,3) :: cbc
     type(bound)     , intent(in) :: bc
     character(len=1), intent(in), dimension(3) :: c_or_f
     real(rp), intent(out), dimension(:,:,0:), optional :: rhsbx
     real(rp), intent(out), dimension(:,:,0:), optional :: rhsby
     real(rp), intent(out), dimension(:,:,0:), optional :: rhsbz
-    real(rp), dimension(3) :: dl
-    real(rp), dimension(0:ng(3)+1) :: dzc,dzf
     !
-    dl(:)  = dli( :)**(-1)
-    dzc(:) = dzci(:)**(-1)
-    dzf(:) = dzfi(:)**(-1)
     if(present(rhsbx)) then
       call bc_rhs(cbc(:,1),bc%x,[dl(1) ,dl(1)      ],[dl(1) ,dl(1)    ],c_or_f(1),rhsbx) ! x-direction
     end if

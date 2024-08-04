@@ -312,7 +312,7 @@ program cans
   !$acc enter data copyin(lambdaxyp,ap,bp,cp) async
   !$acc enter data create(rhsbp,rhsbp%x,rhsbp%y,rhsbp%z) async
   !$acc wait
-  call cmpt_rhs_b(ng,dli,dzci_g,dzfi_g,cbcpre,bcp,['c','c','c'],rhsbp%x,rhsbp%y,rhsbp%z)
+  call cmpt_rhs_b(ng,dl,dzc_g,dzf_g,cbcpre,bcp,['c','c','c'],rhsbp%x,rhsbp%y,rhsbp%z)
 #if defined(_IMPDIFF)
   !
   ! initialize Helmholtz solver, three velocities
@@ -412,7 +412,7 @@ program cans
       call bulk_forcing(n,is_forced,f,u,v,w)
 #if defined(_IMPDIFF)
       alpha = -.5*visc*dtrk
-      call cmpt_rhs_b(ng,dli,dzci_g,dzfi_g,cbcvel(:,:,1),bcu,['f','c','c'],rhsbu%x,rhsbu%y,rhsbu%z)
+      call cmpt_rhs_b(ng,dl,dzc_g,dzf_g,cbcvel(:,:,1),bcu,['f','c','c'],rhsbu%x,rhsbu%y,rhsbu%z)
       !$acc kernels present(rhsbx,rhsby,rhsbz,rhsbu) async(1)
 #if !defined(_IMPDIFF_1D)
       rhsbx(:,:,0:1) = rhsbu%x(:,:,0:1)*alpha
@@ -434,7 +434,7 @@ program cans
 #else
       call solver_gaussel_z(n                    ,aa,bb,cc,cbcvel(:,3,1),['f','c','c'],u)
 #endif
-      call cmpt_rhs_b(ng,dli,dzci_g,dzfi_g,cbcvel(:,:,2),bcv,['c','f','c'],rhsbv%x,rhsbv%y,rhsbv%z)
+      call cmpt_rhs_b(ng,dl,dzc_g,dzf_g,cbcvel(:,:,2),bcv,['c','f','c'],rhsbv%x,rhsbv%y,rhsbv%z)
       !$acc kernels present(rhsbx,rhsby,rhsbz,rhsbv) async(1)
 #if !defined(_IMPDIFF_1D)
       rhsbx(:,:,0:1) = rhsbv%x(:,:,0:1)*alpha
@@ -456,7 +456,7 @@ program cans
 #else
       call solver_gaussel_z(n                    ,aa,bb,cc,cbcvel(:,3,2),['c','f','c'],v)
 #endif
-      call cmpt_rhs_b(ng,dli,dzci_g,dzfi_g,cbcvel(:,:,3),bcw,['c','c','f'],rhsbw%x,rhsbw%y,rhsbw%z)
+      call cmpt_rhs_b(ng,dl,dzc_g,dzf_g,cbcvel(:,:,3),bcw,['c','c','f'],rhsbw%x,rhsbw%y,rhsbw%z)
       !$acc kernels present(rhsbx,rhsby,rhsbz,rhsbw) async(1)
 #if !defined(_IMPDIFF_1D)
       rhsbx(:,:,0:1) = rhsbw%x(:,:,0:1)*alpha
@@ -563,8 +563,6 @@ program cans
     end if
     write(fldnum,'(i7.7)') istep
     if(mod(istep,iout1d) == 0) then
-      !$acc update self(u,v,w,p,visct) async(1)
-      !$acc wait(1)
       include 'out1d.h90'
     end if
     if(mod(istep,iout2d) == 0) then
