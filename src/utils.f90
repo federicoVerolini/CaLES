@@ -28,10 +28,8 @@ contains
     real(rp), intent(out) :: mean
     integer :: i,j,k
     integer :: ierr
-    !$acc data copyout(mean) async(1)
-    !$acc parallel default(present) async(1)
-    mean = 0._rp
-    !$acc end parallel
+    mean = 0.
+    !$acc data copy(mean) async(1)
     !$acc parallel loop collapse(3) default(present) reduction(+:mean) async(1)
     do k=1,n(3)
       do j=1,n(2)
