@@ -334,7 +334,7 @@ module mod_sgs
       !$acc parallel loop gang default(present) private(p1d_s) async(1)
       do k=lo(3),hi(3)
         p1d_s = 0._rp
-        !$acc loop collapse(2) reduction(+:p1d_s)
+        !$acc loop vector collapse(2) reduction(+:p1d_s)
         do j=lo(2),hi(2)
           do i=lo(1),hi(1)
             p1d_s = p1d_s + p(i,j,k)*grid_area_ratio
@@ -358,7 +358,7 @@ module mod_sgs
       !$acc parallel loop gang default(present) private(p1d_s) async(1)
       do j=lo(2),hi(2)
         p1d_s = 0._rp
-        !$acc loop collapse(2) reduction(+:p1d_s)
+        !$acc loop vector collapse(2) reduction(+:p1d_s)
         do k=lo(3),hi(3)
           do i=lo(1),hi(1)
             p1d_s = p1d_s + p(i,j,k)*dz(k)*grid_area_ratio
@@ -382,7 +382,7 @@ module mod_sgs
       !$acc parallel loop gang default(present) private(p1d_s) async(1)
       do i=lo(1),hi(1)
         p1d_s = 0._rp
-        !$acc loop collapse(2) reduction(+:p1d_s)
+        !$acc loop vector collapse(2) reduction(+:p1d_s)
         do k=lo(3),hi(3)
           do j=lo(2),hi(2)
             p1d_s = p1d_s + p(i,j,k)*dz(k)*grid_area_ratio
