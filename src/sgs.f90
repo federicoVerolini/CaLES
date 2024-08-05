@@ -337,10 +337,10 @@ module mod_sgs
         !$acc loop vector collapse(2) reduction(+:p1d_s)
         do j=lo(2),hi(2)
           do i=lo(1),hi(1)
-            p1d_s = p1d_s + p(i,j,k)*grid_area_ratio
+            p1d_s = p1d_s + p(i,j,k)
           end do
         end do
-        p1d(k) = p1d_s
+        p1d(k) = p1d_s*grid_area_ratio
       end do
       !$acc end data
       !$acc wait(1)
@@ -361,10 +361,10 @@ module mod_sgs
         !$acc loop vector collapse(2) reduction(+:p1d_s)
         do k=lo(3),hi(3)
           do i=lo(1),hi(1)
-            p1d_s = p1d_s + p(i,j,k)*dz(k)*grid_area_ratio
+            p1d_s = p1d_s + p(i,j,k)*dz(k)
           end do
         end do
-        p1d(j) = p1d_s
+        p1d(j) = p1d_s*grid_area_ratio
       end do
       !$acc end data
       !$acc wait(1)
@@ -385,10 +385,10 @@ module mod_sgs
         !$acc loop vector collapse(2) reduction(+:p1d_s)
         do k=lo(3),hi(3)
           do j=lo(2),hi(2)
-            p1d_s = p1d_s + p(i,j,k)*dz(k)*grid_area_ratio
+            p1d_s = p1d_s + p(i,j,k)*dz(k)
           end do
         end do
-        p1d(i) = p1d_s
+        p1d(i) = p1d_s*grid_area_ratio
       end do
       !$acc end data
       !$acc wait(1)
