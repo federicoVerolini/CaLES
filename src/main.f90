@@ -593,9 +593,6 @@ program cans
       !$acc update self(u,v,w,p,visct) async(1)
       !$acc wait(1)
       call load_all('w',trim(datadir)//trim(filename),MPI_COMM_WORLD,ng,[1,1,1],lo,hi,u,v,w,p,time,istep)
-      if(.not.is_overwrite_save) then
-        call gen_alias(myid,trim(datadir),trim(filename),'fld.bin')
-      end if
       if(myid == 0) print*, '*** Checkpoint saved at time = ', time, 'time step = ', istep, '. ***'
     end if
     !$acc wait(1)

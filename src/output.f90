@@ -435,9 +435,9 @@ module mod_output
             buf07 = buf07 + 0.25*(u(i-1,j,k) + u(i,j,k))* &
                                  (v(i,j-1,k) + v(i,j,k))
             buf08 = buf08 + 0.25*(u(i-1,j,k) + u(i,j,k))* &
-                                  (w(i,j,k-1) + w(i,j,k))
+                                 (w(i,j,k-1) + w(i,j,k))
             buf09 = buf09 + 0.25*(v(i,j-1,k) + v(i,j,k))* &
-                                  (w(i,j,k-1) + w(i,j,k))
+                                 (w(i,j,k-1) + w(i,j,k))
           end do
           um(j,k) = buf01*grid_area_ratio
           vm(j,k) = buf02*grid_area_ratio
