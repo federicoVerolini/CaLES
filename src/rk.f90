@@ -126,11 +126,9 @@ module mod_rk
           w(i,j,k) = w(i,j,k) + factor1*dwdtrk(i,j,k) + factor2*dwdtrko(i,j,k)
 #else
           u(i,j,k) = u(i,j,k) + factor1*dudtrk(i,j,k) + factor2*dudtrko(i,j,k) + &
-                                factor12*(bforce(1) - dli(1)*( p(i+1,j,k)-p(i,j,k)))
-          !
+                                factor12*(bforce(1) -  dli(1)*(p(i+1,j,k)-p(i,j,k)))
           v(i,j,k) = v(i,j,k) + factor1*dvdtrk(i,j,k) + factor2*dvdtrko(i,j,k) + &
-                                factor12*(bforce(2) - dli(2)*( p(i,j+1,k)-p(i,j,k)))
-          !
+                                factor12*(bforce(2) -  dli(2)*(p(i,j+1,k)-p(i,j,k)))
           w(i,j,k) = w(i,j,k) + factor1*dwdtrk(i,j,k) + factor2*dwdtrko(i,j,k) + &
                                 factor12*(bforce(3) - dzci(k)*(p(i,j,k+1)-p(i,j,k)))
 #endif

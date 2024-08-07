@@ -75,7 +75,7 @@ module mod_sgs
       call extrapolate(n,is_bound,dzci,v,wk2,iface=2,lwm=lwm)
       call extrapolate(n,is_bound,dzci,w,wk3,iface=3,lwm=lwm)
       call strain_rate(n,dli,dzci,dzfi,wk1,wk2,wk3,s0,sij)
-      call cmpt_dw_plus(cbcvel,n,is_bound,l,dl,zc,dzc,visc,u,v,w,dw_plus)
+      call cmpt_dw_plus(cbcvel,n,is_bound,l,dl,dli,zc,dzc,dzci,visc,u,v,w,dw_plus)
       call sgs_smag(n,dl,dzf,dw_plus,s0,visct)
     case('dsmag')
       if(is_first) then
@@ -723,7 +723,7 @@ module mod_sgs
     end do
   end subroutine sgs_smag
   !
-  subroutine cmpt_dw_plus(cbc,n,is_bound,l,dl,zc,dzc,visc,u,v,w,dw_plus)
+  subroutine cmpt_dw_plus(cbc,n,is_bound,l,dl,dli,zc,dzc,dzci,visc,u,v,w,dw_plus)
     !
     ! inner-scaled distance to the nearest wall. We assume that a wall only
     ! affects its neighboring block, which requires that block to have enough
@@ -745,8 +745,8 @@ module mod_sgs
     character(len=1), intent(in), dimension(0:1,3,3) :: cbc
     integer , intent(in ), dimension(3)        :: n
     logical , intent(in ), dimension(0:1,3)    :: is_bound
-    real(rp), intent(in ), dimension(3)        :: l,dl
-    real(rp), intent(in ), dimension(0:)       :: zc,dzc
+    real(rp), intent(in ), dimension(3)        :: l,dl,dli
+    real(rp), intent(in ), dimension(0:)       :: zc,dzc,dzci
     real(rp), intent(in )                      :: visc
     real(rp), intent(in ), dimension(0:,0:,0:) :: u,v,w
     real(rp), intent(out), dimension(0:,0:,0:) :: dw_plus
@@ -767,17 +767,16 @@ module mod_sgs
     !$acc end kernels
     !
     if(is_bound(0,1).and.cbc(0,1,1)=='D') then
-      !$acc parallel loop gang collapse(2) default(present) private(tauw,tauw_tot,this_dw) async(1)
+      !$acc parallel loop collapse(3) default(present) private(tauw,tauw_tot,this_dw) async(1)
       do k=1,n(3)
         do j=1,n(2)
-          tauw(1) = visc*0.5_rp*(v(1,j,k)-v(0,j,k)+v(1,j-1,k)-v(0,j-1,k))/dl(1)
-          tauw(2) = visc*0.5_rp*(w(1,j,k)-w(0,j,k)+w(1,j,k-1)-w(0,j,k-1))/dl(1)
-          tauw_tot= sqrt(tauw(1)*tauw(1) + tauw(2)*tauw(2))
-          !$acc loop vector
-          do i = 1,n(1)
+          do i=1,n(1)
             this_dw = dl(1)*(i-0.5)
             if(this_dw < dw(i,j,k)) then
               dw(i,j,k) = this_dw
+              tauw(1) = v(1,j,k)-v(0,j,k)+v(1,j-1,k)-v(0,j-1,k)
+              tauw(2) = w(1,j,k)-w(0,j,k)+w(1,j,k-1)-w(0,j,k-1)
+              tauw_tot= 0.5_rp*visc*sqrt(tauw(1)*tauw(1)+tauw(2)*tauw(2))*dli(1)
               dw_plus(i,j,k) = this_dw*sqrt(tauw_tot)*visci
             end if
           end do
@@ -785,93 +784,84 @@ module mod_sgs
       end do
     end if
     if(is_bound(1,1).and.cbc(1,1,1)=='D') then
-      !$acc parallel loop gang collapse(2) default(present) private(tauw,tauw_tot,this_dw) async(1)
+      !$acc parallel loop collapse(3) default(present) private(tauw,tauw_tot,this_dw) async(1)
       do k=1,n(3)
         do j=1,n(2)
-          tauw(1) = visc*0.5_rp*(v(n(1),j,k)-v(n(1)+1,j,k)+v(n(1),j-1,k)-v(n(1)+1,j-1,k))/dl(1)
-          tauw(2) = visc*0.5_rp*(w(n(1),j,k)-w(n(1)+1,j,k)+w(n(1),j,k-1)-w(n(1)+1,j,k-1))/dl(1)
-          tauw_tot= sqrt(tauw(1)*tauw(1) + tauw(2)*tauw(2))
-          !$acc loop vector
-          do i = 1,n(1)
+          do i=1,n(1)
             this_dw = dl(1)*(n(1)-i+0.5)
             if(this_dw < dw(i,j,k)) then
               dw(i,j,k) = this_dw
+              tauw(1) = v(n(1),j,k)-v(n(1)+1,j,k)+v(n(1),j-1,k)-v(n(1)+1,j-1,k)
+              tauw(2) = w(n(1),j,k)-w(n(1)+1,j,k)+w(n(1),j,k-1)-w(n(1)+1,j,k-1)
+              tauw_tot= 0.5_rp*visc*sqrt(tauw(1)*tauw(1) + tauw(2)*tauw(2))*dli(1)
               dw_plus(i,j,k) = this_dw*sqrt(tauw_tot)*visci
             end if
           end do
         end do
       end do
     end if
-    !
     if(is_bound(0,2).and.cbc(0,2,2)=='D') then
-      !$acc parallel loop gang collapse(2) default(present) private(tauw,tauw_tot,this_dw) async(1)
+      !$acc parallel loop collapse(3) default(present) private(tauw,tauw_tot,this_dw) async(1)
       do k=1,n(3)
-        do i=1,n(1)
-          tauw(1) = visc*0.5_rp*(u(i,1,k)-u(i,0,k)+u(i-1,1,k)-u(i-1,0,k))/dl(2)
-          tauw(2) = visc*0.5_rp*(w(i,1,k)-w(i,0,k)+w(i,1,k-1)-w(i,0,k-1))/dl(2)
-          tauw_tot= sqrt(tauw(1)*tauw(1) + tauw(2)*tauw(2))
-          !$acc loop vector
-          do j = 1,n(2)
+        do j=1,n(2)
+          do i=1,n(1)
             this_dw = dl(2)*(j-0.5)
             if(this_dw < dw(i,j,k)) then
               dw(i,j,k) = this_dw
+              tauw(1) = u(i,1,k)-u(i,0,k)+u(i-1,1,k)-u(i-1,0,k)
+              tauw(2) = w(i,1,k)-w(i,0,k)+w(i,1,k-1)-w(i,0,k-1)
+              tauw_tot= 0.5_rp*visc*sqrt(tauw(1)*tauw(1) + tauw(2)*tauw(2))*dli(2)
               dw_plus(i,j,k) = this_dw*sqrt(tauw_tot)*visci
             end if
           end do
         end do
       end do
     end if
-    !
     if(is_bound(1,2).and.cbc(1,2,2)=='D') then
-      !$acc parallel loop gang collapse(2) default(present) private(tauw,tauw_tot,this_dw) async(1)
+      !$acc parallel loop collapse(3) default(present) private(tauw,tauw_tot,this_dw) async(1)
       do k=1,n(3)
-        do i=1,n(1)
-          tauw(1) = visc*0.5_rp*(u(i,n(2),k)-u(i,n(2)+1,k)+u(i-1,n(2),k)-u(i-1,n(2)+1,k))/dl(2)
-          tauw(2) = visc*0.5_rp*(w(i,n(2),k)-w(i,n(2)+1,k)+w(i,n(2),k-1)-w(i,n(2)+1,k-1))/dl(2)
-          tauw_tot= sqrt(tauw(1)*tauw(1) + tauw(2)*tauw(2))
-          !$acc loop vector
-          do j = 1,n(2)
+        do j=1,n(2)
+          do i=1,n(1)
             this_dw = dl(2)*(n(2)-j+0.5)
             if(this_dw < dw(i,j,k)) then
               dw(i,j,k) = this_dw
+              tauw(1) = u(i,n(2),k)-u(i,n(2)+1,k)+u(i-1,n(2),k)-u(i-1,n(2)+1,k)
+              tauw(2) = w(i,n(2),k)-w(i,n(2)+1,k)+w(i,n(2),k-1)-w(i,n(2)+1,k-1)
+              tauw_tot= 0.5_rp*visc*sqrt(tauw(1)*tauw(1) + tauw(2)*tauw(2))*dli(2)
               dw_plus(i,j,k) = this_dw*sqrt(tauw_tot)*visci
             end if
           end do
         end do
       end do
     end if
-    !
     if(is_bound(0,3).and.cbc(0,3,3)=='D') then
-      !$acc parallel loop gang collapse(2) default(present) private(tauw,tauw_tot,this_dw) async(1)
-      do j=1,n(2)
-        do i=1,n(1)
-          tauw(1) = visc*0.5_rp*(u(i,j,1)-u(i,j,0)+u(i-1,j,1)-u(i-1,j,0))/dzc(0)
-          tauw(2) = visc*0.5_rp*(v(i,j,1)-v(i,j,0)+v(i,j-1,1)-v(i,j-1,0))/dzc(0)
-          tauw_tot= sqrt(tauw(1)*tauw(1) + tauw(2)*tauw(2))
-          !$acc loop vector
-          do k = 1,n(3)
+      !$acc parallel loop collapse(3) default(present) private(tauw,tauw_tot,this_dw) async(1)
+      do k=1,n(3)
+        do j=1,n(2)
+          do i=1,n(1)
             this_dw = zc(k)
             if(this_dw < dw(i,j,k)) then
               dw(i,j,k) = this_dw
+              tauw(1) = u(i,j,1)-u(i,j,0)+u(i-1,j,1)-u(i-1,j,0)
+              tauw(2) = v(i,j,1)-v(i,j,0)+v(i,j-1,1)-v(i,j-1,0)
+              tauw_tot= 0.5_rp*visc*sqrt(tauw(1)*tauw(1)+tauw(2)*tauw(2))*dzci(0)
               dw_plus(i,j,k) = this_dw*sqrt(tauw_tot)*visci
             end if
           end do
         end do
       end do
     end if
-    !
     if(is_bound(1,3).and.cbc(1,3,3)=='D') then
-      !$acc parallel loop gang collapse(2) default(present) private(tauw,tauw_tot,this_dw) async(1)
-      do j=1,n(2)
-        do i=1,n(1)
-          tauw(1) = visc*0.5_rp*(u(i,j,n(3))-u(i,j,n(3)+1)+u(i-1,j,n(3))-u(i-1,j,n(3)+1))/dzc(n(3))
-          tauw(2) = visc*0.5_rp*(v(i,j,n(3))-v(i,j,n(3)+1)+v(i,j-1,n(3))-v(i,j-1,n(3)+1))/dzc(n(3))
-          tauw_tot= sqrt(tauw(1)*tauw(1) + tauw(2)*tauw(2))
-          !$acc loop vector
-          do k = 1,n(3)
+      !$acc parallel loop collapse(3) default(present) private(tauw,tauw_tot,this_dw) async(1)
+      do k=1,n(3)
+        do j=1,n(2)
+          do i=1,n(1)
             this_dw = l(3)-zc(k)
             if(this_dw < dw(i,j,k)) then
               dw(i,j,k) = this_dw
+              tauw(1) = u(i,j,n(3))-u(i,j,n(3)+1)+u(i-1,j,n(3))-u(i-1,j,n(3)+1)
+              tauw(2) = v(i,j,n(3))-v(i,j,n(3)+1)+v(i,j-1,n(3))-v(i,j-1,n(3)+1)
+              tauw_tot= 0.5_rp*visc*sqrt(tauw(1)*tauw(1)+tauw(2)*tauw(2))*dzci(n(3))
               dw_plus(i,j,k) = this_dw*sqrt(tauw_tot)*visci
             end if
           end do
@@ -880,16 +870,15 @@ module mod_sgs
     end if
   end subroutine cmpt_dw_plus
   !
-  subroutine strain_rate(n,dli,dzci,dzfi,ux,uy,uz,s0,sij)
+  subroutine strain_rate_old(n,dli,dzci,dzfi,ux,uy,uz,s0,sij)
     !
     ! compute the strain rate field
     !
     ! Sij is first computed at (or averaged to) cell center, then s0=sqrt(2SijSij)
     ! at cell center (Bae and Orlandi's codes). The implementation is efficient, since
     ! it avoids repetitive computation of derivatives. Costa first averages SijSij to
-    ! cell center, then computes s0, which leads to larger s0, especially when Sij
+    ! cell center, then computes s0. This leads to larger s0, especially when Sij
     ! at the cell edges have opposite signs. The second and third loops cannot combine.
-    ! please modify this back to Costa's version for memory saving
     !
     implicit none
     integer , intent(in ), dimension(3)        :: n
@@ -942,5 +931,105 @@ module mod_sgs
         (sij(:,:,:,4)**2 + sij(:,:,:,5)**2 + sij(:,:,:,6)**2)*2._rp
     s0 = sqrt(2._rp*s0)
     !$acc end kernels
+  end subroutine strain_rate_old
+  !
+  subroutine strain_rate(n,dli,dzci,dzfi,u,v,w,s0,sij)
+    implicit none
+    integer , intent(in ), dimension(3)        :: n
+    real(rp), intent(in ), dimension(3)        :: dli
+    real(rp), intent(in ), dimension(0:)       :: dzci,dzfi
+    real(rp), intent(in ), dimension(0:,0:,0:) :: u,v,w
+    real(rp), intent(out), dimension(0:,0:,0:) :: s0
+    real(rp), intent(out), dimension(0:,0:,0:,1:) :: sij
+    real(rp) :: s11,s22,s33,s12,s13,s23
+    real(rp) :: dxi,dyi
+    integer :: i,j,k
+    real(rp) :: u_mcm,u_ccm,u_mmc,u_cmc,u_mcc,u_ccc,u_mpc,u_cpc,u_mcp,u_ccp, &
+                v_cmm,v_ccm,v_mmc,v_cmc,v_pmc,v_mcc,v_ccc,v_pcc,v_cmp,v_ccp, &
+                w_cmm,w_mcm,w_ccm,w_pcm,w_cpm,w_cmc,w_mcc,w_ccc,w_pcc,w_cpc
+    dxi = dli(1)
+    dyi = dli(2)
+    !
+    ! compute sijsij, where sij = (1/2)(du_i/dx_j + du_j/dx_i)
+    !
+    !$acc parallel loop collapse(3) default(present) async(1) &
+    !$acc private(u_mcm,u_ccm,u_mmc,u_cmc,u_mcc,u_ccc,u_mpc,u_cpc,u_mcp,u_ccp) &
+    !$acc private(v_cmm,v_ccm,v_mmc,v_cmc,v_pmc,v_mcc,v_ccc,v_pcc,v_cmp,v_ccp) &
+    !$acc private(w_cmm,w_mcm,w_ccm,w_pcm,w_cpm,w_cmc,w_mcc,w_ccc,w_pcc,w_cpc) &
+    !$acc private(s11,s22,s33,s12,s13,s23)
+    do k=1,n(3)
+      do j=1,n(2)
+        do i=1,n(1)
+          !
+          u_mcm = u(i-1,j  ,k-1)
+          u_ccm = u(i  ,j  ,k-1)
+          u_mmc = u(i-1,j-1,k  )
+          u_cmc = u(i  ,j-1,k  )
+          u_mcc = u(i-1,j  ,k  )
+          u_ccc = u(i  ,j  ,k  )
+          u_mpc = u(i-1,j+1,k  )
+          u_cpc = u(i  ,j+1,k  )
+          u_mcp = u(i-1,j  ,k+1)
+          u_ccp = u(i  ,j  ,k+1)
+          !
+          v_cmm = v(i  ,j-1,k-1)
+          v_ccm = v(i  ,j  ,k-1)
+          v_mmc = v(i-1,j-1,k  )
+          v_cmc = v(i  ,j-1,k  )
+          v_pmc = v(i+1,j-1,k  )
+          v_mcc = v(i-1,j  ,k  )
+          v_ccc = v(i  ,j  ,k  )
+          v_pcc = v(i+1,j  ,k  )
+          v_cmp = v(i  ,j-1,k+1)
+          v_ccp = v(i  ,j  ,k+1)
+          !
+          w_cmm = w(i  ,j-1,k-1)
+          w_mcm = w(i-1,j  ,k-1)
+          w_ccm = w(i  ,j  ,k-1)
+          w_pcm = w(i+1,j  ,k-1)
+          w_cpm = w(i  ,j+1,k-1)
+          w_cmc = w(i  ,j-1,k  )
+          w_mcc = w(i-1,j  ,k  )
+          w_ccc = w(i  ,j  ,k  )
+          w_pcc = w(i+1,j  ,k  )
+          w_cpc = w(i  ,j+1,k  )
+          !
+          s11 = (u_ccc-u_mcc)*dxi
+          s22 = (v_ccc-v_cmc)*dyi
+          s33 = (w_ccc-w_ccm)*dzfi(k)
+          s12 = .125_rp*((u_cpc-u_ccc)*dyi + (v_pcc-v_ccc)*dxi + &
+                         (u_ccc-u_cmc)*dyi + (v_pmc-v_cmc)*dxi + &
+                         (u_mpc-u_mcc)*dyi + (v_ccc-v_mcc)*dxi + &
+                         (u_mcc-u_mmc)*dyi + (v_cmc-v_mmc)*dxi)
+          s13 = .125_rp*((u_ccp-u_ccc)*dzci(k  ) + (w_pcc-w_ccc)*dxi + &
+                         (u_ccc-u_ccm)*dzci(k-1) + (w_pcm-w_ccm)*dxi + &
+                         (u_mcp-u_mcc)*dzci(k  ) + (w_ccc-w_mcc)*dxi + &
+                         (u_mcc-u_mcm)*dzci(k-1) + (w_ccm-w_mcm)*dxi)
+          s23 = .125_rp*((v_ccp-v_ccc)*dzci(k  ) + (w_cpc-w_ccc)*dyi + &
+                         (v_ccc-v_ccm)*dzci(k-1) + (w_cpm-w_ccm)*dyi + &
+                         (v_cmp-v_cmc)*dzci(k  ) + (w_ccc-w_cmc)*dyi + &
+                         (v_cmc-v_cmm)*dzci(k-1) + (w_ccm-w_cmm)*dyi)
+          s0(i,j,k) = sqrt(2._rp*(s11**2+s22**2+s33**2+2._rp*(s12**2+s13**2+s23**2)))
+          ! sij(i,j,k,1:6) = (/s11,s22,s33,s12,s13,s23/)
+        end do
+      end do
+    end do
+    !
+    ! s11 = (u(i,j,k)-u(i-1,j,k))*dxi
+    ! s22 = (v(i,j,k)-v(i,j-1,k))*dyi
+    ! s33 = (w(i,j,k)-w(i,j,k-1))*dzfi(k)
+    ! s12 = .125_rp*((u(i  ,j+1,k)-u(i  ,j  ,k))*dyi + (v(i+1,j  ,k)-v(i  ,j  ,k))*dxi + &
+    !                (u(i  ,j  ,k)-u(i  ,j-1,k))*dyi + (v(i+1,j-1,k)-v(i  ,j-1,k))*dxi + &
+    !                (u(i-1,j+1,k)-u(i-1,j  ,k))*dyi + (v(i  ,j  ,k)-v(i-1,j  ,k))*dxi + &
+    !                (u(i-1,j  ,k)-u(i-1,j-1,k))*dyi + (v(i  ,j-1,k)-v(i-1,j-1,k))*dxi)
+    ! s13 = .125_rp*((u(i  ,j,k+1)-u(i  ,j,k  ))*dzci(k  ) + (w(i+1,j,k  )-w(i  ,j,k  ))*dxi + &
+    !                (u(i  ,j,k  )-u(i  ,j,k-1))*dzci(k-1) + (w(i+1,j,k-1)-w(i  ,j,k-1))*dxi + &
+    !                (u(i-1,j,k+1)-u(i-1,j,k  ))*dzci(k  ) + (w(i  ,j,k  )-w(i-1,j,k  ))*dxi + &
+    !                (u(i-1,j,k  )-u(i-1,j,k-1))*dzci(k-1) + (w(i  ,j,k-1)-w(i-1,j,k-1))*dxi)
+    ! s23 = .125_rp*((v(i,j  ,k+1)-v(i,j  ,k  ))*dzci(k  ) + (w(i,j+1,k  )-w(i,j  ,k  ))*dyi + &
+    !                (v(i,j  ,k  )-v(i,j  ,k-1))*dzci(k-1) + (w(i,j+1,k-1)-w(i,j  ,k-1))*dyi + &
+    !                (v(i,j-1,k+1)-v(i,j-1,k  ))*dzci(k  ) + (w(i,j  ,k  )-w(i,j-1,k  ))*dyi + &
+    !                (v(i,j-1,k  )-v(i,j-1,k-1))*dzci(k-1) + (w(i,j  ,k-1)-w(i,j-1,k-1))*dyi)
+    ! s0(i,j,k) = sqrt(2._rp*(s11**2+s22**2+s33**2+2._rp*(s12**2+s13**2+s23**2)))
   end subroutine strain_rate
 end module mod_sgs
