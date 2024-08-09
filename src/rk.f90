@@ -4,18 +4,8 @@
 ! SPDX-License-Identifier: MIT
 !
 ! -
-#define _FAST_MOM_KERNELS
 module mod_rk
-  use mod_mom  , only: momx_a,momy_a,momz_a, &
-                       momx_d,momy_d,momz_d, &
-                       momx_p,momy_p,momz_p, cmpt_wallshear
-#if defined(_IMPDIFF_1D)
-  use mod_mom  , only: momx_d_xy,momy_d_xy,momz_d_xy, &
-                       momx_d_z ,momy_d_z ,momz_d_z
-#endif
-#if defined(_FAST_MOM_KERNELS)
-  use mod_mom  , only: mom_xyz_ad
-#endif
+  use mod_mom  , only: mom_xyz_ad,cmpt_wallshear
   use mod_scal , only: scal,cmpt_scalflux
   use mod_utils, only: bulk_mean,swap
   use mod_precision
@@ -80,58 +70,19 @@ module mod_rk
       dwdtrko => dwdtrko_t
     end if
     !
-#if defined(_FAST_MOM_KERNELS)
-    call mom_xyz_ad(n(1),n(2),n(3),dli(1),dli(2),dzci,dzfi,visc,u,v,w,visct,dudtrk,dvdtrk,dwdtrk,dudtrkd,dvdtrkd,dwdtrkd)
-#else
-    !$acc kernels default(present) async(1)
-    dudtrk(:,:,:) = 0._rp
-    dvdtrk(:,:,:) = 0._rp
-    dwdtrk(:,:,:) = 0._rp
-    !$acc end kernels
-#if !defined(_IMPDIFF)
-    call momx_d(n(1),n(2),n(3),dli(1),dli(2),dzci,dzfi,visc,u,dudtrk)
-    call momy_d(n(1),n(2),n(3),dli(1),dli(2),dzci,dzfi,visc,v,dvdtrk)
-    call momz_d(n(1),n(2),n(3),dli(1),dli(2),dzci,dzfi,visc,w,dwdtrk)
-#else
-    !$acc kernels default(present) async(1)
-    dudtrkd(:,:,:) = 0._rp
-    dvdtrkd(:,:,:) = 0._rp
-    dwdtrkd(:,:,:) = 0._rp
-    !$acc end kernels
-#if !defined(_IMPDIFF_1D)
-    call momx_d(n(1),n(2),n(3),dli(1),dli(2),dzci,dzfi,visc,u,dudtrkd)
-    call momy_d(n(1),n(2),n(3),dli(1),dli(2),dzci,dzfi,visc,v,dvdtrkd)
-    call momz_d(n(1),n(2),n(3),dli(1),dli(2),dzci,dzfi,visc,w,dwdtrkd)
-#else
-    call momx_d_xy(n(1),n(2),n(3),dli(1),dli(2),visc,u,dudtrk )
-    call momy_d_xy(n(1),n(2),n(3),dli(1),dli(2),visc,v,dvdtrk )
-    call momz_d_xy(n(1),n(2),n(3),dli(1),dli(2),visc,w,dwdtrk )
-    call momx_d_z( n(1),n(2),n(3),dzci  ,dzfi  ,visc,u,dudtrkd)
-    call momy_d_z( n(1),n(2),n(3),dzci  ,dzfi  ,visc,v,dvdtrkd)
-    call momz_d_z( n(1),n(2),n(3),dzci  ,dzfi  ,visc,w,dwdtrkd)
-#endif
-    call momx_a(n(1),n(2),n(3),dli(1),dli(2),dzfi,u,v,w,dudtrk)
-    call momy_a(n(1),n(2),n(3),dli(1),dli(2),dzfi,u,v,w,dvdtrk)
-    call momz_a(n(1),n(2),n(3),dli(1),dli(2),dzci,u,v,w,dwdtrk)
-#endif
-#endif
+    call mom_xyz_ad(n(1),n(2),n(3),dli(1),dli(2),dzci,dzfi,visc,u,v,w,visct, &
+                    dudtrk,dvdtrk,dwdtrk,dudtrkd,dvdtrkd,dwdtrkd)
     !
     !$acc parallel loop collapse(3) default(present) async(1)
     do k=1,n(3)
       do j=1,n(2)
         do i=1,n(1)
-#if !defined(_FAST_MOM_KERNELS)
-          u(i,j,k) = u(i,j,k) + factor1*dudtrk(i,j,k) + factor2*dudtrko(i,j,k)
-          v(i,j,k) = v(i,j,k) + factor1*dvdtrk(i,j,k) + factor2*dvdtrko(i,j,k)
-          w(i,j,k) = w(i,j,k) + factor1*dwdtrk(i,j,k) + factor2*dwdtrko(i,j,k)
-#else
           u(i,j,k) = u(i,j,k) + factor1*dudtrk(i,j,k) + factor2*dudtrko(i,j,k) + &
                                 factor12*(bforce(1) -  dli(1)*(p(i+1,j,k)-p(i,j,k)))
           v(i,j,k) = v(i,j,k) + factor1*dvdtrk(i,j,k) + factor2*dvdtrko(i,j,k) + &
                                 factor12*(bforce(2) -  dli(2)*(p(i,j+1,k)-p(i,j,k)))
           w(i,j,k) = w(i,j,k) + factor1*dwdtrk(i,j,k) + factor2*dwdtrko(i,j,k) + &
                                 factor12*(bforce(3) - dzci(k)*(p(i,j,k+1)-p(i,j,k)))
-#endif
 #if defined(_IMPDIFF)
           u(i,j,k) = u(i,j,k) + factor12*dudtrkd(i,j,k)
           v(i,j,k) = v(i,j,k) + factor12*dvdtrkd(i,j,k)
@@ -146,19 +97,6 @@ module mod_rk
     call swap(dudtrk,dudtrko)
     call swap(dvdtrk,dvdtrko)
     call swap(dwdtrk,dwdtrko)
-    !
-#if !defined(_FAST_MOM_KERNELS)
-    !$acc parallel loop collapse(3) default(present) async(1)
-    do k=1,n(3)
-      do j=1,n(2)
-        do i=1,n(1)
-          u(i,j,k) = u(i,j,k) + factor12*(bforce(1) -  dli(1)*(p(i+1,j,k)-p(i,j,k)))
-          v(i,j,k) = v(i,j,k) + factor12*(bforce(2) -  dli(2)*(p(i,j+1,k)-p(i,j,k)))
-          w(i,j,k) = w(i,j,k) + factor12*(bforce(3) - dzci(k)*(p(i,j,k+1)-p(i,j,k)))
-        end do
-      end do
-    end do
-#endif
     !
     ! compute bulk velocity forcing
     !

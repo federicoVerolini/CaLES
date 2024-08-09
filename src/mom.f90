@@ -10,602 +10,8 @@ module mod_mom
   use mod_precision
   implicit none
   private
-  public momx_a,momy_a,momz_a, &
-         momx_d,momy_d,momz_d, &
-         momx_p,momy_p,momz_p, cmpt_wallshear, bulk_forcing
-#if defined(_IMPDIFF_1D)
-  public momx_d_xy,momy_d_xy,momz_d_xy, &
-         momx_d_z ,momy_d_z ,momz_d_z
-#endif
-  public mom_xyz_ad
+  public cmpt_wallshear,bulk_forcing,mom_xyz_ad
   contains
-  !
-  subroutine momx_a(nx,ny,nz,dxi,dyi,dzfi,u,v,w,dudt)
-    implicit none
-    integer , intent(in) :: nx,ny,nz
-    real(rp), intent(in) :: dxi,dyi
-    real(rp), intent(in), dimension(0:) :: dzfi
-    real(rp), dimension(0:,0:,0:), intent(in   ) :: u,v,w
-    real(rp), dimension( :, :, :), intent(inout) :: dudt
-    integer :: i,j,k
-    real(rp) :: uuip,uuim,vujp,vujm,wukp,wukm
-    !
-    !$acc parallel loop collapse(3) default(present) private(uuip,uuim,vujp,vujm,wukp,wukm) async(1)
-    do k=1,nz
-      do j=1,ny
-        do i=1,nx
-          uuip  = 0.25*( u(i+1,j  ,k  )+u(i,j  ,k  ) )*( u(i,j,k)+u(i+1,j,k) )
-          uuim  = 0.25*( u(i-1,j  ,k  )+u(i,j  ,k  ) )*( u(i,j,k)+u(i-1,j,k) )
-          vujp  = 0.25*( v(i+1,j  ,k  )+v(i,j  ,k  ) )*( u(i,j,k)+u(i,j+1,k) )
-          vujm  = 0.25*( v(i+1,j-1,k  )+v(i,j-1,k  ) )*( u(i,j,k)+u(i,j-1,k) )
-          wukp  = 0.25*( w(i+1,j  ,k  )+w(i,j  ,k  ) )*( u(i,j,k)+u(i,j,k+1) )
-          wukm  = 0.25*( w(i+1,j  ,k-1)+w(i,j  ,k-1) )*( u(i,j,k)+u(i,j,k-1) )
-          !
-          ! Momentum balance
-          !
-          dudt(i,j,k) = dudt(i,j,k) + &
-                        dxi*(     -uuip + uuim ) + &
-                        dyi*(     -vujp + vujm ) + &
-                        dzfi(k)*( -wukp + wukm )
-        end do
-      end do
-    end do
-  end subroutine momx_a
-  !
-  subroutine momy_a(nx,ny,nz,dxi,dyi,dzfi,u,v,w,dvdt)
-    implicit none
-    integer , intent(in) :: nx,ny,nz
-    real(rp), intent(in) :: dxi,dyi
-    real(rp), intent(in), dimension(0:) :: dzfi
-    real(rp), dimension(0:,0:,0:), intent(in   ) :: u,v,w
-    real(rp), dimension( :, :, :), intent(inout) :: dvdt
-    integer :: i,j,k
-    real(rp) :: uvip,uvim,vvjp,vvjm,wvkp,wvkm
-    !
-    !$acc parallel loop collapse(3) default(present) private(uvip,uvim,vvjp,vvjm,wvkp,wvkm) async(1)
-    do k=1,nz
-      do j=1,ny
-        do i=1,nx
-          uvip  = 0.25*( u(i  ,j,k  )+u(i  ,j+1,k  ) )*( v(i,j,k)+v(i+1,j,k) )
-          uvim  = 0.25*( u(i-1,j,k  )+u(i-1,j+1,k  ) )*( v(i,j,k)+v(i-1,j,k) )
-          vvjp  = 0.25*( v(i  ,j,k  )+v(i  ,j+1,k  ) )*( v(i,j,k)+v(i,j+1,k) )
-          vvjm  = 0.25*( v(i  ,j,k  )+v(i  ,j-1,k  ) )*( v(i,j,k)+v(i,j-1,k) )
-          wvkp  = 0.25*( w(i  ,j,k  )+w(i  ,j+1,k  ) )*( v(i,j,k)+v(i,j,k+1) )
-          wvkm  = 0.25*( w(i  ,j,k-1)+w(i  ,j+1,k-1) )*( v(i,j,k)+v(i,j,k-1) )
-          !
-          ! Momentum balance
-          !
-          dvdt(i,j,k) = dvdt(i,j,k) + &
-                        dxi*(     -uvip + uvim ) + &
-                        dyi*(     -vvjp + vvjm ) + &
-                        dzfi(k)*( -wvkp + wvkm )
-        end do
-      end do
-    end do
-  end subroutine momy_a
-  !
-  subroutine momz_a(nx,ny,nz,dxi,dyi,dzci,u,v,w,dwdt)
-    implicit none
-    integer , intent(in) :: nx,ny,nz
-    real(rp), intent(in) :: dxi,dyi
-    real(rp), intent(in), dimension(0:) :: dzci
-    real(rp), dimension(0:,0:,0:), intent(in   ) :: u,v,w
-    real(rp), dimension( :, :, :), intent(inout) :: dwdt
-    integer :: i,j,k
-    real(rp) :: uwip,uwim,vwjp,vwjm,wwkp,wwkm
-    !
-    !$acc parallel loop collapse(3) default(present) private(uwip,uwim,vwjp,vwjm,wwkp,wwkm) async(1)
-    do k=1,nz
-      do j=1,ny
-        do i=1,nx
-          uwip  = 0.25*( u(i  ,j  ,k)+u(i  ,j  ,k+1) )*( w(i,j,k)+w(i+1,j,k) )
-          uwim  = 0.25*( u(i-1,j  ,k)+u(i-1,j  ,k+1) )*( w(i,j,k)+w(i-1,j,k) )
-          vwjp  = 0.25*( v(i  ,j  ,k)+v(i  ,j  ,k+1) )*( w(i,j,k)+w(i,j+1,k) )
-          vwjm  = 0.25*( v(i  ,j-1,k)+v(i  ,j-1,k+1) )*( w(i,j,k)+w(i,j-1,k) )
-          wwkp  = 0.25*( w(i  ,j  ,k)+w(i  ,j  ,k+1) )*( w(i,j,k)+w(i,j,k+1) )
-          wwkm  = 0.25*( w(i  ,j  ,k)+w(i  ,j  ,k-1) )*( w(i,j,k)+w(i,j,k-1) )
-          !
-          ! Momentum balance
-          !
-          dwdt(i,j,k) = dwdt(i,j,k) + &
-                        dxi*(     -uwip + uwim ) + &
-                        dyi*(     -vwjp + vwjm ) + &
-                        dzci(k)*( -wwkp + wwkm )
-        end do
-      end do
-    end do
-  end subroutine momz_a
-  !
-  subroutine momx_d(nx,ny,nz,dxi,dyi,dzci,dzfi,visc,u,dudt)
-    implicit none
-    integer , intent(in) :: nx,ny,nz
-    real(rp), intent(in) :: dxi,dyi,visc
-    real(rp), intent(in), dimension(0:) :: dzci,dzfi
-    real(rp), dimension(0:,0:,0:), intent(in   ) :: u
-    real(rp), dimension( :, :, :), intent(inout) :: dudt
-    real(rp) :: dudxp,dudxm,dudyp,dudym,dudzp,dudzm
-    integer :: i,j,k
-    !
-    !$acc parallel loop collapse(3) default(present) private(dudxp,dudxm,dudyp,dudym,dudzp,dudzm) async(1)
-    do k=1,nz
-      do j=1,ny
-        do i=1,nx
-          dudxp = (u(i+1,j,k)-u(i,j,k))*dxi
-          dudxm = (u(i,j,k)-u(i-1,j,k))*dxi
-          dudyp = (u(i,j+1,k)-u(i,j,k))*dyi
-          dudym = (u(i,j,k)-u(i,j-1,k))*dyi
-          dudzp = (u(i,j,k+1)-u(i,j,k))*dzci(k  )
-          dudzm = (u(i,j,k)-u(i,j,k-1))*dzci(k-1)
-          dudt(i,j,k) = dudt(i,j,k) + &
-                        (dudxp-dudxm)*visc*dxi + &
-                        (dudyp-dudym)*visc*dyi + &
-                        (dudzp-dudzm)*visc*dzfi(k)
-        end do
-      end do
-    end do
-  end subroutine momx_d
-  !
-  subroutine momy_d(nx,ny,nz,dxi,dyi,dzci,dzfi,visc,v,dvdt)
-    implicit none
-    integer , intent(in) :: nx,ny,nz
-    real(rp), intent(in) :: dxi,dyi,visc
-    real(rp), intent(in), dimension(0:) :: dzci,dzfi
-    real(rp), dimension(0:,0:,0:), intent(in   ) :: v
-    real(rp), dimension( :, :, :), intent(inout) :: dvdt
-    real(rp) :: dvdxp,dvdxm,dvdyp,dvdym,dvdzp,dvdzm
-    integer :: i,j,k
-    !
-    !$acc parallel loop collapse(3) default(present) private(dvdxp,dvdxm,dvdyp,dvdym,dvdzp,dvdzm) async(1)
-    do k=1,nz
-      do j=1,ny
-        do i=1,nx
-          dvdxp = (v(i+1,j,k)-v(i,j,k))*dxi
-          dvdxm = (v(i,j,k)-v(i-1,j,k))*dxi
-          dvdyp = (v(i,j+1,k)-v(i,j,k))*dyi
-          dvdym = (v(i,j,k)-v(i,j-1,k))*dyi
-          dvdzp = (v(i,j,k+1)-v(i,j,k))*dzci(k  )
-          dvdzm = (v(i,j,k)-v(i,j,k-1))*dzci(k-1)
-          dvdt(i,j,k) = dvdt(i,j,k) + &
-                        (dvdxp-dvdxm)*visc*dxi + &
-                        (dvdyp-dvdym)*visc*dyi + &
-                        (dvdzp-dvdzm)*visc*dzfi(k)
-        end do
-      end do
-    end do
-  end subroutine momy_d
-  !
-  subroutine momz_d(nx,ny,nz,dxi,dyi,dzci,dzfi,visc,w,dwdt)
-    implicit none
-    integer , intent(in) :: nx,ny,nz
-    real(rp), intent(in) :: dxi,dyi,visc
-    real(rp), intent(in), dimension(0:) :: dzci,dzfi
-    real(rp), dimension(0:,0:,0:), intent(in   ) :: w
-    real(rp), dimension( :, :, :), intent(inout) :: dwdt
-    integer :: i,j,k
-    real(rp) :: dwdxp,dwdxm,dwdyp,dwdym,dwdzp,dwdzm
-    !
-    !$acc parallel loop collapse(3) default(present) private(dwdxp,dwdxm,dwdyp,dwdym,dwdzp,dwdzm) async(1)
-    do k=1,nz
-      do j=1,ny
-        do i=1,nx
-          dwdxp = (w(i+1,j,k)-w(i,j,k))*dxi
-          dwdxm = (w(i,j,k)-w(i-1,j,k))*dxi
-          dwdyp = (w(i,j+1,k)-w(i,j,k))*dyi
-          dwdym = (w(i,j,k)-w(i,j-1,k))*dyi
-          dwdzp = (w(i,j,k+1)-w(i,j,k))*dzfi(k+1)
-          dwdzm = (w(i,j,k)-w(i,j,k-1))*dzfi(k  )
-          dwdt(i,j,k) = dwdt(i,j,k) + &
-                        (dwdxp-dwdxm)*visc*dxi + &
-                        (dwdyp-dwdym)*visc*dyi + &
-                        (dwdzp-dwdzm)*visc*dzci(k)
-        end do
-      end do
-    end do
-  end subroutine momz_d
-  !
-  subroutine momx_p(nx,ny,nz,dxi,bforce,p,dudt)
-    implicit none
-    integer , intent(in) :: nx,ny,nz
-    real(rp), intent(in) :: dxi
-    real(rp), intent(in) :: bforce
-    real(rp), dimension(0:,0:,0:), intent(in ) :: p
-    real(rp), dimension( :, :, :), intent(out) :: dudt
-    integer :: i,j,k
-    !
-    !$acc parallel loop collapse(3) default(present) async(1)
-    do k=1,nz
-      do j=1,ny
-        do i=1,nx
-          dudt(i,j,k) = - dxi*( p(i+1,j,k)-p(i,j,k) ) + bforce
-        end do
-      end do
-    end do
-  end subroutine momx_p
-  !
-  subroutine momy_p(nx,ny,nz,dyi,bforce,p,dvdt)
-    implicit none
-    integer , intent(in) :: nx,ny,nz
-    real(rp), intent(in) :: dyi
-    real(rp), intent(in) :: bforce
-    real(rp), dimension(0:,0:,0:), intent(in ) :: p
-    real(rp), dimension( :, :, :), intent(out) :: dvdt
-    integer :: i,j,k
-    !
-    !$acc parallel loop collapse(3) default(present) async(1)
-    do k=1,nz
-      do j=1,ny
-        do i=1,nx
-          dvdt(i,j,k) = - dyi*( p(i,j+1,k)-p(i,j,k) ) + bforce
-        end do
-      end do
-    end do
-  end subroutine momy_p
-  !
-  subroutine momz_p(nx,ny,nz,dzci,bforce,p,dwdt)
-    implicit none
-    integer , intent(in) :: nx,ny,nz
-    real(rp), intent(in), dimension(0:) :: dzci
-    real(rp), intent(in) :: bforce
-    real(rp), dimension(0:,0:,0:), intent(in ) :: p
-    real(rp), dimension( :, :, :), intent(out) :: dwdt
-    integer :: i,j,k
-    !
-    !$acc parallel loop collapse(3) default(present) async(1)
-    do k=1,nz
-      do j=1,ny
-        do i=1,nx
-          dwdt(i,j,k) = - dzci(k)*( p(i,j,k+1)-p(i,j,k) ) + bforce
-        end do
-      end do
-    end do
-  end subroutine momz_p
-  !
-#if defined(_IMPDIFF_1D)
-  subroutine momx_d_z(nx,ny,nz,dzci,dzfi,visc,u,dudt)
-    implicit none
-    integer , intent(in) :: nx,ny,nz
-    real(rp), intent(in) :: visc
-    real(rp), intent(in), dimension(0:) :: dzci,dzfi
-    real(rp), dimension(0:,0:,0:), intent(in   ) :: u
-    real(rp), dimension( :, :, :), intent(inout) :: dudt
-    real(rp) :: dudzp,dudzm
-    integer :: i,j,k
-    !
-    !$acc parallel loop collapse(3) default(present) private(dudzp,dudzm) async(1)
-    do k=1,nz
-      do j=1,ny
-        do i=1,nx
-          dudzp = (u(i,j,k+1)-u(i,j,k))*dzci(k  )
-          dudzm = (u(i,j,k)-u(i,j,k-1))*dzci(k-1)
-          dudt(i,j,k) = dudt(i,j,k) + &
-                        (dudzp-dudzm)*visc*dzfi(k)
-        end do
-      end do
-    end do
-  end subroutine momx_d_z
-  !
-  subroutine momy_d_z(nx,ny,nz,dzci,dzfi,visc,v,dvdt)
-    implicit none
-    integer , intent(in) :: nx,ny,nz
-    real(rp), intent(in) :: visc
-    real(rp), intent(in), dimension(0:) :: dzci,dzfi
-    real(rp), dimension(0:,0:,0:), intent(in   ) :: v
-    real(rp), dimension( :, :, :), intent(inout) :: dvdt
-    real(rp) :: dvdzp,dvdzm
-    integer :: i,j,k
-    !
-    !$acc parallel loop collapse(3) default(present) private(dvdzp,dvdzm) async(1)
-    do k=1,nz
-      do j=1,ny
-        do i=1,nx
-          dvdzp = (v(i,j,k+1)-v(i,j,k))*dzci(k  )
-          dvdzm = (v(i,j,k)-v(i,j,k-1))*dzci(k-1)
-          dvdt(i,j,k) = dvdt(i,j,k) + &
-                        (dvdzp-dvdzm)*visc*dzfi(k)
-        end do
-      end do
-    end do
-  end subroutine momy_d_z
-  !
-  subroutine momz_d_z(nx,ny,nz,dzci,dzfi,visc,w,dwdt)
-    implicit none
-    integer , intent(in) :: nx,ny,nz
-    real(rp), intent(in) :: visc
-    real(rp), intent(in), dimension(0:) :: dzci,dzfi
-    real(rp), dimension(0:,0:,0:), intent(in   ) :: w
-    real(rp), dimension( :, :, :), intent(inout) :: dwdt
-    integer :: i,j,k
-    real(rp) :: dwdzp,dwdzm
-    !
-    !$acc parallel loop collapse(3) default(present) private(dwdzp,dwdzm) async(1)
-    do k=1,nz
-      do j=1,ny
-        do i=1,nx
-          dwdzp = (w(i,j,k+1)-w(i,j,k))*dzfi(k+1)
-          dwdzm = (w(i,j,k)-w(i,j,k-1))*dzfi(k  )
-          dwdt(i,j,k) = dwdt(i,j,k) + &
-                        (dwdzp-dwdzm)*visc*dzci(k)
-        end do
-      end do
-    end do
-  end subroutine momz_d_z
-  !
-  subroutine momx_d_xy(nx,ny,nz,dxi,dyi,visc,u,dudt)
-    implicit none
-    integer , intent(in) :: nx,ny,nz
-    real(rp), intent(in) :: dxi,dyi,visc
-    real(rp), dimension(0:,0:,0:), intent(in   ) :: u
-    real(rp), dimension( :, :, :), intent(inout) :: dudt
-    real(rp) :: dudxp,dudxm,dudyp,dudym
-    integer :: i,j,k
-    !
-    !$acc parallel loop collapse(3) default(present) private(dudxp,dudxm,dudyp,dudym) async(1)
-    do k=1,nz
-      do j=1,ny
-        do i=1,nx
-          dudxp = (u(i+1,j,k)-u(i,j,k))*dxi
-          dudxm = (u(i,j,k)-u(i-1,j,k))*dxi
-          dudyp = (u(i,j+1,k)-u(i,j,k))*dyi
-          dudym = (u(i,j,k)-u(i,j-1,k))*dyi
-          dudt(i,j,k) = dudt(i,j,k) + &
-                        (dudxp-dudxm)*visc*dxi + &
-                        (dudyp-dudym)*visc*dyi
-        end do
-      end do
-    end do
-  end subroutine momx_d_xy
-  !
-  subroutine momy_d_xy(nx,ny,nz,dxi,dyi,visc,v,dvdt)
-    implicit none
-    integer , intent(in) :: nx,ny,nz
-    real(rp), intent(in) :: dxi,dyi,visc
-    real(rp), dimension(0:,0:,0:), intent(in   ) :: v
-    real(rp), dimension( :, :, :), intent(inout) :: dvdt
-    real(rp) :: dvdxp,dvdxm,dvdyp,dvdym
-    integer :: i,j,k
-    !
-    !$acc parallel loop collapse(3) default(present) private(dvdxp,dvdxm,dvdyp,dvdym) async(1)
-    do k=1,nz
-      do j=1,ny
-        do i=1,nx
-          dvdxp = (v(i+1,j,k)-v(i,j,k))*dxi
-          dvdxm = (v(i,j,k)-v(i-1,j,k))*dxi
-          dvdyp = (v(i,j+1,k)-v(i,j,k))*dyi
-          dvdym = (v(i,j,k)-v(i,j-1,k))*dyi
-          dvdt(i,j,k) = dvdt(i,j,k) + &
-                        (dvdxp-dvdxm)*visc*dxi + &
-                        (dvdyp-dvdym)*visc*dyi
-        end do
-      end do
-    end do
-  end subroutine momy_d_xy
-  !
-  subroutine momz_d_xy(nx,ny,nz,dxi,dyi,visc,w,dwdt)
-    implicit none
-    integer , intent(in) :: nx,ny,nz
-    real(rp), intent(in) :: dxi,dyi,visc
-    real(rp), dimension(0:,0:,0:), intent(in   ) :: w
-    real(rp), dimension( :, :, :), intent(inout) :: dwdt
-    integer :: i,j,k
-    real(rp) :: dwdxp,dwdxm,dwdyp,dwdym
-    !
-    !$acc parallel loop collapse(3) default(present) private(dwdxp,dwdxm,dwdyp,dwdym) async(1)
-    do k=1,nz
-      do j=1,ny
-        do i=1,nx
-          dwdxp = (w(i+1,j,k)-w(i,j,k))*dxi
-          dwdxm = (w(i,j,k)-w(i-1,j,k))*dxi
-          dwdyp = (w(i,j+1,k)-w(i,j,k))*dyi
-          dwdym = (w(i,j,k)-w(i,j-1,k))*dyi
-          dwdt(i,j,k) = dwdt(i,j,k) + &
-                        (dwdxp-dwdxm)*visc*dxi + &
-                        (dwdyp-dwdym)*visc*dyi
-        end do
-      end do
-    end do
-  end subroutine momz_d_xy
-#endif
-  !
-  subroutine cmpt_wallshear(n,is_cmpt,is_bound,l,dli,dzci,dzfi,visc,u,v,w,taux,tauy,tauz)
-    use mod_param, only: cbcpre
-    implicit none
-    integer , intent(in ), dimension(3) :: n
-    logical , intent(in ), dimension(    3) :: is_cmpt
-    logical , intent(in ), dimension(0:1,3) :: is_bound
-    real(rp), intent(in ), dimension(3)     :: l,dli
-    real(rp), intent(in ), dimension(0:)    :: dzci,dzfi
-    real(rp), intent(in )                   :: visc
-    real(rp), intent(in ), dimension(0:,0:,0:) :: u,v,w
-    real(rp), intent(out), dimension(3) :: taux,tauy,tauz
-    real(rp) :: dudyp,dudym,dudzp,dudzm, &
-                dvdxp,dvdxm,dvdzp,dvdzm, &
-                dwdxp,dwdxm,dwdyp,dwdym
-    !
-    ! n.b.: replace scalars with reduction of tau(1:3,1:3) once the
-    !       nvfortran bug for array reductions on Pascal architectures
-    !       is solved; this subroutine is not used in production anyway
-    !
-    real(rp) :: tau21,tau31,tau12,tau32,tau13,tau23
-    integer :: i,j,k,nx,ny,nz
-    real(rp) :: dxi,dyi,lx,ly,lz
-    real(rp) :: tau(3,3)
-    !
-    nx = n(1); ny = n(2); nz = n(3)
-    dxi = dli(1); dyi = dli(2)
-    lx = l(1); ly = l(2); lz = l(3)
-    tau21 = 0._rp
-    tau31 = 0._rp
-    if(is_cmpt(1)) then
-      !$acc data copy(tau21) async(1)
-      if(is_bound(0,2).and.cbcpre(0,2)//cbcpre(1,2) /= 'PP') then
-        !$acc parallel loop collapse(2) default(present) private(dudyp) reduction(+:tau21) async(1)
-        do k=1,nz
-          do i=1,nx
-            dudyp = (u(i,1 ,k)-u(i,0   ,k))*dyi*visc
-            tau21 = tau21 + dudyp/(dxi*dzfi(k)*lx*lz)
-          end do
-        end do
-      end if
-      if(is_bound(1,2).and.cbcpre(0,2)//cbcpre(1,2) /= 'PP') then
-        !$acc parallel loop collapse(2) default(present) private(dudym) reduction(+:tau21) async(1)
-        do k=1,nz
-          do i=1,nx
-            dudym = (u(i,ny,k)-u(i,ny+1,k))*dyi*visc
-            tau21 = tau21 + dudym/(dxi*dzfi(k)*lx*lz)
-          end do
-        end do
-      end if
-      !$acc end data
-      !$acc data copy(tau31) async(1)
-      if(is_bound(0,3).and.cbcpre(0,3)//cbcpre(1,3) /= 'PP') then
-        !$acc parallel loop collapse(2) default(present) private(dudzp) reduction(+:tau31) async(1)
-        do j=1,ny
-          do i=1,nx
-            dudzp = (u(i,j,1 )-u(i,j,0   ))*dzci(0)*visc
-            tau31 = tau31 + dudzp/(dxi*dyi*lx*ly)
-          end do
-        end do
-      end if
-      if(is_bound(1,3).and.cbcpre(0,3)//cbcpre(1,3) /= 'PP') then
-        !$acc parallel loop collapse(2) default(present) private(dudzm) reduction(+:tau31) async(1)
-        do j=1,ny
-          do i=1,nx
-            dudzm = (u(i,j,nz)-u(i,j,nz+1))*dzci(nz)*visc
-            tau31 = tau31 + dudzm/(dxi*dyi*lx*ly)
-          end do
-        end do
-      end if
-      !$acc end data
-    end if
-    !
-    tau12 = 0._rp
-    tau32 = 0._rp
-    if(is_cmpt(2)) then
-      !$acc data copy(tau12) async(1)
-      if(is_bound(0,1).and.cbcpre(0,1)//cbcpre(1,1) /= 'PP') then
-        !$acc parallel loop collapse(2) default(present) private(dvdxp) reduction(+:tau12) async(1)
-        do k=1,nz
-          do j=1,ny
-            dvdxp = (v(1  ,j,k)-v(0  ,j,k))*dxi*visc
-            tau12 = tau12 + dvdxp/(dyi*dzfi(k)*ly*lz)
-          end do
-        end do
-      end if
-      if(is_bound(1,1).and.cbcpre(0,1)//cbcpre(1,1) /= 'PP') then
-        !$acc parallel loop collapse(2) default(present) private(dvdxm) reduction(+:tau12) async(1)
-        do k=1,nz
-          do j=1,ny
-            dvdxm = (v(nx,j,k)-v(nx+1,j,k))*dxi*visc
-            tau12 = tau12 + dvdxm/(dyi*dzfi(k)*ly*lz)
-          end do
-        end do
-      end if
-      !$acc end data
-      !$acc data copy(tau32) async(1)
-      if(is_bound(0,3).and.cbcpre(0,3)//cbcpre(1,3) /= 'PP') then
-        !$acc parallel loop collapse(2) default(present) private(dvdzp) reduction(+:tau32) async(1)
-        do j=1,ny
-          do i=1,nx
-            dvdzp = (v(i,j,1 )-v(i,j,0   ))*dzci(0)*visc
-            tau32 = tau32 + dvdzp/(dxi*dyi*lx*ly)
-          end do
-        end do
-      end if
-      if(is_bound(1,3).and.cbcpre(0,3)//cbcpre(1,3) /= 'PP') then
-        !$acc parallel loop collapse(2) default(present) private(dvdzm) reduction(+:tau32) async(1)
-        do j=1,ny
-          do i=1,nx
-            dvdzm = (v(i,j,nz)-v(i,j,nz+1))*dzci(nz)*visc
-            tau32 = tau32 + dvdzm/(dxi*dyi*lx*ly)
-          end do
-        end do
-      end if
-      !$acc end data
-    end if
-    !
-    tau13 = 0._rp
-    tau23 = 0._rp
-    if(is_cmpt(3)) then
-      !$acc data copy(tau13) async(1)
-      if(is_bound(0,1).and.cbcpre(0,1)//cbcpre(1,1) /= 'PP') then
-        !$acc parallel loop collapse(2) default(present) private(dwdxp) reduction(+:tau13) async(1)
-        do k=1,nz
-          do j=1,ny
-            dwdxp = (w(1 ,j,k)-w(0   ,j,k))*dxi*visc
-            tau13 = tau13 + dwdxp/(dyi*dzfi(k)*ly*lz)
-          end do
-        end do
-      end if
-      if(is_bound(1,1).and.cbcpre(0,1)//cbcpre(1,1) /= 'PP') then
-        !$acc parallel loop collapse(2) default(present) private(dwdxm) reduction(+:tau13) async(1)
-        do k=1,nz
-          do j=1,ny
-            dwdxm = (w(nx,j,k)-w(nx+1,j,k))*dxi*visc
-            tau13 = tau13 + dwdxm/(dyi*dzfi(k)*ly*lz)
-          end do
-        end do
-      end if
-      !$acc end data
-      !$acc data copy(tau23) async(1)
-      if(is_bound(0,2).and.cbcpre(0,2)//cbcpre(1,2) /= 'PP') then
-        !$acc parallel loop collapse(2) default(present) private(dwdyp) reduction(+:tau23) async(1)
-        do k=1,nz
-          do i=1,nx
-            dwdyp = (w(i,1,k )-w(i,0   ,k))*dyi*visc
-            tau23 = tau23 + dwdyp/(dxi*dzfi(k)*lx*lz)
-          end do
-        end do
-      end if
-      if(is_bound(1,2).and.cbcpre(0,2)//cbcpre(1,2) /= 'PP') then
-        !$acc parallel loop collapse(2) default(present) private(dwdym) reduction(+:tau23) async(1)
-        do k=1,nz
-          do i=1,nx
-            dwdym = (w(i,ny,k)-w(i,ny+1,k))*dyi*visc
-            tau23 = tau23 + dwdym/(dxi*dzfi(k)*lx*lz)
-          end do
-        end do
-      end if
-      !$acc end data
-    end if
-    !$acc wait(1)
-    tau(:,:) = 0._rp
-    tau(2,1) = tau21
-    tau(3,1) = tau31
-    tau(1,2) = tau12
-    tau(3,2) = tau32
-    tau(1,3) = tau13
-    tau(2,3) = tau23
-    call MPI_ALLREDUCE(MPI_IN_PLACE,tau(1,1),9,MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
-    taux(:) = tau(:,1)
-    tauy(:) = tau(:,2)
-    tauz(:) = tau(:,3)
-  end subroutine cmpt_wallshear
-  !
-  subroutine bulk_forcing(n,is_forced,f,u,v,w)
-    integer , intent(in   ), dimension(3) :: n
-    logical , intent(in   ), dimension(3) :: is_forced
-    real(rp), intent(in   ), dimension(3) :: f
-    real(rp), intent(inout), dimension(0:,0:,0:) :: u,v,w
-    real(rp) :: ff
-    if(is_forced(1)) then
-      ff = f(1)
-      !$acc kernels default(present) async(1)
-      u(1:n(1),1:n(2),1:n(3)) = u(1:n(1),1:n(2),1:n(3)) + ff
-      !$acc end kernels
-    end if
-    if(is_forced(2)) then
-      ff = f(2)
-      !$acc kernels default(present) async(1)
-      v(1:n(1),1:n(2),1:n(3)) = v(1:n(1),1:n(2),1:n(3)) + ff
-      !$acc end kernels
-    end if
-    if(is_forced(3)) then
-      ff = f(3)
-      !$acc kernels default(present) async(1)
-      w(1:n(1),1:n(2),1:n(3)) = w(1:n(1),1:n(2),1:n(3)) + ff
-      !$acc end kernels
-    end if
-  end subroutine bulk_forcing
   !
   subroutine mom_xyz_ad(nx,ny,nz,dxi,dyi,dzci,dzfi,visc,u,v,w,visct,dudt,dvdt,dwdt,dudtd,dvdtd,dwdtd)
     !
@@ -901,38 +307,204 @@ module mod_mom
     ! dudtd, implicit terms
   end subroutine mom_xyz_ad
   !
-  function deriv_2nd_ord(p,d,ibound)
-    !
-    ! 1st derivative dp/dx with 2nd order accuracy
-    !
-    implicit none
-    real(rp) :: deriv_2nd_ord
-    real(rp), intent(in), dimension(2:) :: p,d
-    integer, intent(in) :: ibound
-    real(rp) :: sgn,d2,d3,d4,p2,p3,p4
-    !
-    sgn = (1-ibound)*(1._rp) + ibound*(-1._rp)
-    !
-    d2 = d(2); d3 = d(3); d4 = d(4)
-    p2 = p(2); p3 = p(3); p4 = p(4)
-    deriv_2nd_ord = sgn*(d2**2*(p3-p4)-d3**2*(p2-p4)+d4**2*(p2-p3)) / &
-                        (d2**2*(d3-d4)-d3**2*(d2-d4)+d4**2*(d2-d3))
-  end function deriv_2nd_ord
+  subroutine bulk_forcing(n,is_forced,f,u,v,w)
+    integer , intent(in   ), dimension(3) :: n
+    logical , intent(in   ), dimension(3) :: is_forced
+    real(rp), intent(in   ), dimension(3) :: f
+    real(rp), intent(inout), dimension(0:,0:,0:) :: u,v,w
+    real(rp) :: ff
+    if(is_forced(1)) then
+      ff = f(1)
+      !$acc kernels default(present) async(1)
+      u(1:n(1),1:n(2),1:n(3)) = u(1:n(1),1:n(2),1:n(3)) + ff
+      !$acc end kernels
+    end if
+    if(is_forced(2)) then
+      ff = f(2)
+      !$acc kernels default(present) async(1)
+      v(1:n(1),1:n(2),1:n(3)) = v(1:n(1),1:n(2),1:n(3)) + ff
+      !$acc end kernels
+    end if
+    if(is_forced(3)) then
+      ff = f(3)
+      !$acc kernels default(present) async(1)
+      w(1:n(1),1:n(2),1:n(3)) = w(1:n(1),1:n(2),1:n(3)) + ff
+      !$acc end kernels
+    end if
+  end subroutine bulk_forcing
   !
-  function deriv_1st_ord(p,d,ibound)
-    !
-    ! 1st derivative dp/dx with 1st order accuracy
-    !
+  subroutine cmpt_wallshear(n,is_cmpt,is_bound,l,dli,dzci,dzfi,visc,u,v,w,taux,tauy,tauz)
+    use mod_param, only: cbcpre
     implicit none
-    real(rp) :: deriv_1st_ord
-    real(rp), intent(in), dimension(2:) :: p,d
-    integer, intent(in) :: ibound
-    real(rp) :: sgn,d2,d3,p2,p3
+    integer , intent(in ), dimension(3) :: n
+    logical , intent(in ), dimension(    3) :: is_cmpt
+    logical , intent(in ), dimension(0:1,3) :: is_bound
+    real(rp), intent(in ), dimension(3)     :: l,dli
+    real(rp), intent(in ), dimension(0:)    :: dzci,dzfi
+    real(rp), intent(in )                   :: visc
+    real(rp), intent(in ), dimension(0:,0:,0:) :: u,v,w
+    real(rp), intent(out), dimension(3) :: taux,tauy,tauz
+    real(rp) :: dudyp,dudym,dudzp,dudzm, &
+                dvdxp,dvdxm,dvdzp,dvdzm, &
+                dwdxp,dwdxm,dwdyp,dwdym
     !
-    sgn = (1-ibound)*(1._rp) + ibound*(-1._rp)
+    ! n.b.: replace scalars with reduction of tau(1:3,1:3) once the
+    !       nvfortran bug for array reductions on Pascal architectures
+    !       is solved; this subroutine is not used in production anyway
     !
-    d2 = d(2); d3 = d(3)
-    p2 = p(2); p3 = p(3)
-    deriv_1st_ord = sgn*(p3-p2)/(d3-d2)
-  end function deriv_1st_ord
+    real(rp) :: tau21,tau31,tau12,tau32,tau13,tau23
+    integer :: i,j,k,nx,ny,nz
+    real(rp) :: dxi,dyi,lx,ly,lz
+    real(rp) :: tau(3,3)
+    !
+    nx = n(1); ny = n(2); nz = n(3)
+    dxi = dli(1); dyi = dli(2)
+    lx = l(1); ly = l(2); lz = l(3)
+    tau21 = 0._rp
+    tau31 = 0._rp
+    if(is_cmpt(1)) then
+      !$acc data copy(tau21) async(1)
+      if(is_bound(0,2).and.cbcpre(0,2)//cbcpre(1,2) /= 'PP') then
+        !$acc parallel loop collapse(2) default(present) private(dudyp) reduction(+:tau21) async(1)
+        do k=1,nz
+          do i=1,nx
+            dudyp = (u(i,1 ,k)-u(i,0   ,k))*dyi*visc
+            tau21 = tau21 + dudyp/(dxi*dzfi(k)*lx*lz)
+          end do
+        end do
+      end if
+      if(is_bound(1,2).and.cbcpre(0,2)//cbcpre(1,2) /= 'PP') then
+        !$acc parallel loop collapse(2) default(present) private(dudym) reduction(+:tau21) async(1)
+        do k=1,nz
+          do i=1,nx
+            dudym = (u(i,ny,k)-u(i,ny+1,k))*dyi*visc
+            tau21 = tau21 + dudym/(dxi*dzfi(k)*lx*lz)
+          end do
+        end do
+      end if
+      !$acc end data
+      !$acc data copy(tau31) async(1)
+      if(is_bound(0,3).and.cbcpre(0,3)//cbcpre(1,3) /= 'PP') then
+        !$acc parallel loop collapse(2) default(present) private(dudzp) reduction(+:tau31) async(1)
+        do j=1,ny
+          do i=1,nx
+            dudzp = (u(i,j,1 )-u(i,j,0   ))*dzci(0)*visc
+            tau31 = tau31 + dudzp/(dxi*dyi*lx*ly)
+          end do
+        end do
+      end if
+      if(is_bound(1,3).and.cbcpre(0,3)//cbcpre(1,3) /= 'PP') then
+        !$acc parallel loop collapse(2) default(present) private(dudzm) reduction(+:tau31) async(1)
+        do j=1,ny
+          do i=1,nx
+            dudzm = (u(i,j,nz)-u(i,j,nz+1))*dzci(nz)*visc
+            tau31 = tau31 + dudzm/(dxi*dyi*lx*ly)
+          end do
+        end do
+      end if
+      !$acc end data
+    end if
+    !
+    tau12 = 0._rp
+    tau32 = 0._rp
+    if(is_cmpt(2)) then
+      !$acc data copy(tau12) async(1)
+      if(is_bound(0,1).and.cbcpre(0,1)//cbcpre(1,1) /= 'PP') then
+        !$acc parallel loop collapse(2) default(present) private(dvdxp) reduction(+:tau12) async(1)
+        do k=1,nz
+          do j=1,ny
+            dvdxp = (v(1  ,j,k)-v(0  ,j,k))*dxi*visc
+            tau12 = tau12 + dvdxp/(dyi*dzfi(k)*ly*lz)
+          end do
+        end do
+      end if
+      if(is_bound(1,1).and.cbcpre(0,1)//cbcpre(1,1) /= 'PP') then
+        !$acc parallel loop collapse(2) default(present) private(dvdxm) reduction(+:tau12) async(1)
+        do k=1,nz
+          do j=1,ny
+            dvdxm = (v(nx,j,k)-v(nx+1,j,k))*dxi*visc
+            tau12 = tau12 + dvdxm/(dyi*dzfi(k)*ly*lz)
+          end do
+        end do
+      end if
+      !$acc end data
+      !$acc data copy(tau32) async(1)
+      if(is_bound(0,3).and.cbcpre(0,3)//cbcpre(1,3) /= 'PP') then
+        !$acc parallel loop collapse(2) default(present) private(dvdzp) reduction(+:tau32) async(1)
+        do j=1,ny
+          do i=1,nx
+            dvdzp = (v(i,j,1 )-v(i,j,0   ))*dzci(0)*visc
+            tau32 = tau32 + dvdzp/(dxi*dyi*lx*ly)
+          end do
+        end do
+      end if
+      if(is_bound(1,3).and.cbcpre(0,3)//cbcpre(1,3) /= 'PP') then
+        !$acc parallel loop collapse(2) default(present) private(dvdzm) reduction(+:tau32) async(1)
+        do j=1,ny
+          do i=1,nx
+            dvdzm = (v(i,j,nz)-v(i,j,nz+1))*dzci(nz)*visc
+            tau32 = tau32 + dvdzm/(dxi*dyi*lx*ly)
+          end do
+        end do
+      end if
+      !$acc end data
+    end if
+    !
+    tau13 = 0._rp
+    tau23 = 0._rp
+    if(is_cmpt(3)) then
+      !$acc data copy(tau13) async(1)
+      if(is_bound(0,1).and.cbcpre(0,1)//cbcpre(1,1) /= 'PP') then
+        !$acc parallel loop collapse(2) default(present) private(dwdxp) reduction(+:tau13) async(1)
+        do k=1,nz
+          do j=1,ny
+            dwdxp = (w(1 ,j,k)-w(0   ,j,k))*dxi*visc
+            tau13 = tau13 + dwdxp/(dyi*dzfi(k)*ly*lz)
+          end do
+        end do
+      end if
+      if(is_bound(1,1).and.cbcpre(0,1)//cbcpre(1,1) /= 'PP') then
+        !$acc parallel loop collapse(2) default(present) private(dwdxm) reduction(+:tau13) async(1)
+        do k=1,nz
+          do j=1,ny
+            dwdxm = (w(nx,j,k)-w(nx+1,j,k))*dxi*visc
+            tau13 = tau13 + dwdxm/(dyi*dzfi(k)*ly*lz)
+          end do
+        end do
+      end if
+      !$acc end data
+      !$acc data copy(tau23) async(1)
+      if(is_bound(0,2).and.cbcpre(0,2)//cbcpre(1,2) /= 'PP') then
+        !$acc parallel loop collapse(2) default(present) private(dwdyp) reduction(+:tau23) async(1)
+        do k=1,nz
+          do i=1,nx
+            dwdyp = (w(i,1,k )-w(i,0   ,k))*dyi*visc
+            tau23 = tau23 + dwdyp/(dxi*dzfi(k)*lx*lz)
+          end do
+        end do
+      end if
+      if(is_bound(1,2).and.cbcpre(0,2)//cbcpre(1,2) /= 'PP') then
+        !$acc parallel loop collapse(2) default(present) private(dwdym) reduction(+:tau23) async(1)
+        do k=1,nz
+          do i=1,nx
+            dwdym = (w(i,ny,k)-w(i,ny+1,k))*dyi*visc
+            tau23 = tau23 + dwdym/(dxi*dzfi(k)*lx*lz)
+          end do
+        end do
+      end if
+      !$acc end data
+    end if
+    !$acc wait(1)
+    tau(:,:) = 0._rp
+    tau(2,1) = tau21
+    tau(3,1) = tau31
+    tau(1,2) = tau12
+    tau(3,2) = tau32
+    tau(1,3) = tau13
+    tau(2,3) = tau23
+    call MPI_ALLREDUCE(MPI_IN_PLACE,tau(1,1),9,MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
+    taux(:) = tau(:,1)
+    tauy(:) = tau(:,2)
+    tauz(:) = tau(:,3)
+  end subroutine cmpt_wallshear
 end module mod_mom

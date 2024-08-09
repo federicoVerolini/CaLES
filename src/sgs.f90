@@ -47,41 +47,165 @@ module mod_sgs
     real(rp), intent(in )                        :: visc,h
     real(rp), intent(in ), dimension(0:,0:,0:)   :: u,v,w
     real(rp), intent(out), dimension(0:,0:,0:)   :: visct
-    real(rp), allocatable, dimension(:,:,:)  , save :: dw_plus,s0,uc,vc,wc,uf,vf,wf, &
-                                                       wk,wk1,wk2,wk3,alph2
+    real(rp), allocatable, dimension(:,:,:)  , save :: s0,uc,vc,wc,uf,vf,wf, &
+                                                       wk1,wk2,wk3,alph2
     real(rp), allocatable, dimension(:,:,:,:), save :: sij,lij,mij
+    real(rp) :: u_mcm,u_ccm,u_mmc,u_cmc,u_mcc,u_ccc,u_mpc,u_cpc,u_mcp,u_ccp, &
+                v_cmm,v_ccm,v_mmc,v_cmc,v_pmc,v_mcc,v_ccc,v_pcc,v_cmp,v_ccp, &
+                w_cmm,w_mcm,w_ccm,w_pcm,w_cpm,w_cmc,w_mcc,w_ccc,w_pcc,w_cpc, &
+                s11,s22,s33,s12,s13,s23,ss,s0_s, &
+                dxi,dyi,visci,tauw(2),tauw_tot(0:1,3),dw(0:1,3),dw_plus, &
+                fd,del,dw_s,tauw_s
+    real(rp), dimension(0:1,3), save :: is_wall
+    real(rp), save :: factor0,factor1
     logical, save :: is_first = .true.
+    integer :: loc(2)
     integer :: i,j,k,m
     !
     select case(trim(sgstype))
     case('none')
-      !$acc kernels default(present) async(1)
-      visct(:,:,:) = 0._rp
-      !$acc end kernels
+      if(is_first) then
+        is_first = .false.
+        !$acc kernels default(present) async(1)
+        visct(:,:,:) = 0._rp
+        !$acc end kernels
+      end if
     case('smag')
       if(is_first) then
         is_first = .false.
-        allocate(wk     (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
-                 wk1    (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
-                 wk2    (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
-                 wk3    (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
-                 s0     (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
-                 dw_plus(0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
-                 sij    (0:n(1)+1,0:n(2)+1,0:n(3)+1,6))
-        !$acc enter data create(wk,wk1,wk2,wk3) async(1)
-        !$acc enter data create(s0,dw_plus,sij) async(1)
+        is_wall = 0._rp
+        if(is_bound(0,1).and.cbcvel(0,1,1)=='D') is_wall(0,1) = 1._rp
+        if(is_bound(1,1).and.cbcvel(1,1,1)=='D') is_wall(1,1) = 1._rp
+        if(is_bound(0,2).and.cbcvel(0,2,2)=='D') is_wall(0,2) = 1._rp
+        if(is_bound(1,2).and.cbcvel(1,2,2)=='D') is_wall(1,2) = 1._rp
+        if(is_bound(0,3).and.cbcvel(0,3,3)=='D') is_wall(0,3) = 1._rp
+        if(is_bound(1,3).and.cbcvel(1,3,3)=='D') is_wall(1,3) = 1._rp
+        !$acc enter data copyin(is_wall) async(1)
+        allocate(wk1(0:n(1)+1,0:n(2)+1,0:n(3)+1), &
+                 wk2(0:n(1)+1,0:n(2)+1,0:n(3)+1), &
+                 wk3(0:n(1)+1,0:n(2)+1,0:n(3)+1))
+        !$acc enter data create(wk1,wk2,wk3) async(1)
       end if
       call extrapolate(n,is_bound,dzci,u,wk1,iface=1,lwm=lwm)
       call extrapolate(n,is_bound,dzci,v,wk2,iface=2,lwm=lwm)
       call extrapolate(n,is_bound,dzci,w,wk3,iface=3,lwm=lwm)
-      call strain_rate(n,dli,dzci,dzfi,wk1,wk2,wk3,s0,sij)
-      call cmpt_dw_plus(cbcvel,n,is_bound,l,dl,dli,zc,dzc,dzci,visc,u,v,w,dw_plus)
-      call sgs_smag(n,dl,dzf,dw_plus,s0,visct)
+      !
+      dxi = dli(1)
+      dyi = dli(2)
+      visci = 1._rp/visc
+      !
+      !$acc parallel loop collapse(3) default(present) async(1) &
+      !$acc private(u_mcm,u_ccm,u_mmc,u_cmc,u_mcc,u_ccc,u_mpc,u_cpc,u_mcp,u_ccp) &
+      !$acc private(v_cmm,v_ccm,v_mmc,v_cmc,v_pmc,v_mcc,v_ccc,v_pcc,v_cmp,v_ccp) &
+      !$acc private(w_cmm,w_mcm,w_ccm,w_pcm,w_cpm,w_cmc,w_mcc,w_ccc,w_pcc,w_cpc) &
+      !$acc private(s11,s22,s33,s12,s13,s23,s0_s) &
+      !$acc private(dw,tauw,tauw_tot,loc,fd,del,tauw_s,dw_s,dw_plus)
+      do k=1,n(3)
+        do j=1,n(2)
+          do i=1,n(1)
+            !
+            ! strain rate
+            !
+            u_mcm = wk1(i-1,j  ,k-1)
+            u_ccm = wk1(i  ,j  ,k-1)
+            u_mmc = wk1(i-1,j-1,k  )
+            u_cmc = wk1(i  ,j-1,k  )
+            u_mcc = wk1(i-1,j  ,k  )
+            u_ccc = wk1(i  ,j  ,k  )
+            u_mpc = wk1(i-1,j+1,k  )
+            u_cpc = wk1(i  ,j+1,k  )
+            u_mcp = wk1(i-1,j  ,k+1)
+            u_ccp = wk1(i  ,j  ,k+1)
+            !
+            v_cmm = wk2(i  ,j-1,k-1)
+            v_ccm = wk2(i  ,j  ,k-1)
+            v_mmc = wk2(i-1,j-1,k  )
+            v_cmc = wk2(i  ,j-1,k  )
+            v_pmc = wk2(i+1,j-1,k  )
+            v_mcc = wk2(i-1,j  ,k  )
+            v_ccc = wk2(i  ,j  ,k  )
+            v_pcc = wk2(i+1,j  ,k  )
+            v_cmp = wk2(i  ,j-1,k+1)
+            v_ccp = wk2(i  ,j  ,k+1)
+            !
+            w_cmm = wk3(i  ,j-1,k-1)
+            w_mcm = wk3(i-1,j  ,k-1)
+            w_ccm = wk3(i  ,j  ,k-1)
+            w_pcm = wk3(i+1,j  ,k-1)
+            w_cpm = wk3(i  ,j+1,k-1)
+            w_cmc = wk3(i  ,j-1,k  )
+            w_mcc = wk3(i-1,j  ,k  )
+            w_ccc = wk3(i  ,j  ,k  )
+            w_pcc = wk3(i+1,j  ,k  )
+            w_cpc = wk3(i  ,j+1,k  )
+            !
+            s11 = (u_ccc-u_mcc)*dxi
+            s22 = (v_ccc-v_cmc)*dyi
+            s33 = (w_ccc-w_ccm)*dzfi(k)
+            s12 = .125_rp*((u_cpc-u_ccc)*dyi + (v_pcc-v_ccc)*dxi + &
+                           (u_ccc-u_cmc)*dyi + (v_pmc-v_cmc)*dxi + &
+                           (u_mpc-u_mcc)*dyi + (v_ccc-v_mcc)*dxi + &
+                           (u_mcc-u_mmc)*dyi + (v_cmc-v_mmc)*dxi)
+            s13 = .125_rp*((u_ccp-u_ccc)*dzci(k  ) + (w_pcc-w_ccc)*dxi + &
+                           (u_ccc-u_ccm)*dzci(k-1) + (w_pcm-w_ccm)*dxi + &
+                           (u_mcp-u_mcc)*dzci(k  ) + (w_ccc-w_mcc)*dxi + &
+                           (u_mcc-u_mcm)*dzci(k-1) + (w_ccm-w_mcm)*dxi)
+            s23 = .125_rp*((v_ccp-v_ccc)*dzci(k  ) + (w_cpc-w_ccc)*dyi + &
+                           (v_ccc-v_ccm)*dzci(k-1) + (w_cpm-w_ccm)*dyi + &
+                           (v_cmp-v_cmc)*dzci(k  ) + (w_ccc-w_cmc)*dyi + &
+                           (v_cmc-v_cmm)*dzci(k-1) + (w_ccm-w_cmm)*dyi)
+            s0_s = sqrt(2._rp*(s11*s11+s22*s22+s33*s33+2._rp*(s12*s12+s13*s13+s23*s23)))
+            !
+            ! van Driest damping
+            !
+            dw(0,1) = dl(1)*(i-0.5)
+            dw(1,1) = dl(1)*(n(1)-i+0.5)
+            dw(0,2) = dl(2)*(j-0.5)
+            dw(1,2) = dl(2)*(n(2)-j+0.5)
+            dw(0,3) = zc(k)
+            dw(1,3) = l(3)-zc(k)
+            dw = dw*is_wall + big*(1._rp-is_wall)
+            loc = minloc(dw)
+            dw_s = dw(loc(1),loc(2))
+            !
+            if(loc(1)==0.and.loc(2)==1) then
+              tauw(1) = v(1,j,k)-v(0,j,k)+v(1,j-1,k)-v(0,j-1,k)
+              tauw(2) = w(1,j,k)-w(0,j,k)+w(1,j,k-1)-w(0,j,k-1)
+              tauw_s = sqrt(tauw(1)*tauw(1)+tauw(2)*tauw(2))*dxi
+            else if(loc(1)==1.and.loc(2)==1) then
+              tauw(1) = v(n(1),j,k)-v(n(1)+1,j,k)+v(n(1),j-1,k)-v(n(1)+1,j-1,k)
+              tauw(2) = w(n(1),j,k)-w(n(1)+1,j,k)+w(n(1),j,k-1)-w(n(1)+1,j,k-1)
+              tauw_s = sqrt(tauw(1)*tauw(1)+tauw(2)*tauw(2))*dxi
+            else if(loc(1)==0.and.loc(2)==2) then
+              tauw(1) = u(i,1,k)-u(i,0,k)+u(i-1,1,k)-u(i-1,0,k)
+              tauw(2) = w(i,1,k)-w(i,0,k)+w(i,1,k-1)-w(i,0,k-1)
+              tauw_s  = sqrt(tauw(1)*tauw(1)+tauw(2)*tauw(2))*dyi
+            else if(loc(1)==1.and.loc(2)==2) then
+              tauw(1) = u(i,n(2),k)-u(i,n(2)+1,k)+u(i-1,n(2),k)-u(i-1,n(2)+1,k)
+              tauw(2) = w(i,n(2),k)-w(i,n(2)+1,k)+w(i,n(2),k-1)-w(i,n(2)+1,k-1)
+              tauw_s  = sqrt(tauw(1)*tauw(1)+tauw(2)*tauw(2))*dyi
+            else if(loc(1)==0.and.loc(2)==3) then
+              tauw(1) = u(i,j,1)-u(i,j,0)+u(i-1,j,1)-u(i-1,j,0)
+              tauw(2) = v(i,j,1)-v(i,j,0)+v(i,j-1,1)-v(i,j-1,0)
+              tauw_s  = sqrt(tauw(1)*tauw(1)+tauw(2)*tauw(2))*dzci(0)
+            else if(loc(1)==1.and.loc(2)==3) then
+              tauw(1) = u(i,j,n(3))-u(i,j,n(3)+1)+u(i-1,j,n(3))-u(i-1,j,n(3)+1)
+              tauw(2) = v(i,j,n(3))-v(i,j,n(3)+1)+v(i,j-1,n(3))-v(i,j-1,n(3)+1)
+              tauw_s  = sqrt(tauw(1)*tauw(1)+tauw(2)*tauw(2))*dzci(n(3))
+            end if
+            tauw_s = 0.5_rp*visc*tauw_s
+            dw_plus = dw_s*sqrt(tauw_s)*visci
+            fd = 1._rp-exp(-dw_plus/25._rp)
+            !
+            del = (dl(1)*dl(2)*dzf(k))**(.333_rp)
+            visct(i,j,k) = (c_smag*del*fd)**2*s0_s
+          end do
+        end do
+      end do
     case('dsmag')
       if(is_first) then
         is_first = .false.
-        allocate(wk (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
-                 wk1(0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
+        allocate(wk1(0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
                  wk2(0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
                  wk3(0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
                  uc (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
@@ -95,7 +219,7 @@ module mod_sgs
                  lij(0:n(1)+1,0:n(2)+1,0:n(3)+1,6), &
                  mij(0:n(1)+1,0:n(2)+1,0:n(3)+1,6))
         allocate(alph2(0:n(1)+1,0:n(2)+1,0:n(3)+1))
-        !$acc enter data create(wk,wk1,wk2,wk3) async(1)
+        !$acc enter data create(wk1,wk2,wk3) async(1)
         !$acc enter data create(uc,vc,wc,uf,vf,wf) async(1)
         !$acc enter data create(s0,sij,lij,mij) async(1)
         !$acc enter data create(alph2) async(1)
@@ -105,7 +229,7 @@ module mod_sgs
       call extrapolate(n,is_bound,dzci,u,wk1,iface=1,lwm=lwm)
       call extrapolate(n,is_bound,dzci,v,wk2,iface=2,lwm=lwm)
       call extrapolate(n,is_bound,dzci,w,wk3,iface=3,lwm=lwm)
-      call strain_rate(n,dli,dzci,dzfi,wk1,wk2,wk3,s0,sij)
+      call strain_rate(n,dli,dzci,dzfi,wk1,wk2,wk3,s0,sij)  ! remove sij, lij is enough
       !
       !$acc kernels default(present) async(1)
       visct = s0
@@ -522,7 +646,7 @@ module mod_sgs
     integer , intent(in ) :: iface
     character(len=1), intent(in), dimension(0:1,3,3), optional :: cbc
     integer, intent(in), dimension(0:1,3), optional :: lwm
-    logical, dimension(0:1,3) :: is_extra
+    logical, dimension(0:1,3) :: is_done
     real(rp) :: dzc(0:n(3)+1),factor0,factor1
     integer :: i,j,k
     !
@@ -531,20 +655,21 @@ module mod_sgs
     if(present(cbc)) then
       factor0 = 1._rp
       factor1 = 1._rp
-      is_extra(:,1) = (is_bound(:,1).and.cbc(:,1,1)=='D'.and.iface/=1)
-      is_extra(:,2) = (is_bound(:,2).and.cbc(:,2,2)=='D'.and.iface/=2)
-      is_extra(:,3) = (is_bound(:,3).and.cbc(:,3,3)=='D'.and.iface/=3)
+      is_done(:,1) = (is_bound(:,1).and.cbc(:,1,1)=='D'.and.iface/=1)
+      is_done(:,2) = (is_bound(:,2).and.cbc(:,2,2)=='D'.and.iface/=2)
+      is_done(:,3) = (is_bound(:,3).and.cbc(:,3,3)=='D'.and.iface/=3)
     elseif(present(lwm)) then
       factor0 = dzc(0)*dzci(1)
       factor1 = dzc(n(3))*dzci(n(3)-1)
-      is_extra(:,1) = (is_bound(:,1).and.lwm(:,1)/=0.and.iface/=1)
-      is_extra(:,2) = (is_bound(:,2).and.lwm(:,2)/=0.and.iface/=2)
-      is_extra(:,3) = (is_bound(:,3).and.lwm(:,3)/=0.and.iface/=3)
+      is_done(:,1) = (is_bound(:,1).and.lwm(:,1)/=0.and.iface/=1)
+      is_done(:,2) = (is_bound(:,2).and.lwm(:,2)/=0.and.iface/=2)
+      is_done(:,3) = (is_bound(:,3).and.lwm(:,3)/=0.and.iface/=3)
     end if
     !$acc kernels default(present) async(1)
     wk(:,:,:) = p(:,:,:)
     !$acc end kernels
-    if(is_extra(0,1)) then
+    !
+    if(is_done(0,1)) then
       !$acc parallel loop collapse(2) default(present) async(1)
       do k = 0,n(3)+1
         do j = 0,n(2)+1
@@ -552,7 +677,7 @@ module mod_sgs
         end do
       end do
     end if
-    if(is_extra(1,1)) then
+    if(is_done(1,1)) then
       !$acc parallel loop collapse(2) default(present) async(1)
       do k = 0,n(3)+1
         do j = 0,n(2)+1
@@ -560,7 +685,7 @@ module mod_sgs
         end do
       end do
     end if
-    if(is_extra(0,2)) then
+    if(is_done(0,2)) then
       !$acc parallel loop collapse(2) default(present) async(1)
       do k = 0,n(3)+1
         do i = 0,n(1)+1
@@ -568,7 +693,7 @@ module mod_sgs
         end do
       end do
     end if
-    if(is_extra(1,2)) then
+    if(is_done(1,2)) then
       !$acc parallel loop collapse(2) default(present) async(1)
       do k = 0,n(3)+1
         do i = 0,n(1)+1
@@ -576,7 +701,7 @@ module mod_sgs
         end do
       end do
     end if
-    if(is_extra(0,3)) then
+    if(is_done(0,3)) then
       !$acc parallel loop collapse(2) default(present) async(1)
       do j = 0,n(2)+1
         do i = 0,n(1)+1
@@ -584,7 +709,7 @@ module mod_sgs
         end do
       end do
     end if
-    if(is_extra(1,3)) then
+    if(is_done(1,3)) then
       !$acc parallel loop collapse(2) default(present) async(1)
       do j = 0,n(2)+1
         do i = 0,n(1)+1
@@ -696,32 +821,6 @@ module mod_sgs
       end do
     end do
   end subroutine interpolate
-  !
-  subroutine sgs_smag(n,dl,dzf,dw_plus,s0,visct)
-    !
-    ! classical Smagorinsky model with van Driest damping
-    ! 
-    implicit none
-    integer , intent(in ), dimension(3)        :: n
-    real(rp), intent(in ), dimension(3)        :: dl
-    real(rp), intent(in ), dimension(0:)       :: dzf
-    real(rp), intent(in ), dimension(0:,0:,0:) :: dw_plus,s0
-    real(rp), intent(out), dimension(0:,0:,0:) :: visct
-    real(rp) :: del,fd
-    integer :: i,j,k
-    !
-    !$acc parallel loop gang default(present) private(del,fd) async(1)
-    do k=1,n(3)
-      del = (dl(1)*dl(2)*dzf(k))**(1._rp/3._rp)
-      !$acc loop vector collapse(2)
-      do j=1,n(2)
-        do i=1,n(1)
-          fd = 1._rp-exp(-dw_plus(i,j,k)/25._rp)
-          visct(i,j,k) = (c_smag*del*fd)**2*s0(i,j,k)
-        end do
-      end do
-    end do
-  end subroutine sgs_smag
   !
   subroutine cmpt_dw_plus(cbc,n,is_bound,l,dl,dli,zc,dzc,dzci,visc,u,v,w,dw_plus)
     !
@@ -870,7 +969,7 @@ module mod_sgs
     end if
   end subroutine cmpt_dw_plus
   !
-  subroutine strain_rate_old(n,dli,dzci,dzfi,ux,uy,uz,s0,sij)
+  subroutine strain_rate(n,dli,dzci,dzfi,u,v,w,s0,sij)
     !
     ! compute the strain rate field
     !
@@ -884,73 +983,18 @@ module mod_sgs
     integer , intent(in ), dimension(3)        :: n
     real(rp), intent(in ), dimension(3)        :: dli
     real(rp), intent(in ), dimension(0:)       :: dzci,dzfi
-    real(rp), intent(in ), dimension(0:,0:,0:) :: ux,uy,uz
-    real(rp), intent(out), dimension(0:,0:,0:) :: s0
-    real(rp), intent(out), dimension(0:,0:,0:,1:) :: sij
-    real(rp) :: dxi,dyi
-    integer :: i,j,k
-    !
-    dxi = dli(1)
-    dyi = dli(2)
-    !
-    !$acc parallel loop collapse(3) default(present) async(1)
-    do k = 0,n(3)
-      do j = 0,n(2)
-        do i = 0,n(1)
-          ! compute at cell edge
-          sij(i,j,k,1) = 0.5_rp*((ux(i,j+1,k)-ux(i,j,k))*dyi     + (uy(i+1,j,k)-uy(i,j,k))*dxi)
-          sij(i,j,k,2) = 0.5_rp*((ux(i,j,k+1)-ux(i,j,k))*dzci(k) + (uz(i+1,j,k)-uz(i,j,k))*dxi)
-          sij(i,j,k,3) = 0.5_rp*((uy(i,j,k+1)-uy(i,j,k))*dzci(k) + (uz(i,j+1,k)-uz(i,j,k))*dyi)
-        end do
-      end do
-    end do
-    !$acc parallel loop collapse(3) default(present) async(1)
-    do k = 1,n(3)
-      do j = 1,n(2)
-        do i = 1,n(1)
-          ! average to cell center
-          sij(i,j,k,4) = 0.25_rp*(sij(i,j,k,1)+sij(i-1,j,k,1)+sij(i,j-1,k,1)+sij(i-1,j-1,k,1))
-          sij(i,j,k,5) = 0.25_rp*(sij(i,j,k,2)+sij(i-1,j,k,2)+sij(i,j,k-1,2)+sij(i-1,j,k-1,2))
-          sij(i,j,k,6) = 0.25_rp*(sij(i,j,k,3)+sij(i,j-1,k,3)+sij(i,j,k-1,3)+sij(i,j-1,k-1,3))
-        end do
-      end do
-    end do
-    !$acc parallel loop collapse(3) default(present) async(1)
-    do k = 1,n(3)
-      do j = 1,n(2)
-        do i = 1,n(1)
-          ! compute at cell center
-          sij(i,j,k,1) = (ux(i,j,k)-ux(i-1,j,k))*dxi
-          sij(i,j,k,2) = (uy(i,j,k)-uy(i,j-1,k))*dyi
-          sij(i,j,k,3) = (uz(i,j,k)-uz(i,j,k-1))*dzfi(k)
-        end do
-      end do
-    end do
-    !$acc kernels default(present) async(1)
-    s0 = sij(:,:,:,1)**2 + sij(:,:,:,2)**2 + sij(:,:,:,3)**2 + &
-        (sij(:,:,:,4)**2 + sij(:,:,:,5)**2 + sij(:,:,:,6)**2)*2._rp
-    s0 = sqrt(2._rp*s0)
-    !$acc end kernels
-  end subroutine strain_rate_old
-  !
-  subroutine strain_rate(n,dli,dzci,dzfi,u,v,w,s0,sij)
-    implicit none
-    integer , intent(in ), dimension(3)        :: n
-    real(rp), intent(in ), dimension(3)        :: dli
-    real(rp), intent(in ), dimension(0:)       :: dzci,dzfi
     real(rp), intent(in ), dimension(0:,0:,0:) :: u,v,w
     real(rp), intent(out), dimension(0:,0:,0:) :: s0
-    real(rp), intent(out), dimension(0:,0:,0:,1:) :: sij
+    real(rp), intent(out), dimension(0:,0:,0:,1:), optional :: sij
     real(rp) :: s11,s22,s33,s12,s13,s23
     real(rp) :: dxi,dyi
     integer :: i,j,k
     real(rp) :: u_mcm,u_ccm,u_mmc,u_cmc,u_mcc,u_ccc,u_mpc,u_cpc,u_mcp,u_ccp, &
                 v_cmm,v_ccm,v_mmc,v_cmc,v_pmc,v_mcc,v_ccc,v_pcc,v_cmp,v_ccp, &
                 w_cmm,w_mcm,w_ccm,w_pcm,w_cpm,w_cmc,w_mcc,w_ccc,w_pcc,w_cpc
+    !
     dxi = dli(1)
     dyi = dli(2)
-    !
-    ! compute sijsij, where sij = (1/2)(du_i/dx_j + du_j/dx_i)
     !
     !$acc parallel loop collapse(3) default(present) async(1) &
     !$acc private(u_mcm,u_ccm,u_mmc,u_cmc,u_mcc,u_ccc,u_mpc,u_cpc,u_mcp,u_ccp) &
@@ -1010,26 +1054,11 @@ module mod_sgs
                          (v_cmp-v_cmc)*dzci(k  ) + (w_ccc-w_cmc)*dyi + &
                          (v_cmc-v_cmm)*dzci(k-1) + (w_ccm-w_cmm)*dyi)
           s0(i,j,k) = sqrt(2._rp*(s11**2+s22**2+s33**2+2._rp*(s12**2+s13**2+s23**2)))
-          ! sij(i,j,k,1:6) = (/s11,s22,s33,s12,s13,s23/)
+          if(present(sij)) then
+            sij(i,j,k,1:6) = (/s11,s22,s33,s12,s13,s23/)
+          end if
         end do
       end do
     end do
-    !
-    ! s11 = (u(i,j,k)-u(i-1,j,k))*dxi
-    ! s22 = (v(i,j,k)-v(i,j-1,k))*dyi
-    ! s33 = (w(i,j,k)-w(i,j,k-1))*dzfi(k)
-    ! s12 = .125_rp*((u(i  ,j+1,k)-u(i  ,j  ,k))*dyi + (v(i+1,j  ,k)-v(i  ,j  ,k))*dxi + &
-    !                (u(i  ,j  ,k)-u(i  ,j-1,k))*dyi + (v(i+1,j-1,k)-v(i  ,j-1,k))*dxi + &
-    !                (u(i-1,j+1,k)-u(i-1,j  ,k))*dyi + (v(i  ,j  ,k)-v(i-1,j  ,k))*dxi + &
-    !                (u(i-1,j  ,k)-u(i-1,j-1,k))*dyi + (v(i  ,j-1,k)-v(i-1,j-1,k))*dxi)
-    ! s13 = .125_rp*((u(i  ,j,k+1)-u(i  ,j,k  ))*dzci(k  ) + (w(i+1,j,k  )-w(i  ,j,k  ))*dxi + &
-    !                (u(i  ,j,k  )-u(i  ,j,k-1))*dzci(k-1) + (w(i+1,j,k-1)-w(i  ,j,k-1))*dxi + &
-    !                (u(i-1,j,k+1)-u(i-1,j,k  ))*dzci(k  ) + (w(i  ,j,k  )-w(i-1,j,k  ))*dxi + &
-    !                (u(i-1,j,k  )-u(i-1,j,k-1))*dzci(k-1) + (w(i  ,j,k-1)-w(i-1,j,k-1))*dxi)
-    ! s23 = .125_rp*((v(i,j  ,k+1)-v(i,j  ,k  ))*dzci(k  ) + (w(i,j+1,k  )-w(i,j  ,k  ))*dyi + &
-    !                (v(i,j  ,k  )-v(i,j  ,k-1))*dzci(k-1) + (w(i,j+1,k-1)-w(i,j  ,k-1))*dyi + &
-    !                (v(i,j-1,k+1)-v(i,j-1,k  ))*dzci(k  ) + (w(i,j  ,k  )-w(i,j-1,k  ))*dyi + &
-    !                (v(i,j-1,k  )-v(i,j-1,k-1))*dzci(k-1) + (w(i,j  ,k-1)-w(i,j-1,k-1))*dyi)
-    ! s0(i,j,k) = sqrt(2._rp*(s11**2+s22**2+s33**2+2._rp*(s12**2+s13**2+s23**2)))
   end subroutine strain_rate
 end module mod_sgs
