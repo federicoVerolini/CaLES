@@ -49,15 +49,15 @@ module mod_sgs
     real(rp), intent(out), dimension(0:,0:,0:)   :: visct
     real(rp), allocatable, dimension(:,:,:)  , save :: s0,uc,vc,wc,uf,vf,wf, &
                                                        wk1,wk2,wk3,alph2
-    real(rp), allocatable, dimension(:,:,:,:), save :: sij,lij,mij
+    real(rp), target,  allocatable, dimension(:,:,:,:), save :: sij,mij
+    real(rp), pointer, contiguous , dimension(:,:,:,:), save :: lij
     real(rp) :: u_mcm,u_ccm,u_mmc,u_cmc,u_mcc,u_ccc,u_mpc,u_cpc,u_mcp,u_ccp, &
                 v_cmm,v_ccm,v_mmc,v_cmc,v_pmc,v_mcc,v_ccc,v_pcc,v_cmp,v_ccp, &
                 w_cmm,w_mcm,w_ccm,w_pcm,w_cpm,w_cmc,w_mcc,w_ccc,w_pcc,w_cpc, &
                 s11,s22,s33,s12,s13,s23,ss,s0_s, &
                 dxi,dyi,visci,tauw(2),tauw_tot(0:1,3),dw(0:1,3),dw_plus, &
-                fd,del,dw_s,tauw_s
+                fd,del,dw_s,tauw_s,mij_s(6),lij_s(6)
     real(rp), dimension(0:1,3), save :: is_wall
-    real(rp), save :: factor0,factor1
     logical, save :: is_first = .true.
     integer :: loc(2)
     integer :: i,j,k,m
@@ -86,9 +86,14 @@ module mod_sgs
                  wk3(0:n(1)+1,0:n(2)+1,0:n(3)+1))
         !$acc enter data create(wk1,wk2,wk3) async(1)
       end if
-      call extrapolate(n,is_bound,dzci,u,wk1,iface=1,lwm=lwm)
-      call extrapolate(n,is_bound,dzci,v,wk2,iface=2,lwm=lwm)
-      call extrapolate(n,is_bound,dzci,w,wk3,iface=3,lwm=lwm)
+      !$acc kernels default(present) async(1)
+      wk1(:,:,:) = u(:,:,:)
+      wk2(:,:,:) = v(:,:,:)
+      wk3(:,:,:) = w(:,:,:)
+      !$acc end kernels
+      call extrapolate(n,is_bound,dzci,wk1,iface=1,lwm=lwm)
+      call extrapolate(n,is_bound,dzci,wk2,iface=2,lwm=lwm)
+      call extrapolate(n,is_bound,dzci,wk3,iface=3,lwm=lwm)
       !
       dxi = dli(1)
       dyi = dli(2)
@@ -216,90 +221,27 @@ module mod_sgs
                  wf (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
                  s0 (0:n(1)+1,0:n(2)+1,0:n(3)+1  ), &
                  sij(0:n(1)+1,0:n(2)+1,0:n(3)+1,6), &
-                 lij(0:n(1)+1,0:n(2)+1,0:n(3)+1,6), &
                  mij(0:n(1)+1,0:n(2)+1,0:n(3)+1,6))
         allocate(alph2(0:n(1)+1,0:n(2)+1,0:n(3)+1))
         !$acc enter data create(wk1,wk2,wk3) async(1)
         !$acc enter data create(uc,vc,wc,uf,vf,wf) async(1)
-        !$acc enter data create(s0,sij,lij,mij) async(1)
+        !$acc enter data create(s0,sij,mij) async(1)
         !$acc enter data create(alph2) async(1)
         call cmpt_alph2(n,is_bound,cbcvel,alph2)
       end if
       !
-      call extrapolate(n,is_bound,dzci,u,wk1,iface=1,lwm=lwm)
-      call extrapolate(n,is_bound,dzci,v,wk2,iface=2,lwm=lwm)
-      call extrapolate(n,is_bound,dzci,w,wk3,iface=3,lwm=lwm)
-      call strain_rate(n,dli,dzci,dzfi,wk1,wk2,wk3,s0,sij)  ! remove sij, lij is enough
+      !$acc kernels default(present) async(1)
+      wk1(:,:,:) = u(:,:,:)
+      wk2(:,:,:) = v(:,:,:)
+      wk3(:,:,:) = w(:,:,:)
+      !$acc end kernels
+      call extrapolate(n,is_bound,dzci,wk1,iface=1,lwm=lwm)
+      call extrapolate(n,is_bound,dzci,wk2,iface=2,lwm=lwm)
+      call extrapolate(n,is_bound,dzci,wk3,iface=3,lwm=lwm)
+      call strain_rate(n,dli,dzci,dzfi,wk1,wk2,wk3,s0,sij)
       !
       !$acc kernels default(present) async(1)
-      visct = s0
-      !$acc end kernels
-      !
-      ! Lij
-      !
-      call interpolate(n,u,v,w,uc,vc,wc)
-      ! periodic/patched bc's are updated, wall bc ghost points are set
-      ! by extrapolation from the interior.
-      call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,uc)
-      call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,vc)
-      call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,wc)
-#if !defined(_FILTER_2D)
-      !$acc kernels default(present) async(1)
-      lij(:,:,:,1) = uc*uc
-      lij(:,:,:,2) = vc*vc
-      lij(:,:,:,3) = wc*wc
-      !$acc end kernels
-      call extrapolate(n,is_bound,dzci,lij(:,:,:,1),wk1,iface=0,cbc=cbcvel)
-      call extrapolate(n,is_bound,dzci,lij(:,:,:,2),wk2,iface=0,cbc=cbcvel)
-      call extrapolate(n,is_bound,dzci,lij(:,:,:,3),wk3,iface=0,cbc=cbcvel)
-      call filter3d(n,wk1,lij(:,:,:,1))
-      call filter3d(n,wk2,lij(:,:,:,2))
-      call filter3d(n,wk3,lij(:,:,:,3))
-      !$acc kernels default(present) async(1)
-      lij(:,:,:,4) = uc*vc
-      lij(:,:,:,5) = uc*wc
-      lij(:,:,:,6) = vc*wc
-      !$acc end kernels
-      call extrapolate(n,is_bound,dzci,lij(:,:,:,4),wk1,iface=0,cbc=cbcvel)
-      call extrapolate(n,is_bound,dzci,lij(:,:,:,5),wk2,iface=0,cbc=cbcvel)
-      call extrapolate(n,is_bound,dzci,lij(:,:,:,6),wk3,iface=0,cbc=cbcvel)
-      call filter3d(n,wk1,lij(:,:,:,4))
-      call filter3d(n,wk2,lij(:,:,:,5))
-      call filter3d(n,wk3,lij(:,:,:,6))
-      call extrapolate(n,is_bound,dzci,uc,wk1,iface=0,cbc=cbcvel)
-      call extrapolate(n,is_bound,dzci,vc,wk2,iface=0,cbc=cbcvel)
-      call extrapolate(n,is_bound,dzci,wc,wk3,iface=0,cbc=cbcvel)
-      call filter3d(n,wk1,uf)
-      call filter3d(n,wk2,vf)
-      call filter3d(n,wk3,wf)
-#else
-      !$acc kernels default(present) async(1)
-      wk1 = uc*uc
-      wk2 = vc*vc
-      wk3 = wc*wc
-      !$acc end kernels
-      call filter2d(n,wk1,lij(:,:,:,1))
-      call filter2d(n,wk2,lij(:,:,:,2))
-      call filter2d(n,wk3,lij(:,:,:,3))
-      !$acc kernels default(present) async(1)
-      wk1 = uc*vc
-      wk2 = uc*wc
-      wk3 = vc*wc
-      !$acc end kernels
-      call filter2d(n,wk1,lij(:,:,:,4))
-      call filter2d(n,wk2,lij(:,:,:,5))
-      call filter2d(n,wk3,lij(:,:,:,6))
-      call filter2d(n,uc,uf)
-      call filter2d(n,vc,vf)
-      call filter2d(n,wc,wf)
-#endif
-      !$acc kernels default(present) async(1)
-      lij(:,:,:,1) = lij(:,:,:,1) - uf*uf
-      lij(:,:,:,2) = lij(:,:,:,2) - vf*vf
-      lij(:,:,:,3) = lij(:,:,:,3) - wf*wf
-      lij(:,:,:,4) = lij(:,:,:,4) - uf*vf
-      lij(:,:,:,5) = lij(:,:,:,5) - uf*wf
-      lij(:,:,:,6) = lij(:,:,:,6) - vf*wf
+      visct(:,:,:) = s0(:,:,:)
       !$acc end kernels
       !
       ! Mij
@@ -314,51 +256,78 @@ module mod_sgs
       call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,sij(:,:,:,5))
       call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,sij(:,:,:,6))
 #if !defined(_FILTER_2D)
-      !$acc kernels default(present) async(1)
-      mij(:,:,:,1) = s0*sij(:,:,:,1)
-      mij(:,:,:,2) = s0*sij(:,:,:,2)
-      mij(:,:,:,3) = s0*sij(:,:,:,3)
-      !$acc end kernels
-      call extrapolate(n,is_bound,dzci,mij(:,:,:,1),wk1,iface=0,cbc=cbcvel)
-      call extrapolate(n,is_bound,dzci,mij(:,:,:,2),wk2,iface=0,cbc=cbcvel)
-      call extrapolate(n,is_bound,dzci,mij(:,:,:,3),wk3,iface=0,cbc=cbcvel)
+      !$acc parallel loop collapse(3) default(present) async(1)
+      do k = 0,n(3)+1
+        do j = 0,n(2)+1
+          do i = 0,n(1)+1
+            wk1(i,j,k) = s0(i,j,k)*sij(i,j,k,1)
+            wk2(i,j,k) = s0(i,j,k)*sij(i,j,k,2)
+            wk3(i,j,k) = s0(i,j,k)*sij(i,j,k,3)
+          end do
+        end do
+      end do
+      call extrapolate(n,is_bound,dzci,wk1,iface=0,cbc=cbcvel)
+      call extrapolate(n,is_bound,dzci,wk2,iface=0,cbc=cbcvel)
+      call extrapolate(n,is_bound,dzci,wk3,iface=0,cbc=cbcvel)
       call filter3d(n,wk1,mij(:,:,:,1))
       call filter3d(n,wk2,mij(:,:,:,2))
       call filter3d(n,wk3,mij(:,:,:,3))
-      !$acc kernels default(present) async(1)
-      mij(:,:,:,4) = s0*sij(:,:,:,4)
-      mij(:,:,:,5) = s0*sij(:,:,:,5)
-      mij(:,:,:,6) = s0*sij(:,:,:,6)
-      !$acc end kernels
-      call extrapolate(n,is_bound,dzci,mij(:,:,:,4),wk1,iface=0,cbc=cbcvel)
-      call extrapolate(n,is_bound,dzci,mij(:,:,:,5),wk2,iface=0,cbc=cbcvel)
-      call extrapolate(n,is_bound,dzci,mij(:,:,:,6),wk3,iface=0,cbc=cbcvel)
+      !$acc parallel loop collapse(3) default(present) async(1)
+      do k = 0,n(3)+1
+        do j = 0,n(2)+1
+          do i = 0,n(1)+1
+            wk1(i,j,k) = s0(i,j,k)*sij(i,j,k,4)
+            wk2(i,j,k) = s0(i,j,k)*sij(i,j,k,5)
+            wk3(i,j,k) = s0(i,j,k)*sij(i,j,k,6)
+          end do
+        end do
+      end do
+      call extrapolate(n,is_bound,dzci,wk1,iface=0,cbc=cbcvel)
+      call extrapolate(n,is_bound,dzci,wk2,iface=0,cbc=cbcvel)
+      call extrapolate(n,is_bound,dzci,wk3,iface=0,cbc=cbcvel)
       call filter3d(n,wk1,mij(:,:,:,4))
       call filter3d(n,wk2,mij(:,:,:,5))
       call filter3d(n,wk3,mij(:,:,:,6))
-      call extrapolate(n,is_bound,dzci,u,wk1,iface=1,cbc=cbcvel)
-      call extrapolate(n,is_bound,dzci,v,wk2,iface=2,cbc=cbcvel)
-      call extrapolate(n,is_bound,dzci,w,wk3,iface=3,cbc=cbcvel)
+      !
+      !$acc kernels default(present) async(1)
+      wk1(:,:,:) = u(:,:,:)
+      wk2(:,:,:) = v(:,:,:)
+      wk3(:,:,:) = w(:,:,:)
+      !$acc end kernels
+      call extrapolate(n,is_bound,dzci,wk1,iface=1,cbc=cbcvel)
+      call extrapolate(n,is_bound,dzci,wk2,iface=2,cbc=cbcvel)
+      call extrapolate(n,is_bound,dzci,wk3,iface=3,cbc=cbcvel)
       call filter3d(n,wk1,uf)
       call filter3d(n,wk2,vf)
       call filter3d(n,wk3,wf)
 #else
-      !$acc kernels default(present) async(1)
-      wk1 = s0*sij(:,:,:,1)
-      wk2 = s0*sij(:,:,:,2)
-      wk3 = s0*sij(:,:,:,3)
-      !$acc end kernels
+      !$acc parallel loop collapse(3) default(present) async(1)
+      do k = 0,n(3)+1
+        do j = 0,n(2)+1
+          do i = 0,n(1)+1
+            wk1(i,j,k) = s0(i,j,k)*sij(i,j,k,1)
+            wk2(i,j,k) = s0(i,j,k)*sij(i,j,k,2)
+            wk3(i,j,k) = s0(i,j,k)*sij(i,j,k,3)
+          end do
+        end do
+      end do
       call filter2d(n,wk1,mij(:,:,:,1))
       call filter2d(n,wk2,mij(:,:,:,2))
       call filter2d(n,wk3,mij(:,:,:,3))
-      !$acc kernels default(present) async(1)
-      wk1 = s0*sij(:,:,:,4)
-      wk2 = s0*sij(:,:,:,5)
-      wk3 = s0*sij(:,:,:,6)
-      !$acc end kernels
+      !$acc parallel loop collapse(3) default(present) async(1)
+      do k = 0,n(3)+1
+        do j = 0,n(2)+1
+          do i = 0,n(1)+1
+            wk1(i,j,k) = s0(i,j,k)*sij(i,j,k,4)
+            wk2(i,j,k) = s0(i,j,k)*sij(i,j,k,5)
+            wk3(i,j,k) = s0(i,j,k)*sij(i,j,k,6)
+          end do
+        end do
+      end do
       call filter2d(n,wk1,mij(:,:,:,4))
       call filter2d(n,wk2,mij(:,:,:,5))
       call filter2d(n,wk3,mij(:,:,:,6))
+      !
       call filter2d(n,u,uf)
       call filter2d(n,v,vf)
       call filter2d(n,w,wf)
@@ -373,55 +342,153 @@ module mod_sgs
       ! the no-slip/no-penetration bc's if a spectral filter is applied.
       call bounduvw(cbcvel,n,bcuf,bcvf,bcwf,bcu_mag,bcv_mag,bcw_mag,nb,is_bound,lwm, &
                     l,dl,zc,zf,dzc,dzf,visc,h,index_wm,.false.,.false.,uf,vf,wf)
-      call extrapolate(n,is_bound,dzci,uf,wk1,iface=1,lwm=lwm)
-      call extrapolate(n,is_bound,dzci,vf,wk2,iface=2,lwm=lwm)
-      call extrapolate(n,is_bound,dzci,wf,wk3,iface=3,lwm=lwm)
-      call strain_rate(n,dli,dzci,dzfi,wk1,wk2,wk3,s0,sij)
-      !$acc kernels default(present) async(1)
-      do m = 1,6
-        mij(:,:,:,m) = 2._rp*(mij(:,:,:,m)-alph2*s0*sij(:,:,:,m))
+      call extrapolate(n,is_bound,dzci,uf,iface=1,lwm=lwm)
+      call extrapolate(n,is_bound,dzci,vf,iface=2,lwm=lwm)
+      call extrapolate(n,is_bound,dzci,wf,iface=3,lwm=lwm)
+      call strain_rate(n,dli,dzci,dzfi,uf,vf,wf,s0,sij)
+      !$acc parallel loop collapse(3) default(present) async(1)
+      do k = 1,n(3)
+        do j = 1,n(2)
+          do i = 1,n(1)
+            !$acc loop seq
+            do m = 1,6
+              mij(i,j,k,m) = 2._rp*(mij(i,j,k,m)-alph2(i,j,k)*s0(i,j,k)*sij(i,j,k,m))
+            end do
+          end do
+        end do
       end do
-      !$acc end kernels
       !
-      ! cs = c_smag^2*del**2
+      ! Lij, stored in sij
       !
-      !$acc kernels default(present) async(1)
-      s0(:,:,:) = mij(:,:,:,1)*lij(:,:,:,1) + &
-                  mij(:,:,:,2)*lij(:,:,:,2) + &
-                  mij(:,:,:,3)*lij(:,:,:,3) + &
-                 (mij(:,:,:,4)*lij(:,:,:,4) + &
-                  mij(:,:,:,5)*lij(:,:,:,5) + &
-                  mij(:,:,:,6)*lij(:,:,:,6))*2._rp
-      !$acc end kernels
+      lij => sij
+      call interpolate(n,u,v,w,uc,vc,wc)
+      ! periodic/patched bc's are updated, wall bc ghost points are set
+      ! by extrapolation from the interior.
+      call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,uc)
+      call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,vc)
+      call boundp(cbcsgs,n,bcs,nb,is_bound,dl,dzc,wc)
+#if !defined(_FILTER_2D)
+      !$acc parallel loop collapse(3) default(present) async(1)
+      do k = 1,n(3)
+        do j = 1,n(2)
+          do i = 1,n(1)
+            wk1(i,j,k) = uc(i,j,k)*uc(i,j,k)
+            wk2(i,j,k) = vc(i,j,k)*vc(i,j,k)
+            wk3(i,j,k) = wc(i,j,k)*wc(i,j,k)
+          end do
+        end do
+      end do
+      call extrapolate(n,is_bound,dzci,wk1,iface=0,cbc=cbcvel)
+      call extrapolate(n,is_bound,dzci,wk2,iface=0,cbc=cbcvel)
+      call extrapolate(n,is_bound,dzci,wk3,iface=0,cbc=cbcvel)
+      call filter3d(n,wk1,lij(:,:,:,1))
+      call filter3d(n,wk2,lij(:,:,:,2))
+      call filter3d(n,wk3,lij(:,:,:,3))
+      !$acc parallel loop collapse(3) default(present) async(1)
+      do k = 1,n(3)
+        do j = 1,n(2)
+          do i = 1,n(1)
+            wk1(i,j,k) = uc(i,j,k)*vc(i,j,k)
+            wk2(i,j,k) = uc(i,j,k)*wc(i,j,k)
+            wk3(i,j,k) = vc(i,j,k)*wc(i,j,k)
+          end do
+        end do
+      end do
+      call extrapolate(n,is_bound,dzci,wk1,iface=0,cbc=cbcvel)
+      call extrapolate(n,is_bound,dzci,wk2,iface=0,cbc=cbcvel)
+      call extrapolate(n,is_bound,dzci,wk3,iface=0,cbc=cbcvel)
+      call filter3d(n,wk1,lij(:,:,:,4))
+      call filter3d(n,wk2,lij(:,:,:,5))
+      call filter3d(n,wk3,lij(:,:,:,6))
+      !
+      call extrapolate(n,is_bound,dzci,uc,iface=0,cbc=cbcvel)
+      call extrapolate(n,is_bound,dzci,vc,iface=0,cbc=cbcvel)
+      call extrapolate(n,is_bound,dzci,wc,iface=0,cbc=cbcvel)
+      call filter3d(n,uc,uf)
+      call filter3d(n,vc,vf)
+      call filter3d(n,wc,wf)
+#else
+      !$acc parallel loop collapse(3) default(present) async(1)
+      do k = 1,n(3)
+        do j = 1,n(2)
+          do i = 1,n(1)
+            wk1(i,j,k) = uc(i,j,k)*uc(i,j,k)
+            wk2(i,j,k) = vc(i,j,k)*vc(i,j,k)
+            wk3(i,j,k) = wc(i,j,k)*wc(i,j,k)
+          end do
+        end do
+      end do
+      call filter2d(n,wk1,lij(:,:,:,1))
+      call filter2d(n,wk2,lij(:,:,:,2))
+      call filter2d(n,wk3,lij(:,:,:,3))
+      !$acc parallel loop collapse(3) default(present) async(1)
+      do k = 1,n(3)
+        do j = 1,n(2)
+          do i = 1,n(1)
+            wk1(i,j,k) = uc(i,j,k)*vc(i,j,k)
+            wk2(i,j,k) = uc(i,j,k)*wc(i,j,k)
+            wk3(i,j,k) = vc(i,j,k)*wc(i,j,k)
+          end do
+        end do
+      end do
+      call filter2d(n,wk1,lij(:,:,:,4))
+      call filter2d(n,wk2,lij(:,:,:,5))
+      call filter2d(n,wk3,lij(:,:,:,6))
+      !
+      call filter2d(n,uc,uf)
+      call filter2d(n,vc,vf)
+      call filter2d(n,wc,wf)
+#endif
+      !$acc parallel loop collapse(3) default(present) async(1) &
+      !$acc private(mij_s,lij_s)
+      do k = 1,n(3)
+        do j = 1,n(2)
+          do i = 1,n(1)
+            !
+            mij_s = mij(i,j,k,1:6)
+            lij_s = lij(i,j,k,1:6)
+            !
+            lij_s(1) = lij_s(1) - uf(i,j,k)*uf(i,j,k)
+            lij_s(2) = lij_s(2) - vf(i,j,k)*vf(i,j,k)
+            lij_s(3) = lij_s(3) - wf(i,j,k)*wf(i,j,k)
+            lij_s(4) = lij_s(4) - uf(i,j,k)*vf(i,j,k)
+            lij_s(5) = lij_s(5) - uf(i,j,k)*wf(i,j,k)
+            lij_s(6) = lij_s(6) - vf(i,j,k)*wf(i,j,k)
+            !
+            wk1(i,j,k) = mij_s(1)*lij_s(1) + &
+                         mij_s(2)*lij_s(2) + &
+                         mij_s(3)*lij_s(3) + &
+                        (mij_s(4)*lij_s(4) + &
+                         mij_s(5)*lij_s(5) + &
+                         mij_s(6)*lij_s(6))*2._rp
+            wk2(i,j,k) = mij_s(1)*mij_s(1) + &
+                         mij_s(2)*mij_s(2) + &
+                         mij_s(3)*mij_s(3) + &
+                        (mij_s(4)*mij_s(4) + &
+                         mij_s(5)*mij_s(5) + &
+                         mij_s(6)*mij_s(6))*2._rp
+          end do
+        end do
+      end do
 #if defined(_CHANNEL)
-      call ave1d_channel(ng,lo,hi,3,l,dl,dzf,s0)
+      call ave1d_channel(ng,lo,hi,3,l,dl,dzf,wk1)
+      call ave1d_channel(ng,lo,hi,3,l,dl,dzf,wk2)
 #elif defined(_DUCT)
-      call ave2d_duct(ng,lo,hi,1,l,dl,dzf,s0)
+      call ave2d_duct(ng,lo,hi,1,l,dl,dzf,wk2)
+      call ave2d_duct(ng,lo,hi,1,l,dl,dzf,wk1)
 #elif defined(_CAVITY)
       !
 #endif
-      !$acc kernels default(present) async(1)
-      visct = visct*s0
-      !$acc end kernels
-      !
-      !$acc kernels default(present) async(1)
-      s0(:,:,:) = mij(:,:,:,1)*mij(:,:,:,1) + &
-                  mij(:,:,:,2)*mij(:,:,:,2) + &
-                  mij(:,:,:,3)*mij(:,:,:,3) + &
-                 (mij(:,:,:,4)*mij(:,:,:,4) + &
-                  mij(:,:,:,5)*mij(:,:,:,5) + &
-                  mij(:,:,:,6)*mij(:,:,:,6))*2._rp
-      !$acc end kernels
-#if defined(_CHANNEL)
-      call ave1d_channel(ng,lo,hi,3,l,dl,dzf,s0)
-#elif defined(_DUCT)
-      call ave2d_duct(ng,lo,hi,1,l,dl,dzf,s0)
-#elif defined(_CAVITY)
-      !
-#endif
-      !$acc kernels default(present) async(1)
-      visct = max(visct/s0,0._rp)
-      !$acc end kernels
+      ! cs = (c_smag*del)^2
+      !$acc parallel loop collapse(3) default(present) async(1)
+      do k = 1,n(3)
+        do j = 1,n(2)
+          do i = 1,n(1)
+            visct(i,j,k) = visct(i,j,k)*wk1(i,j,k)/wk2(i,j,k)
+            visct(i,j,k) = max(visct(i,j,k),0._rp)
+          end do
+        end do
+      end do
     case('amd')
       print*, 'ERROR: AMD model not yet implemented'
     case default
@@ -597,7 +664,7 @@ module mod_sgs
     end select
   end subroutine ave2d_duct
   !
-  subroutine filter3d(n,p,pf)
+  subroutine filter3d_old(n,p,pf)
     !
     ! 3D top-hat filter, second-order trapezoidal rule
     ! it is useless to define temporary variables to touch array elements, since
@@ -622,13 +689,80 @@ module mod_sgs
                               p(i,j-1,k+1) + p(i-1,j,k+1) + p(i-1,j+1,k) + &
                               p(i,j+1,k-1) + p(i+1,j,k-1) + p(i+1,j-1,k)) + &
                        1._rp*(p(i-1,j-1,k-1) + p(i+1,j-1,k-1) + p(i-1,j+1,k-1) + p(i+1,j+1,k-1) + &
-                              p(i-1,j-1,k+1) + p(i+1,j-1,k+1) + p(i-1,j+1,k+1) + p(i+1,j+1,k+1)))/64._rp
+                              p(i-1,j-1,k+1) + p(i+1,j-1,k+1) + p(i-1,j+1,k+1) + p(i+1,j+1,k+1)) &
+                      )/64._rp
+        end do
+      end do
+    end do
+  end subroutine filter3d_old
+  !
+  subroutine filter3d(n,p,pf)
+    !
+    ! 3D top-hat filter, second-order trapezoidal rule
+    ! it is useless to define temporary variables to touch array elements, since
+    ! each element is used only once. The current implementation is ~50% the cost of
+    ! computing eight cubes (Bae's code and Davidson's book).
+    !
+    implicit none
+    integer , intent(in ), dimension(3) :: n
+    real(rp), intent(in ), dimension(0:,0:,0:) :: p
+    real(rp), intent(out), dimension(0:,0:,0:) :: pf
+    real(rp) :: p_mmm,p_cmm,p_pmm,p_mcm,p_ccm,p_pcm,p_mpm,p_cpm,p_ppm, &
+                p_mmc,p_cmc,p_pmc,p_mcc,p_ccc,p_pcc,p_mpc,p_cpc,p_ppc, &
+                p_mmp,p_cmp,p_pmp,p_mcp,p_ccp,p_pcp,p_mpp,p_cpp,p_ppp
+    integer :: i,j,k
+    !
+    !$acc parallel loop collapse(3) default(present) async(1)
+    do k = 1,n(3)
+      do j = 1,n(2)
+        do i = 1,n(1)
+          !
+          p_mmm = p(i-1,j-1,k-1)
+          p_cmm = p(i  ,j-1,k-1)
+          p_pmm = p(i+1,j-1,k-1)
+          p_mcm = p(i-1,j  ,k-1)
+          p_ccm = p(i  ,j  ,k-1)
+          p_pcm = p(i+1,j  ,k-1)
+          p_mpm = p(i-1,j+1,k-1)
+          p_cpm = p(i  ,j+1,k-1)
+          p_ppm = p(i+1,j+1,k-1)
+          
+          p_mmc = p(i-1,j-1,k  )
+          p_cmc = p(i  ,j-1,k  )
+          p_pmc = p(i+1,j-1,k  )
+          p_mcc = p(i-1,j  ,k  )
+          p_ccc = p(i  ,j  ,k  )
+          p_pcc = p(i+1,j  ,k  )
+          p_mpc = p(i-1,j+1,k  )
+          p_cpc = p(i  ,j+1,k  )
+          p_ppc = p(i+1,j+1,k  )
+          
+          p_mmp = p(i-1,j-1,k+1)
+          p_cmp = p(i  ,j-1,k+1)
+          p_pmp = p(i+1,j-1,k+1)
+          p_mcp = p(i-1,j  ,k+1)
+          p_ccp = p(i  ,j  ,k+1)
+          p_pcp = p(i+1,j  ,k+1)
+          p_mpp = p(i-1,j+1,k+1)
+          p_cpp = p(i  ,j+1,k+1)
+          p_ppp = p(i+1,j+1,k+1)
+          !
+          pf(i,j,k) = (8._rp*(p_ccc) + &
+                       4._rp*(p_mcc + p_cmc + p_ccm + &
+                              p_pcc + p_cpc + p_ccp) + &
+                       2._rp*(p_cmm + p_mcm + p_mmc + &
+                              p_cpm + p_pcm + p_pmc + &
+                              p_cmp + p_mcp + p_mpc + &
+                              p_cpp + p_pcp + p_ppc) + &
+                       1._rp*(p_mmm + p_pmm + p_mpm + p_ppm +&
+                              p_mmp + p_pmp + p_mpp + p_ppp) &
+                      )/64._rp
         end do
       end do
     end do
   end subroutine filter3d
   !
-  subroutine extrapolate(n,is_bound,dzci,p,wk,iface,cbc,lwm)
+  subroutine extrapolate(n,is_bound,dzci,p,iface,cbc,lwm)
     !
     ! linear extrapolation of wall-parallel velocity
     !
@@ -638,12 +772,11 @@ module mod_sgs
     ! when stored at cell faces (iface=1,2,3). i.e., no-penetration bc.
     !
     implicit none
-    integer , intent(in ), dimension(3)        :: n
-    logical , intent(in ), dimension(0:1,3)    :: is_bound
-    real(rp), intent(in ), dimension(0:)       :: dzci
-    real(rp), intent(in ), dimension(0:,0:,0:) :: p
-    real(rp), intent(out), dimension(0:,0:,0:) :: wk
-    integer , intent(in ) :: iface
+    integer , intent(in)   , dimension(3)        :: n
+    logical , intent(in)   , dimension(0:1,3)    :: is_bound
+    real(rp), intent(in)   , dimension(0:)       :: dzci
+    real(rp), intent(inout), dimension(0:,0:,0:) :: p
+    integer , intent(in) :: iface
     character(len=1), intent(in), dimension(0:1,3,3), optional :: cbc
     integer, intent(in), dimension(0:1,3), optional :: lwm
     logical, dimension(0:1,3) :: is_done
@@ -665,15 +798,12 @@ module mod_sgs
       is_done(:,2) = (is_bound(:,2).and.lwm(:,2)/=0.and.iface/=2)
       is_done(:,3) = (is_bound(:,3).and.lwm(:,3)/=0.and.iface/=3)
     end if
-    !$acc kernels default(present) async(1)
-    wk(:,:,:) = p(:,:,:)
-    !$acc end kernels
     !
     if(is_done(0,1)) then
       !$acc parallel loop collapse(2) default(present) async(1)
       do k = 0,n(3)+1
         do j = 0,n(2)+1
-          wk(0,j,k) = 2._rp*wk(1,j,k) - wk(2,j,k)
+          p(0,j,k) = 2._rp*p(1,j,k) - p(2,j,k)
         end do
       end do
     end if
@@ -681,7 +811,7 @@ module mod_sgs
       !$acc parallel loop collapse(2) default(present) async(1)
       do k = 0,n(3)+1
         do j = 0,n(2)+1
-          wk(n(1)+1,j,k) = 2._rp*wk(n(1),j,k) - wk(n(1)-1,j,k)
+          p(n(1)+1,j,k) = 2._rp*p(n(1),j,k) - p(n(1)-1,j,k)
         end do
       end do
     end if
@@ -689,7 +819,7 @@ module mod_sgs
       !$acc parallel loop collapse(2) default(present) async(1)
       do k = 0,n(3)+1
         do i = 0,n(1)+1
-          wk(i,0,k) = 2._rp*wk(i,1,k) - wk(i,2,k)
+          p(i,0,k) = 2._rp*p(i,1,k) - p(i,2,k)
         end do
       end do
     end if
@@ -697,7 +827,7 @@ module mod_sgs
       !$acc parallel loop collapse(2) default(present) async(1)
       do k = 0,n(3)+1
         do i = 0,n(1)+1
-          wk(i,n(2)+1,k) = 2._rp*wk(i,n(2),k) - wk(i,n(2)-1,k)
+          p(i,n(2)+1,k) = 2._rp*p(i,n(2),k) - p(i,n(2)-1,k)
         end do
       end do
     end if
@@ -705,7 +835,7 @@ module mod_sgs
       !$acc parallel loop collapse(2) default(present) async(1)
       do j = 0,n(2)+1
         do i = 0,n(1)+1
-          wk(i,j,0) = (1._rp+factor0)*wk(i,j,1) - factor0*wk(i,j,2)
+          p(i,j,0) = (1._rp+factor0)*p(i,j,1) - factor0*p(i,j,2)
         end do
       end do
     end if
@@ -713,7 +843,7 @@ module mod_sgs
       !$acc parallel loop collapse(2) default(present) async(1)
       do j = 0,n(2)+1
         do i = 0,n(1)+1
-          wk(i,j,n(3)+1) = (1._rp+factor1)*wk(i,j,n(3)) - factor1*wk(i,j,n(3)-1)
+          p(i,j,n(3)+1) = (1._rp+factor1)*p(i,j,n(3)) - factor1*p(i,j,n(3)-1)
         end do
       end do
     end if
