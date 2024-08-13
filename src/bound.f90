@@ -488,12 +488,12 @@ module mod_bound
     if(present(rhsby)) then
       call bc_rhs(cbc(:,2),bc%y,dyc01  ,dyf01,c_or_f(2),rhsby) ! y-direction
     end if
-    if(     c_or_f(3) == 'c') then
-      if(present(rhsbz)) &
-      call bc_rhs(cbc(:,3),bc%z,dzc01_c,dzf01_c,c_or_f(3),rhsbz) ! z-direction
-    else if(c_or_f(3) == 'f') then
-      if(present(rhsbz)) &
-      call bc_rhs(cbc(:,3),bc%z,dzc01_f,dzf01_f,c_or_f(3),rhsbz) ! z-direction
+    if(present(rhsbz)) then
+      if(c_or_f(3) == 'c') then
+        call bc_rhs(cbc(:,3),bc%z,dzc01_c,dzf01_c,c_or_f(3),rhsbz) ! z-direction
+      else if(c_or_f(3) == 'f') then
+        call bc_rhs(cbc(:,3),bc%z,dzc01_f,dzf01_f,c_or_f(3),rhsbz) ! z-direction
+      end if
     end if
   end subroutine cmpt_rhs_b
   !

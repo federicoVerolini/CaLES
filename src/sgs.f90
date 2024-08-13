@@ -50,16 +50,11 @@ module mod_sgs
     real(rp), allocatable, dimension(:,:,:)  , save :: s0,uc,vc,wc,uf,vf,wf,alph2
     real(rp), target,  allocatable, dimension(:,:,:,:), save :: wk,sij,mij
     real(rp), pointer, contiguous , dimension(:,:,:,:), save :: lij
-    real(rp) :: u_mcm,u_ccm,u_mmc,u_cmc,u_mcc,u_ccc,u_mpc,u_cpc,u_mcp,u_ccp, &
-                v_cmm,v_ccm,v_mmc,v_cmc,v_pmc,v_mcc,v_ccc,v_pcc,v_cmp,v_ccp, &
-                w_cmm,w_mcm,w_ccm,w_pcm,w_cpm,w_cmc,w_mcc,w_ccc,w_pcc,w_cpc, &
-                s11,s22,s33,s12,s13,s23,ss,s0_s, &
-                dxi,dyi,visci,tauw(2),tauw_tot(0:1,3),dw(0:1,3),dw_plus, &
-                fd,del,dw_s,tauw_s,mij_s(6),lij_s(6)
-    real(rp), dimension(0:1,3), save :: is_wall
+    real(rp) :: dxi,dyi,visci,tauw(2),dw(6),dw_plus, &
+                fd,del,dw_min,tauw_s,mij_s(6),lij_s(6)
+    real(rp), save :: is_wall(6)
     logical, save :: is_first = .true.
-    integer :: loc(2)
-    integer :: i,j,k,m
+    integer :: i,j,k,m,loc
     real(rp), parameter :: one_third = 1._rp/3._rp
     !
     select case(trim(sgstype))
@@ -77,12 +72,12 @@ module mod_sgs
                  wk(0:n(1)+1,0:n(2)+1,0:n(3)+1,3))
         !$acc enter data create(s0,wk) async(1)
         is_wall = 0._rp
-        if(is_bound(0,1).and.cbcvel(0,1,1)=='D') is_wall(0,1) = 1._rp
-        if(is_bound(1,1).and.cbcvel(1,1,1)=='D') is_wall(1,1) = 1._rp
-        if(is_bound(0,2).and.cbcvel(0,2,2)=='D') is_wall(0,2) = 1._rp
-        if(is_bound(1,2).and.cbcvel(1,2,2)=='D') is_wall(1,2) = 1._rp
-        if(is_bound(0,3).and.cbcvel(0,3,3)=='D') is_wall(0,3) = 1._rp
-        if(is_bound(1,3).and.cbcvel(1,3,3)=='D') is_wall(1,3) = 1._rp
+        if(is_bound(0,1).and.cbcvel(0,1,1)=='D') is_wall(1) = 1._rp
+        if(is_bound(1,1).and.cbcvel(1,1,1)=='D') is_wall(2) = 1._rp
+        if(is_bound(0,2).and.cbcvel(0,2,2)=='D') is_wall(3) = 1._rp
+        if(is_bound(1,2).and.cbcvel(1,2,2)=='D') is_wall(4) = 1._rp
+        if(is_bound(0,3).and.cbcvel(0,3,3)=='D') is_wall(5) = 1._rp
+        if(is_bound(1,3).and.cbcvel(1,3,3)=='D') is_wall(6) = 1._rp
         !$acc enter data copyin(is_wall) async(1)
       end if
       !$acc kernels default(present) async(1)
@@ -100,53 +95,50 @@ module mod_sgs
       visci = 1._rp/visc
       !
       !$acc parallel loop collapse(3) default(present) async(1) &
-      !$acc private(u_mcm,u_ccm,u_mmc,u_cmc,u_mcc,u_ccc,u_mpc,u_cpc,u_mcp,u_ccp) &
-      !$acc private(v_cmm,v_ccm,v_mmc,v_cmc,v_pmc,v_mcc,v_ccc,v_pcc,v_cmp,v_ccp) &
-      !$acc private(w_cmm,w_mcm,w_ccm,w_pcm,w_cpm,w_cmc,w_mcc,w_ccc,w_pcc,w_cpc) &
-      !$acc private(dw,tauw,loc,fd,del,tauw_s,dw_s,dw_plus)
+      !$acc private(dw,tauw,loc,fd,del,tauw_s,dw_min,dw_plus)
       do k=1,n(3)
         do j=1,n(2)
           do i=1,n(1)
             !
             ! van Driest damping
             !
-            dw(0,1) = dl(1)*(i-0.5)
-            dw(1,1) = dl(1)*(n(1)-i+0.5)
-            dw(0,2) = dl(2)*(j-0.5)
-            dw(1,2) = dl(2)*(n(2)-j+0.5)
-            dw(0,3) = zc(k)
-            dw(1,3) = l(3)-zc(k)
+            dw(1) = dl(1)*(i-0.5)
+            dw(2) = dl(1)*(n(1)-i+0.5)
+            dw(3) = dl(2)*(j-0.5)
+            dw(4) = dl(2)*(n(2)-j+0.5)
+            dw(5) = zc(k)
+            dw(6) = l(3)-zc(k)
             dw = dw*is_wall + big*(1._rp-is_wall)
-            loc = minloc(dw)
-            dw_s = dw(loc(1),loc(2))
+            loc = minloc(dw,1)
+            dw_min = dw(loc)
             !
-            if(loc(1)==0.and.loc(2)==1) then
+            if(loc==1) then
               tauw(1) = v(1,j,k)-v(0,j,k)+v(1,j-1,k)-v(0,j-1,k)
               tauw(2) = w(1,j,k)-w(0,j,k)+w(1,j,k-1)-w(0,j,k-1)
               tauw_s = sqrt(tauw(1)*tauw(1)+tauw(2)*tauw(2))*dxi
-            else if(loc(1)==1.and.loc(2)==1) then
+            else if(loc==2) then
               tauw(1) = v(n(1),j,k)-v(n(1)+1,j,k)+v(n(1),j-1,k)-v(n(1)+1,j-1,k)
               tauw(2) = w(n(1),j,k)-w(n(1)+1,j,k)+w(n(1),j,k-1)-w(n(1)+1,j,k-1)
               tauw_s = sqrt(tauw(1)*tauw(1)+tauw(2)*tauw(2))*dxi
-            else if(loc(1)==0.and.loc(2)==2) then
+            else if(loc==3) then
               tauw(1) = u(i,1,k)-u(i,0,k)+u(i-1,1,k)-u(i-1,0,k)
               tauw(2) = w(i,1,k)-w(i,0,k)+w(i,1,k-1)-w(i,0,k-1)
               tauw_s  = sqrt(tauw(1)*tauw(1)+tauw(2)*tauw(2))*dyi
-            else if(loc(1)==1.and.loc(2)==2) then
+            else if(loc==4) then
               tauw(1) = u(i,n(2),k)-u(i,n(2)+1,k)+u(i-1,n(2),k)-u(i-1,n(2)+1,k)
               tauw(2) = w(i,n(2),k)-w(i,n(2)+1,k)+w(i,n(2),k-1)-w(i,n(2)+1,k-1)
               tauw_s  = sqrt(tauw(1)*tauw(1)+tauw(2)*tauw(2))*dyi
-            else if(loc(1)==0.and.loc(2)==3) then
+            else if(loc==5) then
               tauw(1) = u(i,j,1)-u(i,j,0)+u(i-1,j,1)-u(i-1,j,0)
               tauw(2) = v(i,j,1)-v(i,j,0)+v(i,j-1,1)-v(i,j-1,0)
               tauw_s  = sqrt(tauw(1)*tauw(1)+tauw(2)*tauw(2))*dzci(0)
-            else if(loc(1)==1.and.loc(2)==3) then
+            else if(loc==6) then
               tauw(1) = u(i,j,n(3))-u(i,j,n(3)+1)+u(i-1,j,n(3))-u(i-1,j,n(3)+1)
               tauw(2) = v(i,j,n(3))-v(i,j,n(3)+1)+v(i,j-1,n(3))-v(i,j-1,n(3)+1)
               tauw_s  = sqrt(tauw(1)*tauw(1)+tauw(2)*tauw(2))*dzci(n(3))
             end if
             tauw_s = 0.5_rp*visc*tauw_s
-            dw_plus = dw_s*sqrt(tauw_s)*visci
+            dw_plus = dw_min*sqrt(tauw_s)*visci
             fd = 1._rp-exp(-dw_plus/25._rp)
             !
             del = (dl(1)*dl(2)*dzf(k))**(one_third)
