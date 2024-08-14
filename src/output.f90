@@ -79,6 +79,9 @@ module mod_output
     case(3)
       grid_area_ratio = dl(1)*dl(2)/(l(1)*l(2))
       !$acc data copyout(p1d) async(1)
+      !$acc kernels default(present) async(1)
+      p1d(:) = 0._rp
+      !$acc end kernels
       !$acc parallel loop gang default(present) private(p1d_s) async(1)
       do k=lo(3),hi(3)
         p1d_s = 0._rp
@@ -103,6 +106,9 @@ module mod_output
     case(2)
       grid_area_ratio = dl(1)/(l(1)*l(3))
       !$acc data copyout(p1d) async(1)
+      !$acc kernels default(present) async(1)
+      p1d(:) = 0._rp
+      !$acc end kernels
       !$acc parallel loop gang default(present) private(p1d_s) async(1)
       do j=lo(2),hi(2)
         p1d_s = 0._rp
@@ -127,6 +133,9 @@ module mod_output
     case(1)
       grid_area_ratio = dl(2)/(l(2)*l(3))
       !$acc data copyout(p1d) async(1)
+      !$acc kernels default(present) async(1)
+      p1d(:) = 0._rp
+      !$acc end kernels
       !$acc parallel loop gang default(present) private(p1d_s) async(1)
       do i=lo(1),hi(1)
         p1d_s = 0._rp
