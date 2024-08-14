@@ -506,6 +506,9 @@ module mod_sgs
       grid_area_ratio = dl(2)/l(2)
       allocate(p2d(ng(1),ng(3)))
       !$acc data copyout(p2d) async(1)
+      !$acc kernels default(present) async(1)
+      p2d(:,:) = 0._rp
+      !$acc end kernels
       !$acc parallel loop gang collapse(2) default(present) private(p2d_s) async(1)
       do k=lo(3),hi(3)
         do i=lo(1),hi(1)
@@ -531,6 +534,9 @@ module mod_sgs
       grid_area_ratio = dl(1)/l(1)
       allocate(p2d(ng(2),ng(3)))
       !$acc data copyout(p2d) async(1)
+      !$acc kernels default(present) async(1)
+      p2d(:,:) = 0._rp
+      !$acc end kernels
       !$acc parallel loop gang collapse(2) default(present) private(p2d_s) async(1)
       do k=lo(3),hi(3)
         do j=lo(2),hi(2)

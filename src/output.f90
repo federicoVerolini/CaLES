@@ -337,6 +337,15 @@ module mod_output
       grid_area_ratio = dl(1)*dl(2)/(l(1)*l(2))
       allocate(um(q),vm(q),wm(q),u2(q),v2(q),w2(q),uw(q))
       !$acc data copyout(um,vm,wm,u2,v2,w2,uw) async(1)
+      !$acc kernels default(present) async(1)
+      um(:) = 0._rp
+      vm(:) = 0._rp
+      wm(:) = 0._rp
+      u2(:) = 0._rp
+      v2(:) = 0._rp
+      w2(:) = 0._rp
+      uw(:) = 0._rp
+      !$acc end kernels
       !$acc parallel loop gang default(present) async(1) &
       !$acc private(buf01,buf02,buf03,buf04,buf05,buf06,buf07)
       do k=lo(3),hi(3)
@@ -352,23 +361,23 @@ module mod_output
         do j=lo(2),hi(2)
           do i=lo(1),hi(1)
             ! located at zc
-            um(k) = um(k) + u(i,j,k)
-            vm(k) = vm(k) + v(i,j,k)
-            wm(k) = wm(k) + 0.50*(w(i,j,k-1) + w(i,j,k))
-            u2(k) = u2(k) + u(i,j,k)**2
-            v2(k) = v2(k) + v(i,j,k)**2
-            w2(k) = w2(k) + 0.50*(w(i,j,k)**2+w(i,j,k-1)**2)
-            uw(k) = uw(k) + 0.25*(u(i-1,j,k) + u(i,j,k))* &
+            buf01 = buf01 + u(i,j,k)
+            buf02 = buf02 + v(i,j,k)
+            buf03 = buf03 + 0.50*(w(i,j,k-1) + w(i,j,k))
+            buf04 = buf04 + u(i,j,k)**2
+            buf05 = buf05 + v(i,j,k)**2
+            buf06 = buf06 + 0.50*(w(i,j,k)**2+w(i,j,k-1)**2)
+            buf07 = buf07 + 0.25*(u(i-1,j,k) + u(i,j,k))* &
                                  (w(i,j,k-1) + w(i,j,k))
           end do
         end do
-        um(k) = um(k)*grid_area_ratio
-        vm(k) = vm(k)*grid_area_ratio
-        wm(k) = wm(k)*grid_area_ratio
-        u2(k) = u2(k)*grid_area_ratio
-        v2(k) = v2(k)*grid_area_ratio
-        w2(k) = w2(k)*grid_area_ratio
-        uw(k) = uw(k)*grid_area_ratio
+        um(k) = buf01*grid_area_ratio
+        vm(k) = buf02*grid_area_ratio
+        wm(k) = buf03*grid_area_ratio
+        u2(k) = buf04*grid_area_ratio
+        v2(k) = buf05*grid_area_ratio
+        w2(k) = buf06*grid_area_ratio
+        uw(k) = buf07*grid_area_ratio
       end do
       !$acc end data
       !$acc wait(1)
@@ -420,6 +429,17 @@ module mod_output
       q = ng(3)
       allocate(um(p,q),vm(p,q),wm(p,q),u2(p,q),v2(p,q),w2(p,q),uv(p,q),uw(p,q),vw(p,q))
       !$acc data copyout(um,vm,wm,u2,v2,w2,uv,uw,vw) async(1)
+      !$acc kernels default(present) async(1)
+      um(:,:) = 0._rp
+      vm(:,:) = 0._rp
+      wm(:,:) = 0._rp
+      u2(:,:) = 0._rp
+      v2(:,:) = 0._rp
+      w2(:,:) = 0._rp
+      uv(:,:) = 0._rp
+      uw(:,:) = 0._rp
+      vw(:,:) = 0._rp
+      !$acc end kernels
       !$acc parallel loop gang collapse(2) default(present) async(1) &
       !$acc private(buf01,buf02,buf03,buf04,buf05,buf06,buf07,buf08,buf09)
       do k=lo(3),hi(3)
@@ -515,6 +535,9 @@ module mod_output
       grid_area_ratio = dl(1)*dl(2)/(l(1)*l(2))
       allocate(buf(nvars,nn))
       !$acc enter data create(buf) async(1)
+      !$acc kernels default(present) async(1)
+      buf(:,:) = 0._rp
+      !$acc end kernels
       !$acc parallel loop gang default(present) async(1) &
       !$acc private(buf01,buf02,buf03,buf04,buf05,buf06,buf07,buf08,buf09,buf10) &
       !$acc private(buf11,buf12,buf13,buf14,buf15,buf16,buf17,buf18,buf19,buf20) &
