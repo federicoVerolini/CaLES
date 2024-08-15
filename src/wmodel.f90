@@ -150,7 +150,7 @@ module mod_wmodel
           bcv(j,k,ibound) = sgn*visci*tauw(1)
         end do
       end do
-      !$acc parallel loop collapse(2) default(present)  private(v1,v2,w1,w2,v_mag,w_mag,vh,wh,tauw) async(1)
+      !$acc parallel loop collapse(2) default(present)  private(v1,v2,w1,w2,v_mag,w_mag,vh,wh,tauw,wei) async(1)
       do k = 0,n(3)
         do j = 1,n(2)
           wei   = (zf(k)-zc(k))/dzc(k)
@@ -201,7 +201,7 @@ module mod_wmodel
           bcu(i,k,ibound) = sgn*visci*tauw(1)
         end do
       end do
-      !$acc parallel loop collapse(2) default(present)  private(u1,u2,w1,w2,u_mag,w_mag,uh,wh,tauw) async(1)
+      !$acc parallel loop collapse(2) default(present)  private(u1,u2,w1,w2,u_mag,w_mag,uh,wh,tauw,wei) async(1)
       do k = 0,n(3)
         do i = 1,n(1)
           wei   = (zf(k)-zc(k))/dzc(k)
