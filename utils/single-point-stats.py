@@ -126,7 +126,7 @@ tend   = float(args[1]) if len(args) > 1 else tend
 fldstp = int(  args[2]) if len(args) > 2 else fldstp
 fname_dpdx = datadir+'forcing.out'
 data = np.loadtxt(fname_dpdx)
-tarr, ind = np.unique(data[:,0], return_index=True)
+tarr, ind = np.unique(data[:,0], return_index=True) # this requires the same number of tasks used for restart
 if(shuffle_data):
     print('Note: dataset will be randomly shuffled before fixing the time window\n')
     nlen = np.size(data[ind,1][np.where((tarr>tbeg) & (tarr<tend))])

@@ -4,25 +4,25 @@
 ! SPDX-License-Identifier: MIT
 !
 ! -
-!
-!        CCCCCCCCCCCCC                    NNNNNNNN        NNNNNNNN    SSSSSSSSSSSSSSS
-!     CCC::::::::::::C                    N:::::::N       N::::::N  SS:::::::::::::::S
-!   CC:::::::::::::::C                    N::::::::N      N::::::N S:::::SSSSSS::::::S
-!  C:::::CCCCCCCC::::C                    N:::::::::N     N::::::N S:::::S     SSSSSSS
-! C:::::C       CCCCCC   aaaaaaaaaaaaa    N::::::::::N    N::::::N S:::::S
-!C:::::C                 a::::::::::::a   N:::::::::::N   N::::::N S:::::S
-!C:::::C                 aaaaaaaaa:::::a  N:::::::N::::N  N::::::N  S::::SSSS
-!C:::::C                          a::::a  N::::::N N::::N N::::::N   SS::::::SSSSS
-!C:::::C                   aaaaaaa:::::a  N::::::N  N::::N:::::::N     SSS::::::::SS
-!C:::::C                 aa::::::::::::a  N::::::N   N:::::::::::N        SSSSSS::::S
-!C:::::C                a::::aaaa::::::a  N::::::N    N::::::::::N             S:::::S
-! C:::::C       CCCCCC a::::a    a:::::a  N::::::N     N:::::::::N             S:::::S
-!  C:::::CCCCCCCC::::C a::::a    a:::::a  N::::::N      N::::::::N SSSSSSS     S:::::S
-!   CC:::::::::::::::C a:::::aaaa::::::a  N::::::N       N:::::::N S::::::SSSSSS:::::S
-!     CCC::::::::::::C  a::::::::::aa:::a N::::::N        N::::::N S:::::::::::::::SS
-!        CCCCCCCCCCCCC   aaaaaaaaaa  aaaa NNNNNNNN         NNNNNNN  SSSSSSSSSSSSSSS
+!                                                                                                                                                                       
+!         CCCCCCCCCCCCC                    LLLLLLLLLLL              EEEEEEEEEEEEEEEEEEEEEE    SSSSSSSSSSSSSSS 
+!      CCC::::::::::::C                    L:::::::::L              E::::::::::::::::::::E  SS:::::::::::::::S
+!    CC:::::::::::::::C                    L:::::::::L              E::::::::::::::::::::E S:::::SSSSSS::::::S
+!   C:::::CCCCCCCC::::C                    LL:::::::LL              EE::::::EEEEEEEEE::::E S:::::S     SSSSSSS
+!  C:::::C       CCCCCC   aaaaaaaaaaaaa      L:::::L                  E:::::E       EEEEEE S:::::S            
+! C:::::C                 a::::::::::::a     L:::::L                  E:::::E              S:::::S            
+! C:::::C                 aaaaaaaaa:::::a    L:::::L                  E::::::EEEEEEEEEE     S::::SSSS         
+! C:::::C                          a::::a    L:::::L                  E:::::::::::::::E      SS::::::SSSSS    
+! C:::::C                   aaaaaaa:::::a    L:::::L                  E:::::::::::::::E        SSS::::::::SS  
+! C:::::C                 aa::::::::::::a    L:::::L                  E::::::EEEEEEEEEE           SSSSSS::::S 
+! C:::::C                a::::aaaa::::::a    L:::::L                  E:::::E                          S:::::S
+!  C:::::C       CCCCCC a::::a    a:::::a    L:::::L         LLLLLL   E:::::E       EEEEEE             S:::::S
+!   C:::::CCCCCCCC::::C a::::a    a:::::a  LL:::::::LLLLLLLLL:::::L EE::::::EEEEEEEE:::::E SSSSSSS     S:::::S
+!    CC:::::::::::::::C a:::::aaaa::::::a  L::::::::::::::::::::::L E::::::::::::::::::::E S::::::SSSSSS:::::S
+!      CCC::::::::::::C  a::::::::::aa:::a L::::::::::::::::::::::L E::::::::::::::::::::E S:::::::::::::::SS 
+!         CCCCCCCCCCCCC   aaaaaaaaaa  aaaa LLLLLLLLLLLLLLLLLLLLLLLL EEEEEEEEEEEEEEEEEEEEEE  SSSSSSSSSSSSSSS   
 !-------------------------------------------------------------------------------------
-! CaNS -- Canonical Navier-Stokes Solver
+! CaLES -- Canonical Large-Eddy Simulation
 !-------------------------------------------------------------------------------------
 program cans
   use, intrinsic :: iso_fortran_env, only: compiler_version,compiler_options
