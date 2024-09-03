@@ -21,9 +21,9 @@
 !    CC:::::::::::::::C a:::::aaaa::::::a  L::::::::::::::::::::::L E::::::::::::::::::::E S::::::SSSSSS:::::S
 !      CCC::::::::::::C  a::::::::::aa:::a L::::::::::::::::::::::L E::::::::::::::::::::E S:::::::::::::::SS 
 !         CCCCCCCCCCCCC   aaaaaaaaaa  aaaa LLLLLLLLLLLLLLLLLLLLLLLL EEEEEEEEEEEEEEEEEEEEEE  SSSSSSSSSSSSSSS   
-!-------------------------------------------------------------------------------------
+!---------------------------------------------------------------------------------------------------------------
 ! CaLES -- Canonical Large-Eddy Simulation
-!-------------------------------------------------------------------------------------
+!---------------------------------------------------------------------------------------------------------------
 program cans
   use, intrinsic :: iso_fortran_env, only: compiler_version,compiler_options
   use, intrinsic :: iso_c_binding  , only: C_PTR

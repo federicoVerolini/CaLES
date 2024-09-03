@@ -99,47 +99,50 @@ module mod_sgs
       do k=1,n(3)
         do j=1,n(2)
           do i=1,n(1)
-            !
-            ! van Driest damping
-            !
-            dw(1) = dl(1)*(i-0.5)
-            dw(2) = dl(1)*(n(1)-i+0.5)
-            dw(3) = dl(2)*(j-0.5)
-            dw(4) = dl(2)*(n(2)-j+0.5)
-            dw(5) = zc(k)
-            dw(6) = l(3)-zc(k)
-            dw = dw*is_wall + big*(1._rp-is_wall)
-            loc = minloc(dw,1)
-            dw_min = dw(loc)
-            !
-            if(loc==1) then
-              tauw(1) = v(1,j,k)-v(0,j,k)+v(1,j-1,k)-v(0,j-1,k)
-              tauw(2) = w(1,j,k)-w(0,j,k)+w(1,j,k-1)-w(0,j,k-1)
-              tauw_s = sqrt(tauw(1)*tauw(1)+tauw(2)*tauw(2))*dxi
-            else if(loc==2) then
-              tauw(1) = v(n(1),j,k)-v(n(1)+1,j,k)+v(n(1),j-1,k)-v(n(1)+1,j-1,k)
-              tauw(2) = w(n(1),j,k)-w(n(1)+1,j,k)+w(n(1),j,k-1)-w(n(1)+1,j,k-1)
-              tauw_s = sqrt(tauw(1)*tauw(1)+tauw(2)*tauw(2))*dxi
-            else if(loc==3) then
-              tauw(1) = u(i,1,k)-u(i,0,k)+u(i-1,1,k)-u(i-1,0,k)
-              tauw(2) = w(i,1,k)-w(i,0,k)+w(i,1,k-1)-w(i,0,k-1)
-              tauw_s  = sqrt(tauw(1)*tauw(1)+tauw(2)*tauw(2))*dyi
-            else if(loc==4) then
-              tauw(1) = u(i,n(2),k)-u(i,n(2)+1,k)+u(i-1,n(2),k)-u(i-1,n(2)+1,k)
-              tauw(2) = w(i,n(2),k)-w(i,n(2)+1,k)+w(i,n(2),k-1)-w(i,n(2)+1,k-1)
-              tauw_s  = sqrt(tauw(1)*tauw(1)+tauw(2)*tauw(2))*dyi
-            else if(loc==5) then
-              tauw(1) = u(i,j,1)-u(i,j,0)+u(i-1,j,1)-u(i-1,j,0)
-              tauw(2) = v(i,j,1)-v(i,j,0)+v(i,j-1,1)-v(i,j-1,0)
-              tauw_s  = sqrt(tauw(1)*tauw(1)+tauw(2)*tauw(2))*dzci(0)
-            else if(loc==6) then
-              tauw(1) = u(i,j,n(3))-u(i,j,n(3)+1)+u(i-1,j,n(3))-u(i-1,j,n(3)+1)
-              tauw(2) = v(i,j,n(3))-v(i,j,n(3)+1)+v(i,j-1,n(3))-v(i,j-1,n(3)+1)
-              tauw_s  = sqrt(tauw(1)*tauw(1)+tauw(2)*tauw(2))*dzci(n(3))
+            if(sum(is_wall(1:6))==0) then
+              ! triperiodic
+              fd = 1._rp
+            else
+              ! van Driest damping
+              dw(1) = dl(1)*(i-0.5)
+              dw(2) = dl(1)*(n(1)-i+0.5)
+              dw(3) = dl(2)*(j-0.5)
+              dw(4) = dl(2)*(n(2)-j+0.5)
+              dw(5) = zc(k)
+              dw(6) = l(3)-zc(k)
+              dw = dw*is_wall + big*(1._rp-is_wall)
+              loc = minloc(dw,1)
+              dw_min = dw(loc)
+              !
+              if(loc==1) then
+                tauw(1) = v(1,j,k)-v(0,j,k)+v(1,j-1,k)-v(0,j-1,k)
+                tauw(2) = w(1,j,k)-w(0,j,k)+w(1,j,k-1)-w(0,j,k-1)
+                tauw_s = sqrt(tauw(1)*tauw(1)+tauw(2)*tauw(2))*dxi
+              else if(loc==2) then
+                tauw(1) = v(n(1),j,k)-v(n(1)+1,j,k)+v(n(1),j-1,k)-v(n(1)+1,j-1,k)
+                tauw(2) = w(n(1),j,k)-w(n(1)+1,j,k)+w(n(1),j,k-1)-w(n(1)+1,j,k-1)
+                tauw_s = sqrt(tauw(1)*tauw(1)+tauw(2)*tauw(2))*dxi
+              else if(loc==3) then
+                tauw(1) = u(i,1,k)-u(i,0,k)+u(i-1,1,k)-u(i-1,0,k)
+                tauw(2) = w(i,1,k)-w(i,0,k)+w(i,1,k-1)-w(i,0,k-1)
+                tauw_s  = sqrt(tauw(1)*tauw(1)+tauw(2)*tauw(2))*dyi
+              else if(loc==4) then
+                tauw(1) = u(i,n(2),k)-u(i,n(2)+1,k)+u(i-1,n(2),k)-u(i-1,n(2)+1,k)
+                tauw(2) = w(i,n(2),k)-w(i,n(2)+1,k)+w(i,n(2),k-1)-w(i,n(2)+1,k-1)
+                tauw_s  = sqrt(tauw(1)*tauw(1)+tauw(2)*tauw(2))*dyi
+              else if(loc==5) then
+                tauw(1) = u(i,j,1)-u(i,j,0)+u(i-1,j,1)-u(i-1,j,0)
+                tauw(2) = v(i,j,1)-v(i,j,0)+v(i,j-1,1)-v(i,j-1,0)
+                tauw_s  = sqrt(tauw(1)*tauw(1)+tauw(2)*tauw(2))*dzci(0)
+              else if(loc==6) then
+                tauw(1) = u(i,j,n(3))-u(i,j,n(3)+1)+u(i-1,j,n(3))-u(i-1,j,n(3)+1)
+                tauw(2) = v(i,j,n(3))-v(i,j,n(3)+1)+v(i,j-1,n(3))-v(i,j-1,n(3)+1)
+                tauw_s  = sqrt(tauw(1)*tauw(1)+tauw(2)*tauw(2))*dzci(n(3))
+              end if
+              tauw_s = 0.5_rp*visc*tauw_s
+              dw_plus = dw_min*sqrt(tauw_s)*visci
+              fd = 1._rp-exp(-dw_plus/25._rp)
             end if
-            tauw_s = 0.5_rp*visc*tauw_s
-            dw_plus = dw_min*sqrt(tauw_s)*visci
-            fd = 1._rp-exp(-dw_plus/25._rp)
             !
             del = (dl(1)*dl(2)*dzf(k))**(one_third)
             visct(i,j,k) = (c_smag*del*fd)**2*s0(i,j,k)
@@ -352,7 +355,10 @@ module mod_sgs
           end do
         end do
       end do
-#if defined(_CHANNEL)
+#if defined(_DIT)
+      call ave0d_dit(ng,lo,hi,l,dl,dzf,wk(:,:,:,1))
+      call ave0d_dit(ng,lo,hi,l,dl,dzf,wk(:,:,:,2))
+#elif defined(_CHANNEL)
       call ave1d_channel(ng,lo,hi,3,l,dl,dzf,wk(:,:,:,1))
       call ave1d_channel(ng,lo,hi,3,l,dl,dzf,wk(:,:,:,2))
 #elif defined(_DUCT)
@@ -378,10 +384,55 @@ module mod_sgs
     end select
   end subroutine cmpt_sgs
   !
+  subroutine ave0d_dit(ng,lo,hi,l,dl,dz,p)
+    !
+    ! average a variable over three directions
+    !
+    ! ng    -> global domain sizes
+    ! lo,hi -> upper and lower extents of the input array
+    ! dl,l  -> uniform grid spacing and length arrays
+    ! dz    -> local z grid spacing array (should work also with the global one)
+    ! p     -> 3D scalar field
+    !
+    implicit none
+    integer , intent(in), dimension(3) :: ng,lo,hi
+    real(rp), intent(in), dimension(3) :: l,dl
+    real(rp), intent(in), dimension(lo(3)-1:) :: dz
+    real(rp), intent(inout), dimension(lo(1)-1:,lo(2)-1:,lo(3)-1:) :: p
+    real(dp) :: p0d
+    real(dp) :: grid_area_ratio
+    integer :: i,j,k
+    !
+    grid_area_ratio = dl(1)*dl(2)/(l(1)*l(2))
+    p0d = 0._rp
+    !$acc data copy(p0d) async(1)
+    !$acc parallel loop collapse(3) default(present) reduction(+:p0d) async(1)
+    do k=lo(3),hi(3)
+      do j=lo(2),hi(2)
+        do i=lo(1),hi(1)
+          p0d = p0d + p(i,j,k)*grid_area_ratio*dz(k)/l(3)
+        end do
+      end do
+    end do
+    !$acc end data
+    !$acc wait(1)
+    call MPI_ALLREDUCE(MPI_IN_PLACE,p0d,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+    !$acc data copyin(p0d) async(1)
+    !$acc parallel loop collapse(3) default(present) async(1)
+    do k=lo(3),hi(3)
+      do j=lo(2),hi(2)
+        do i=lo(1),hi(1)
+          p(i,j,k) = p0d
+        end do
+      end do
+    end do
+    !$acc end data
+  end subroutine ave0d_dit
+  !
   subroutine ave1d_channel(ng,lo,hi,idir,l,dl,dz,p)
     !
-    ! average a variable over two domain directions
-    ! adapted from out1d, channel
+    ! average a variable over two directions
+    ! adapted from out1d
     !
     ! ng    -> global domain sizes
     ! lo,hi -> upper and lower extents of the input array
@@ -487,7 +538,7 @@ module mod_sgs
   !
   subroutine ave2d_duct(ng,lo,hi,idir,l,dl,dz,p)
     !
-    ! average a variable over one domain direction,
+    ! average a variable over one direction,
     ! adapted from out2d_duct
     !
     implicit none
