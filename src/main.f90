@@ -1,6 +1,7 @@
 ! -
 !
-! SPDX-FileCopyrightText: Copyright (c) 2017-2022 Pedro Costa and the CaNS contributors. All rights reserved.
+! SPDX-FileCopyrightText: Copyright (c) 2017-2022 Pedro Costa and the CaNS contributors.
+! SPDX-FileCopyrightText: Modifications Copyright (c) 2023-2024 Maochao Xiao and the CaLES contributors.
 ! SPDX-License-Identifier: MIT
 !
 ! -
@@ -80,7 +81,6 @@ program cans
 #endif
   use mod_updatep        , only: updatep
   use mod_utils          , only: bulk_mean
-  !@acc use mod_utils    , only: device_memory_footprint
   use mod_precision
   use mod_typedef        , only: bound
   implicit none
@@ -348,8 +348,6 @@ program cans
   call set_cufft_wspace(pack(arrplanv,.true.),istream_acc_queue_1)
   call set_cufft_wspace(pack(arrplanw,.true.),istream_acc_queue_1)
 #endif
-  if(myid == 0) print*,'*** Device memory footprint (Gb): ', &
-                  device_memory_footprint(n,n_z)/(1._sp*1024**3), ' ***'
 #endif
   !
   ! write(ctmp,'(i1)') myid
@@ -589,6 +587,7 @@ program cans
           var(3) = 1.*savecounter
           call out0d(trim(datadir)//'log_checkpoints.out',3,var)
         end if
+        call gen_alias(myid,trim(datadir),trim(filename),'fld.bin')
       end if
       !$acc update self(u,v,w,p,visct) async(1)
       !$acc wait(1)

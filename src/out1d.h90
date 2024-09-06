@@ -1,6 +1,7 @@
 ! -
 !
-! SPDX-FileCopyrightText: Copyright (c) 2017-2022 Pedro Costa and the CaNS contributors. All rights reserved.
+! SPDX-FileCopyrightText: Copyright (c) 2017-2022 Pedro Costa and the CaNS contributors.
+! SPDX-FileCopyrightText: Modifications Copyright (c) 2023-2024 Maochao Xiao and the CaLES contributors.
 ! SPDX-License-Identifier: MIT
 !
 ! -
@@ -19,7 +20,7 @@
   ! dz    -> global z grid spacing array (should work also with the global one)
   ! p     -> 3D input scalar field
   !
-  ! modify the calls below as desired
+  ! modify the calls below as desised
   !
   call out1d(trim(datadir)//'umean_z_fld_'//fldnum//'.out',ng,lo,hi,3,l,dl,zc_g,dzf,u)
   call out1d(trim(datadir)//'vmean_z_fld_'//fldnum//'.out',ng,lo,hi,3,l,dl,zc_g,dzf,v)

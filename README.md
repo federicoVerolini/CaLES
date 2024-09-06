@@ -113,6 +113,16 @@ See [`INFO_VISU.md`](docs/INFO_VISU.md).
 
 We appreciate any contributions and feedback that can improve CaNS. If you wish to contribute to the tool, please get in touch with the maintainers or open an Issue in the repository / a thread in Discussions. Pull Requests are welcome, but please propose/discuss the changes in an linked Issue first.
 
+To contribute to CaNS, please follow the steps listed below:
+
+1. Fork this repository to your GitHub account
+2. Create a new branch in your forked repository
+3. Make changes in your new branch
+4. Submit your changes by creating a Pull Request to the `develop` branch of the original PyFR repository
+
+Modifications to the `develop` branch are eventually merged into the master
+branch for a new release.
+
 ## Final notes
 
 Please read the `ACKNOWLEDGEMENTS`, `LICENSE` files.
