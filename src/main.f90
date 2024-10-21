@@ -48,7 +48,7 @@ program cans
   use mod_mom            , only: bulk_forcing
   use mod_rk             , only: rk
   use mod_output         , only: out0d,gen_alias,out1d,out1d_chan,out1d_single_point_chan,out2d,out3d,write_log_output, &
-                                 write_visu_2d,write_visu_3d,out2d_duct
+                                 write_visu_2d,write_visu_3d,out2d_duct,out2d_duct_xAvrg
   use mod_param          , only: ng,l,dl,dli, &
                                  gtype,gr, &
                                  cfl,dtmin, &

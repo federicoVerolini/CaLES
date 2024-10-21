@@ -12,7 +12,7 @@ module mod_output
   use mod_precision
   implicit none
   private
-  public out0d,gen_alias,out1d,out1d_chan,out2d,out3d,write_log_output,write_visu_2d,write_visu_3d,out2d_duct
+  public out0d,gen_alias,out1d,out1d_chan,out2d,out3d,write_log_output,write_visu_2d,write_visu_3d,out2d_duct,out2d_duct_xAvrg
   public out1d_single_point_chan
   contains
   subroutine out0d(fname,n,var)
@@ -407,6 +407,14 @@ module mod_output
     !
     ! for a duct, cell-centered values
     !
+    ! fname -> name of the file
+    ! ng    -> global domain sizes
+    ! lo,hi -> upper and lower extents of the input array
+    ! idir  -> direction of the profile
+    ! dl,l  -> uniform grid spacing and length arrays
+    ! z_g   -> global z coordinate array (grid is non-uniform in z)
+    ! u,v,w -> scalar instantaneous velocity components
+    !
     implicit none
     character(len=*), intent(in) :: fname
     integer , intent(in), dimension(3) :: ng,lo,hi
@@ -426,11 +434,16 @@ module mod_output
     case(2)
     case(1)
       grid_area_ratio = dl(1)/l(1)
+      ! p and q are set to the number of grid points in the second (ng(2))
+      ! and third (ng(3)) dimensions
       p = ng(2)
       q = ng(3)
+      ! dynamically allocates memory for several 2D arrays that will hold
+      ! averaged velocity components and their products
       allocate(um(p,q),vm(p,q),wm(p,q),u2(p,q),v2(p,q),w2(p,q),uv(p,q),uw(p,q),vw(p,q))
       !$acc data copyout(um,vm,wm,u2,v2,w2,uv,uw,vw) async(1)
       !$acc kernels default(present) async(1)
+      ! initialize all the 2D arrays to zero
       um(:,:) = 0._rp
       vm(:,:) = 0._rp
       wm(:,:) = 0._rp
@@ -443,7 +456,10 @@ module mod_output
       !$acc end kernels
       !$acc parallel loop gang collapse(2) default(present) async(1) &
       !$acc private(buf01,buf02,buf03,buf04,buf05,buf06,buf07,buf08,buf09)
+      ! outer loops iterate over the vertical (j) and spanwise (k) directions
       do k=lo(3),hi(3)
+        ! each buf variable is initialized to zero before accumulating values
+        ! for the current slice defined by j and k
         do j=lo(2),hi(2)
           buf01 = 0._rp
           buf02 = 0._rp
@@ -455,6 +471,7 @@ module mod_output
           buf08 = 0._rp
           buf09 = 0._rp
           !$acc loop vector reduction(+:buf01,buf02,buf03,buf04,buf05,buf06,buf07,buf08,buf09)
+          ! inner loop iterates over the streamwise direction (i)
           do i=lo(1),hi(1)
             buf01 = buf01 + u(i,j,k)
             buf02 = buf02 + 0.5*(v(i,j-1,k)+v(i,j,k))
@@ -469,6 +486,7 @@ module mod_output
             buf09 = buf09 + 0.25*(v(i,j-1,k) + v(i,j,k))* &
                                  (w(i,j,k-1) + w(i,j,k))
           end do
+          ! normalization adjusts the sums based on the grid spacing and area
           um(j,k) = buf01*grid_area_ratio
           vm(j,k) = buf02*grid_area_ratio
           wm(j,k) = buf03*grid_area_ratio
@@ -482,6 +500,7 @@ module mod_output
       end do
       !$acc end data
       !$acc wait(1)
+      ! MPI_Allreduce function calls aggregate data across multiple processes in parallel computing
       call MPI_ALLREDUCE(MPI_IN_PLACE,um(1,1),ng(2)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
       call MPI_ALLREDUCE(MPI_IN_PLACE,vm(1,1),ng(2)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
       call MPI_ALLREDUCE(MPI_IN_PLACE,wm(1,1),ng(2)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
@@ -491,6 +510,8 @@ module mod_output
       call MPI_ALLREDUCE(MPI_IN_PLACE,uv(1,1),ng(2)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
       call MPI_ALLREDUCE(MPI_IN_PLACE,uw(1,1),ng(2)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
       call MPI_ALLREDUCE(MPI_IN_PLACE,vw(1,1),ng(2)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      ! writing the computed fields to a file, in the same order in write()
+      ! y_g y-coordinate calculated based on grid spacing (dl), z_g(k) global z-coordinate.
       if(myid == 0) then
         open(newunit=iunit,file=fname)
         do k=1,ng(3)
@@ -505,6 +526,110 @@ module mod_output
       end if
     end select
   end subroutine out2d_duct
+  !
+  subroutine out2d_duct_xAvrg(fname,ng,lo,hi,idir,l,dl,z_g,u,v,w)
+    !
+    ! for a duct, cell-centered values
+    !
+    ! fname -> name of the file
+    ! ng    -> global domain sizes
+    ! lo,hi -> upper and lower extents of the input array
+    ! idir  -> direction of the profile
+    ! dl,l  -> uniform grid spacing and length arrays
+    ! z_g   -> global z coordinate array (grid is non-uniform in z)
+    ! u,v,w -> scalar instantaneous velocity components
+    !
+    implicit none
+    character(len=*), intent(in) :: fname
+    integer , intent(in), dimension(3) :: ng,lo,hi
+    integer , intent(in) :: idir
+    real(rp), intent(in), dimension(3) :: l,dl
+    real(rp), intent(in), dimension(0:) :: z_g
+    real(rp), intent(in), dimension(lo(1)-1:,lo(2)-1:,lo(3)-1:) :: u,v,w
+    real(dp), allocatable, dimension(:,:) :: um,vm,wm,um2,vm2,wm2
+    real(dp) :: buf01,buf02,buf03,buf04,buf05,buf06
+    integer :: i,j,k
+    integer :: iunit
+    integer :: p,q
+    real(dp) :: x_g,y_g,grid_area_ratio
+    !
+    select case(idir)
+    case(3)
+    case(2)
+    case(1) ! streamwise direction
+      grid_area_ratio = dl(1)/l(1)
+      ! p and q are set to the number of grid points in the second (ng(2))
+      ! and third (ng(3)) dimensions
+      p = ng(2)
+      q = ng(3)
+      ! dynamically allocates memory for several 2D arrays that will hold
+      ! averaged velocity components and their products
+      allocate(um(p,q),vm(p,q),wm(p,q),um2(p,q),vm2(p,q),wm2(p,q))
+      !$acc data copyout(um,vm,wm,um2,vm2,wm2) async(1)
+      !$acc kernels default(present) async(1)
+      ! initialize all the 2D arrays to zero
+      um(:,:) = 0._rp
+      vm(:,:) = 0._rp
+      wm(:,:) = 0._rp
+      um2(:,:) = 0._rp
+      vm2(:,:) = 0._rp
+      wm2(:,:) = 0._rp
+      !$acc end kernels
+      !$acc parallel loop gang collapse(2) default(present) async(1) &
+      !$acc private(buf01,buf02,buf03,buf04,buf05,buf06)
+      ! outer loops iterate over the vertical (j) and spanwise (k) directions
+      do k=lo(3),hi(3)
+        ! each buf variable is initialized to zero before accumulating values
+        ! for the current slice defined by j and k
+        do j=lo(2),hi(2)
+          buf01 = 0._rp
+          buf02 = 0._rp
+          buf03 = 0._rp
+          buf04 = 0._rp
+          buf05 = 0._rp
+          buf06 = 0._rp
+          !$acc loop vector reduction(+:buf01,buf02,buf03,buf04,buf05,buf06)
+          ! inner loop iterates over the streamwise direction (i)
+          do i=lo(1),hi(1)
+            buf01 = buf01 + u(i,j,k)
+            buf02 = buf02 + 0.5*(v(i,j-1,k)+v(i,j,k))
+            buf03 = buf03 + 0.5*(w(i,j,k-1)+w(i,j,k))
+            buf04 = buf04 + u(i,j,k)**2
+            buf05 = buf05 + 0.5*(v(i,j-1,k)**2+v(i,j,k)**2)
+            buf06 = buf06 + 0.5*(w(i,j,k-1)**2+w(i,j,k)**2)
+          end do
+          ! normalization adjusts the sums based on the grid spacing and area
+          um(j,k) = buf01*grid_area_ratio
+          vm(j,k) = buf02*grid_area_ratio
+          wm(j,k) = buf03*grid_area_ratio
+          um2(j,k) = buf04*grid_area_ratio
+          vm2(j,k) = buf05*grid_area_ratio
+          wm2(j,k) = buf06*grid_area_ratio
+        end do
+      end do
+      !$acc end data
+      !$acc wait(1)
+      ! MPI_Allreduce function calls aggregate data across multiple processes in parallel computing
+      call MPI_ALLREDUCE(MPI_IN_PLACE,um(1,1),ng(2)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,vm(1,1),ng(2)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,wm(1,1),ng(2)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,um2(1,1),ng(2)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,vm2(1,1),ng(2)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      call MPI_ALLREDUCE(MPI_IN_PLACE,wm2(1,1),ng(2)*ng(3),MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+      ! writing the computed fields to a file, in the same order in write()
+      ! y_g y-coordinate calculated based on grid spacing (dl), z_g(k) global z-coordinate.
+      if(myid == 0) then
+        open(newunit=iunit,file=fname)
+        do k=1,ng(3)
+          do j=1,ng(2)
+            y_g = (j-0.5)*dl(2)
+            write(iunit,'(11E16.7e3)') y_g,z_g(k),um(j,k),vm(j,k),wm(j,k),um2(j,k),vm2(j,k),wm2(j,k)
+          end do
+        end do
+        close(iunit)
+      end if
+    end select
+  end subroutine out2d_duct_xAvrg
   !
   subroutine out1d_single_point_chan(fname,ng,lo,hi,idir,l,dl,dzc_g,dzf_g,zc_g,zf_g,u,v,w,p,visct)
     implicit none
